@@ -19,17 +19,17 @@
         <div class="metric-grid" aria-label="Account summary">
             <article class="metric-card">
                 <span>Active surveys</span>
-                <strong>{{ points_balance }}</strong>
-                <small>Your published studies</small>
+                <strong>{{ active_survey_count }}</strong>
+                <small>Your non-archived studies</small>
             </article>
             <article class="metric-card">
                 <span>Total responses</span>
-                <strong>{{ active_survey_count }}</strong>
+                <strong>{{ total_response_count }}</strong>
                 <small>Across all survey versions</small>
             </article>
             <article class="metric-card metric-card-reward">
                 <span>Reward points</span>
-                <strong>0</strong>
+                <strong>{{ points_balance }}</strong>
                 <small>Earned through contributions</small>
             </article>
         </div>
@@ -70,6 +70,7 @@
                 </div>
                 <p>A complete research profile will unlock targeted surveys and a one-time points bonus.</p>
                 <a class="button button-secondary button-block" href="{% url 'profile_edit' %}">Complete your profile</a>
+                {% if badge_awards %}<div class="badge-summary"><h3>Your badges</h3>{% for award in badge_awards %}<span title="{{ award.badge.description }}">{{ award.badge.name }}</span>{% endfor %}</div>{% endif %}
             </aside>
         </div>
     </div>

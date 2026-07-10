@@ -54,6 +54,44 @@
     </div>
 </section>
 
+<section class="section discovery-section" aria-labelledby="discover-heading">
+    <div class="shell">
+        <div class="section-heading discovery-heading">
+            <div>
+                <span class="eyebrow">Open research studies</span>
+                <h2 id="discover-heading">{% if user.is_authenticated %}Matched to your profile{% else %}Contribute to active research{% endif %}</h2>
+                <p>{% if user.is_authenticated %}Targeted studies appear only when your profile confirms you are eligible.{% else %}Browse public studies. Targeted surveys will check eligibility before they begin.{% endif %}</p>
+            </div>
+            <form class="discovery-filters" method="get" aria-label="Filter surveys">
+                <label>Topic<select name="topic"><option value="">All topics</option>{% for topic in topics %}<option value="{{ topic.slug }}"{% if selected_topic == topic.slug %} selected{% endif %}>{{ topic.name }}</option>{% endfor %}</select></label>
+                <label>Duration<select name="duration"><option value="">Any length</option><option value="5"{% if selected_duration == 5 %} selected{% endif %}>Up to 5 min</option><option value="10"{% if selected_duration == 10 %} selected{% endif %}>Up to 10 min</option><option value="20"{% if selected_duration == 20 %} selected{% endif %}>Up to 20 min</option></select></label>
+                <button class="button button-secondary" type="submit">Apply filters</button>
+            </form>
+        </div>
+        {% if discovery_surveys %}
+            <div class="discovery-grid">
+                {% for survey in discovery_surveys %}
+                    <article class="discovery-card">
+                        <div class="discovery-card-media"{% if survey.thumbnail %} style="background-image: linear-gradient(180deg, transparent, rgba(23, 22, 43, .58)), url('{{ survey.thumbnail.url }}')"{% elif survey.banner %} style="background-image: linear-gradient(180deg, transparent, rgba(23, 22, 43, .58)), url('{{ survey.banner.url }}')"{% endif %}>
+                            <span class="reward-pill">+{{ base_completion_points }} points</span>
+                            <span class="match-pill">{% if survey.requires_screener %}Eligibility screener{% elif user.is_authenticated %}Profile matched{% else %}Open to everyone{% endif %}</span>
+                        </div>
+                        <div class="discovery-card-body">
+                            <div class="tag-row">{% for topic in survey.topics.all %}<span class="tag">{{ topic.name }}</span>{% endfor %}</div>
+                            <h3>{{ survey.title }}</h3>
+                            <p>{{ survey.summary }}</p>
+                            <div class="discovery-card-meta"><span>{{ survey.estimated_minutes }} min</span><span>{{ survey.get_identity_mode_display }}</span></div>
+                            <a class="button button-primary button-block" href="{% url 'respond_survey' survey.slug %}">View survey</a>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="panel discovery-empty"><span aria-hidden="true">⌁</span><h3>No matching surveys right now</h3><p>{% if user.is_authenticated and user.profile.completion_percentage < 100 %}Complete your profile to unlock more targeted studies.{% else %}Try another filter or check back as researchers publish new studies.{% endif %}</p>{% if user.is_authenticated and user.profile.completion_percentage < 100 %}<a class="button button-secondary" href="{% url 'profile_edit' %}">Complete profile</a>{% endif %}</div>
+        {% endif %}
+    </div>
+</section>
+
 <section class="section section-muted" aria-labelledby="why-heading">
     <div class="shell">
         <div class="section-heading">

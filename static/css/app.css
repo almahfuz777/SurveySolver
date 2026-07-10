@@ -1135,6 +1135,10 @@ form button[type="submit"] {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .discovery-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .survey-detail-grid {
         grid-template-columns: 1fr;
     }
@@ -1294,6 +1298,26 @@ form button[type="submit"] {
 .reward-claim-box > strong { color: var(--teal-700); font-size: 2rem; }
 .reward-claim-box > p { margin: 0; }
 .reward-claim-box form { margin: 0; }
+.discovery-section { background: var(--surface); }
+.discovery-heading { align-items: end; display: flex; justify-content: space-between; text-align: left; }
+.discovery-heading > div { max-width: 42rem; }
+.discovery-filters { align-items: end; display: flex; flex-wrap: wrap; gap: 0.65rem; }
+.discovery-filters label { color: var(--text-muted); display: grid; font-size: 0.78rem; font-weight: 700; gap: 0.25rem; }
+.discovery-filters select { min-width: 10rem; }
+.discovery-grid { display: grid; gap: 1.25rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.discovery-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; overflow: hidden; }
+.discovery-card-media { background: linear-gradient(135deg, var(--indigo-700), var(--teal-600)); background-position: center; background-size: cover; display: flex; justify-content: space-between; min-height: 9rem; padding: 1rem; }
+.reward-pill, .match-pill { align-self: flex-start; backdrop-filter: blur(8px); background: rgba(255, 255, 255, 0.9); border-radius: 999px; color: var(--indigo-900); font-size: 0.72rem; font-weight: 800; padding: 0.42rem 0.65rem; }
+.reward-pill { background: var(--teal-100); color: var(--teal-700); }
+.discovery-card-body { display: flex; flex: 1; flex-direction: column; padding: 1.25rem; }
+.discovery-card-body h3 { font-size: 1.2rem; margin: 0.8rem 0 0.45rem; }
+.discovery-card-body > p { color: var(--text-muted); flex: 1; margin: 0 0 1rem; }
+.discovery-card-meta { border-top: 1px solid var(--border); color: var(--text-muted); display: flex; font-size: 0.8rem; justify-content: space-between; margin-bottom: 1rem; padding-top: 0.8rem; }
+.discovery-empty { padding: 3rem; text-align: center; }
+.discovery-empty > span { color: var(--indigo-500); font-size: 3rem; }
+.badge-summary { border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 1.25rem; padding-top: 1rem; }
+.badge-summary h3 { flex-basis: 100%; font-size: 0.9rem; margin: 0; }
+.badge-summary span { background: var(--teal-50); border: 1px solid var(--teal-200); border-radius: 999px; color: var(--teal-700); font-size: 0.72rem; font-weight: 750; padding: 0.35rem 0.55rem; }
 
 @media (max-width: 760px) {
     .response-hero-inner { grid-template-columns: 1fr; }
@@ -1301,6 +1325,10 @@ form button[type="submit"] {
     .response-submit { align-items: stretch; flex-direction: column; }
     .response-submit .button { width: 100%; }
     .response-submit-actions { width: 100%; }
+    .discovery-heading { align-items: stretch; flex-direction: column; }
+    .discovery-filters { align-items: stretch; flex-direction: column; }
+    .discovery-filters select, .discovery-filters .button { width: 100%; }
+    .discovery-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
