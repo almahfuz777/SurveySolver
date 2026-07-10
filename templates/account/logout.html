@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign out | SurveySolver{% endblock %}
+
+{% block content %}
+<section aria-labelledby="sign-out-heading">
+    <h1 id="sign-out-heading">Sign out</h1>
+    <p>Are you sure you want to end your session?</p>
+    <form method="post" action="{% url 'account_logout' %}">
+        {% csrf_token %}
+        <button type="submit">Sign out</button>
+    </form>
+</section>
+{% endblock %}

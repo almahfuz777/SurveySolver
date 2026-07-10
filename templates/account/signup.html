@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Create account | SurveySolver{% endblock %}
+
+{% block content %}
+<section aria-labelledby="signup-heading">
+    <h1 id="signup-heading">Create your account</h1>
+    <p>Build research surveys or earn points by contributing responses.</p>
+    <form method="post" action="{% url 'account_signup' %}">
+        {% csrf_token %}
+        {{ form.as_p }}
+        {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+        {% endif %}
+        <button type="submit">Create account</button>
+    </form>
+    <p>Already registered? <a href="{% url 'account_login' %}">Sign in</a>.</p>
+</section>
+{% endblock %}

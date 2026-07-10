@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign in | SurveySolver{% endblock %}
+
+{% block content %}
+<section aria-labelledby="sign-in-heading">
+    <h1 id="sign-in-heading">Sign in</h1>
+    <p>Access your surveys, responses, and rewards.</p>
+    <form method="post" action="{% url 'account_login' %}">
+        {% csrf_token %}
+        {{ form.as_p }}
+        {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+        {% endif %}
+        <button type="submit">Sign in</button>
+    </form>
+    <p><a href="{% url 'account_reset_password' %}">Forgot your password?</a></p>
+    <p>New to SurveySolver? <a href="{% url 'account_signup' %}">Create an account</a>.</p>
+</section>
+{% endblock %}

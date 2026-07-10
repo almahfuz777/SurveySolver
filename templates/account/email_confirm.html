@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirm email | SurveySolver{% endblock %}
+
+{% block content %}
+<section aria-labelledby="confirm-heading">
+    <h1 id="confirm-heading">Confirm your email</h1>
+    {% if confirmation %}
+        <p>Confirm <strong>{{ confirmation.email_address.email }}</strong> for your SurveySolver account.</p>
+        <form method="post" action="{% url 'account_confirm_email' confirmation.key %}">
+            {% csrf_token %}
+            <button type="submit">Confirm email</button>
+        </form>
+    {% else %}
+        <p>This verification link is invalid or has expired.</p>
+        <a href="{% url 'account_email' %}">Manage email addresses</a>
+    {% endif %}
+</section>
+{% endblock %}

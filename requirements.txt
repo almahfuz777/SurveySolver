@@ -1,5 +1,6 @@
 asgiref==3.11.1
 Django==5.2.16
+django-allauth==65.18.0
 django-environ==0.14.0
 sqlparse==0.5.5
 tzdata==2026.2
