@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from . import services
+from .publication import PublicationError, publish_survey, readiness_errors
 from .forms import BranchRuleForm, QuestionEditorForm, QuotaForm, SectionForm, SurveyMetadataForm
 from .models import Question, Section, Survey, SurveyVersion
 
@@ -48,7 +49,11 @@ def survey_detail(request, survey_id):
     return render(
         request,
         'surveys/survey_detail.html',
-        {'survey': survey, 'draft_version': survey.draft_version},
+        {
+            'survey': survey,
+            'draft_version': survey.draft_version,
+            'readiness_errors': readiness_errors(survey.draft_version),
+        },
     )
 
 
@@ -78,6 +83,22 @@ def survey_archive(request, survey_id):
     survey.archive()
     messages.success(request, 'Survey archived.')
     return redirect('survey_list')
+
+
+@require_POST
+@login_required
+def survey_publish(request, survey_id):
+    survey = _owned_survey(request, survey_id)
+    try:
+        published_version, _ = publish_survey(survey.id, request.user, _revision(request))
+    except services.StaleVersionError:
+        messages.error(request, 'This draft changed in another tab. Reload before publishing.')
+    except PublicationError as error:
+        for message in error.errors:
+            messages.error(request, message)
+    else:
+        messages.success(request, f'Version {published_version.number} published successfully.')
+    return redirect('survey_detail', survey_id=survey.id)
 
 
 def _owned_survey(request, survey_id):

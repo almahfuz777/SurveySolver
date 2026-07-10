@@ -1061,6 +1061,9 @@ form button[type="submit"] {
 .logic-form { padding-top: 1rem; border-top: 1px solid var(--border); }
 .matrix-preview { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 .matrix-preview th, .matrix-preview td { padding: 0.5rem; border: 1px solid var(--border); text-align: center; }
+.readiness-panel { margin-top: 1.5rem; padding: 1rem; color: #7a2e0e; background: #fff4e8; border-radius: var(--radius-sm); }
+.readiness-panel h3 { margin: 0 0 0.5rem; }
+.readiness-panel ul { margin: 0; padding-left: 1.25rem; }
 
 @media (max-width: 860px) {
     .nav-toggle {

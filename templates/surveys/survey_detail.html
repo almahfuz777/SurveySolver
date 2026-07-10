@@ -18,6 +18,7 @@
         <p>{{ survey.summary }}</p>
         <div class="hero-actions">
             <a class="button button-primary" href="{% url 'survey_builder' survey.id %}">Open builder</a>
+            {% if not readiness_errors %}<form method="post" action="{% url 'survey_publish' survey.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ draft_version.revision }}"><button class="button button-primary" type="submit">Publish version {{ draft_version.number }}</button></form>{% endif %}
             <a class="button button-primary" href="{% url 'survey_edit' survey.id %}">Edit details</a>
             <a class="button button-secondary" href="{% url 'survey_list' %}">All surveys</a>
         </div>
@@ -34,6 +35,7 @@
             {% else %}
                 <p>No detailed description has been added yet.</p>
             {% endif %}
+            {% if readiness_errors %}<div class="readiness-panel"><h3>Before publishing</h3><ul>{% for error in readiness_errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
         </section>
         <aside class="panel survey-settings" aria-labelledby="settings-heading">
             <h2 id="settings-heading">Collection settings</h2>
