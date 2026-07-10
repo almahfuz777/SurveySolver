@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 
 from . import services
 from .publication import PublicationError, publish_survey, readiness_errors
-from .forms import BranchRuleForm, QuestionEditorForm, QuotaForm, SectionForm, SurveyMetadataForm
+from .forms import BranchRuleForm, EligibilityCriteriaForm, QuestionEditorForm, QuotaForm, SectionForm, SurveyMetadataForm
 from .models import Question, Section, Survey, SurveyVersion
 
 
@@ -180,6 +180,17 @@ def survey_logic(request, survey_id):
     version = _draft_version(survey)
     branch_form = BranchRuleForm(version=version)
     quota_form = QuotaForm()
+    criteria = getattr(version, 'eligibility_criteria', None)
+    eligibility_form = EligibilityCriteriaForm(
+        initial={
+            'min_age': criteria.min_age if criteria else None,
+            'max_age': criteria.max_age if criteria else None,
+            'education_levels': criteria.education_levels if criteria else [],
+            'countries': criteria.countries if criteria else [],
+            'genders': criteria.genders if criteria else [],
+            'employment_statuses': criteria.employment_statuses if criteria else [],
+        }
+    )
     if request.method == 'POST':
         action = request.POST.get('action')
         try:
@@ -195,9 +206,29 @@ def survey_logic(request, survey_id):
                     services.add_quota(version.id, _revision(request), quota_form.cleaned_data)
                     messages.success(request, 'Quota added.')
                     return redirect('survey_logic', survey_id=survey.id)
+            elif action == 'update_eligibility':
+                eligibility_form = EligibilityCriteriaForm(request.POST)
+                if eligibility_form.is_valid():
+                    services.update_eligibility(
+                        version.id,
+                        _revision(request),
+                        eligibility_form.cleaned_data,
+                    )
+                    messages.success(request, 'Eligibility criteria updated.')
+                    return redirect('survey_logic', survey_id=survey.id)
         except (services.StaleVersionError, ValidationError) as error:
             return _mutation_error(request, survey, error)
-    return render(request, 'surveys/logic.html', {'survey': survey, 'version': version, 'branch_form': branch_form, 'quota_form': quota_form})
+    return render(
+        request,
+        'surveys/logic.html',
+        {
+            'survey': survey,
+            'version': version,
+            'branch_form': branch_form,
+            'quota_form': quota_form,
+            'eligibility_form': eligibility_form,
+        },
+    )
 
 
 @require_POST

@@ -430,3 +430,69 @@ class Quota(models.Model):
         if self.version.status != SurveyVersion.Status.DRAFT:
             raise ValidationError('Published survey versions are immutable.')
         return super().delete(*args, **kwargs)
+
+
+class EligibilityCriteria(models.Model):
+    version = models.OneToOneField(
+        SurveyVersion,
+        on_delete=models.CASCADE,
+        related_name='eligibility_criteria',
+    )
+    min_age = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        validators=[MaxValueValidator(120)],
+    )
+    max_age = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        validators=[MaxValueValidator(120)],
+    )
+    education_levels = models.JSONField(default=list, blank=True)
+    countries = models.JSONField(default=list, blank=True)
+    genders = models.JSONField(default=list, blank=True)
+    employment_statuses = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        verbose_name_plural = 'eligibility criteria'
+
+    @property
+    def is_targeted(self):
+        return bool(
+            self.min_age is not None
+            or self.max_age is not None
+            or self.education_levels
+            or self.countries
+            or self.genders
+            or self.employment_statuses
+        )
+
+    def clean(self):
+        from accounts.models import Profile
+        from django_countries import countries
+
+        if self.min_age is not None and self.max_age is not None and self.min_age > self.max_age:
+            raise ValidationError({'max_age': 'Maximum age must be at least the minimum age.'})
+        valid_values = {
+            'education_levels': set(Profile.EducationLevel.values),
+            'countries': {code for code, _ in countries},
+            'genders': set(Profile.Gender.values),
+            'employment_statuses': set(Profile.EmploymentStatus.values),
+        }
+        for field_name, allowed in valid_values.items():
+            values = getattr(self, field_name)
+            if not isinstance(values, list) or not set(values).issubset(allowed):
+                raise ValidationError({field_name: 'Select only supported eligibility values.'})
+
+    def save(self, *args, **kwargs):
+        if self.version_id:
+            status = SurveyVersion.objects.values_list('status', flat=True).get(pk=self.version_id)
+            if status != SurveyVersion.Status.DRAFT:
+                raise ValidationError('Published survey versions are immutable.')
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.version.status != SurveyVersion.Status.DRAFT:
+            raise ValidationError('Published survey versions are immutable.')
+        return super().delete(*args, **kwargs)

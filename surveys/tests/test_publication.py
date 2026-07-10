@@ -50,3 +50,30 @@ class PublicationTests(TestCase):
         self.assertEqual(first_published.status, SurveyVersion.Status.RETIRED)
         self.assertEqual(second_published.status, SurveyVersion.Status.PUBLISHED)
         self.assertEqual(third_draft.number, 3)
+
+    def test_publication_clones_eligibility_into_next_draft(self):
+        draft = self.survey.draft_version
+        _, revision = services.add_question(
+            draft.sections.get().id,
+            Question.Type.SHORT_TEXT,
+            draft.revision,
+        )
+        criteria, revision = services.update_eligibility(
+            draft.id,
+            revision,
+            {
+                'min_age': 18,
+                'max_age': 30,
+                'education_levels': ['undergraduate'],
+                'countries': ['BD'],
+                'genders': [],
+                'employment_statuses': ['student'],
+            },
+        )
+
+        _, next_draft = publish_survey(self.survey.id, self.user, revision)
+
+        cloned = next_draft.eligibility_criteria
+        self.assertNotEqual(cloned.pk, criteria.pk)
+        self.assertEqual(cloned.min_age, 18)
+        self.assertEqual(cloned.education_levels, ['undergraduate'])

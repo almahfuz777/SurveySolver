@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Max
 
-from .models import BranchRule, MatrixRow, Question, QuestionChoice, Quota, Section, SurveyVersion
+from .models import BranchRule, EligibilityCriteria, MatrixRow, Question, QuestionChoice, Quota, Section, SurveyVersion
 
 
 class StaleVersionError(Exception):
@@ -151,6 +151,16 @@ def add_quota(version_id, expected_revision, cleaned_data):
     quota.full_clean()
     quota.save()
     return quota, _bump_revision(version)
+
+
+@transaction.atomic
+def update_eligibility(version_id, expected_revision, cleaned_data):
+    version = _lock_version(version_id, expected_revision)
+    criteria, _ = EligibilityCriteria.objects.update_or_create(
+        version=version,
+        defaults=cleaned_data,
+    )
+    return criteria, _bump_revision(version)
 
 
 @transaction.atomic

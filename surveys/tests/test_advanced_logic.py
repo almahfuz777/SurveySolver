@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from surveys import services
-from surveys.forms import BranchRuleForm, QuestionEditorForm
+from surveys.forms import BranchRuleForm, EligibilityCriteriaForm, QuestionEditorForm
 from surveys.models import BranchRule, Question, Survey
 
 
@@ -81,3 +81,29 @@ class AdvancedLogicTests(TestCase):
         self.assertEqual(rule.target_section, second_section)
         self.assertEqual(quota.limit, 100)
         self.assertEqual(revision, 5)
+
+    def test_eligibility_criteria_are_validated_and_versioned(self):
+        invalid = EligibilityCriteriaForm(data={'min_age': 30, 'max_age': 20})
+        self.assertFalse(invalid.is_valid())
+
+        form = EligibilityCriteriaForm(
+            data={
+                'min_age': 18,
+                'max_age': 25,
+                'education_levels': ['undergraduate', 'postgraduate'],
+                'countries': ['BD'],
+                'genders': [],
+                'employment_statuses': ['student'],
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+        criteria, revision = services.update_eligibility(
+            self.version.id,
+            self.version.revision,
+            form.cleaned_data,
+        )
+
+        self.assertTrue(criteria.is_targeted)
+        self.assertEqual(criteria.countries, ['BD'])
+        self.assertEqual(revision, 2)

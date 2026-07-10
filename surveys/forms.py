@@ -1,4 +1,7 @@
 from django import forms
+from django_countries import countries
+
+from accounts.models import Profile
 
 from .models import BranchRule, Question, Quota, Section, Survey, Topic
 
@@ -189,3 +192,26 @@ class QuotaForm(forms.ModelForm):
     class Meta:
         model = Quota
         fields = ('name', 'limit', 'is_active')
+
+
+class EligibilityCriteriaForm(forms.Form):
+    min_age = forms.IntegerField(required=False, min_value=0, max_value=120)
+    max_age = forms.IntegerField(required=False, min_value=0, max_value=120)
+    education_levels = forms.MultipleChoiceField(
+        required=False,
+        choices=Profile.EducationLevel.choices,
+    )
+    countries = forms.MultipleChoiceField(required=False, choices=countries)
+    genders = forms.MultipleChoiceField(required=False, choices=Profile.Gender.choices)
+    employment_statuses = forms.MultipleChoiceField(
+        required=False,
+        choices=Profile.EmploymentStatus.choices,
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        minimum = cleaned_data.get('min_age')
+        maximum = cleaned_data.get('max_age')
+        if minimum is not None and maximum is not None and minimum > maximum:
+            self.add_error('max_age', 'Maximum age must be at least the minimum age.')
+        return cleaned_data

@@ -3,7 +3,7 @@ from copy import deepcopy
 from django.db import transaction
 from django.utils import timezone
 
-from .models import BranchRule, MatrixRow, Question, QuestionChoice, Quota, Section, Survey, SurveyVersion
+from .models import BranchRule, EligibilityCriteria, MatrixRow, Question, QuestionChoice, Quota, Section, Survey, SurveyVersion
 
 
 class PublicationError(Exception):
@@ -105,6 +105,17 @@ def _clone_version(source, created_by):
             limit=quota.limit,
             criteria=deepcopy(quota.criteria),
             is_active=quota.is_active,
+        )
+    if hasattr(source, 'eligibility_criteria'):
+        criteria = source.eligibility_criteria
+        EligibilityCriteria.objects.create(
+            version=clone,
+            min_age=criteria.min_age,
+            max_age=criteria.max_age,
+            education_levels=deepcopy(criteria.education_levels),
+            countries=deepcopy(criteria.countries),
+            genders=deepcopy(criteria.genders),
+            employment_statuses=deepcopy(criteria.employment_statuses),
         )
     return clone
 

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BranchRule, MatrixRow, Question, QuestionChoice, Quota, Section, Survey, SurveyVersion, Topic
+from .models import BranchRule, EligibilityCriteria, MatrixRow, Question, QuestionChoice, Quota, Section, Survey, SurveyVersion, Topic
 
 
 @admin.register(Topic)
@@ -55,3 +55,4 @@ class QuestionAdmin(admin.ModelAdmin):
 
 admin.site.register(BranchRule)
 admin.site.register(Quota)
+admin.site.register(EligibilityCriteria)
