@@ -100,15 +100,18 @@ def start_submission(
     survey = Survey.objects.select_for_update().get(pk=survey.pk)
     version = current_published_version(survey)
     session_hash = hash_session_key(session_key)
+    respondent = user if user and user.is_authenticated else None
+    in_progress_filter = Q(session_key_hash=session_hash)
+    if respondent:
+        in_progress_filter |= Q(respondent=respondent)
     existing = Submission.objects.filter(
+        in_progress_filter,
         survey=survey,
         version=version,
         status=Submission.Status.IN_PROGRESS,
-        session_key_hash=session_hash,
     ).first()
     if existing:
         return existing
-    respondent = user if user and user.is_authenticated else None
     completed_filter = Q(session_key_hash=session_hash)
     if respondent:
         completed_filter |= Q(respondent=respondent)
@@ -162,7 +165,7 @@ def _selected_choice(question, raw_value):
     return {'choice_id': raw_value, 'label': choices[raw_value]}
 
 
-def normalize_answer(question, data):
+def normalize_answer(question, data, enforce_required=True):
     name = f'q_{question.id}'
     raw_value = data.get(name)
     if question.type in {Question.Type.MULTIPLE_CHOICE, Question.Type.RANKING}:
@@ -175,7 +178,7 @@ def normalize_answer(question, data):
         }
 
     if _empty(raw_value):
-        if question.required:
+        if question.required and enforce_required:
             raise ValueError('This question is required.')
         return None
 
@@ -250,6 +253,47 @@ def normalize_answer(question, data):
 
 
 @transaction.atomic
+def save_progress(submission_id, user, session_key, data):
+    submission = (
+        Submission.objects.select_for_update()
+        .select_related('survey', 'version')
+        .get(pk=submission_id)
+    )
+    if not can_access_submission(submission, user, session_key):
+        raise PermissionDenied
+    if submission.status == Submission.Status.COMPLETED:
+        raise ResponseValidationError({'submission': 'Completed responses cannot be changed.'})
+
+    questions = list(
+        Question.objects.filter(section__version=submission.version)
+        .select_related('section')
+        .prefetch_related('choices', 'matrix_rows')
+        .order_by('section__order', 'order')
+    )
+    errors = {}
+    values = {}
+    for question in questions:
+        try:
+            values[question] = normalize_answer(question, data, enforce_required=False)
+        except ValueError as error:
+            errors[str(question.id)] = str(error)
+    if errors:
+        raise ResponseValidationError(errors)
+
+    for question, value in values.items():
+        if value is None:
+            Answer.objects.filter(submission=submission, question=question).delete()
+        else:
+            Answer.objects.update_or_create(
+                submission=submission,
+                question=question,
+                defaults={'value': value},
+            )
+    submission.save(update_fields=('updated_at',))
+    return submission
+
+
+@transaction.atomic
 def complete_submission(submission_id, user, session_key, data):
     submission = (
         Submission.objects.select_for_update()
@@ -292,6 +336,7 @@ def complete_submission(submission_id, user, session_key, data):
     if errors:
         raise ResponseValidationError(errors)
 
+    submission.answers.all().delete()
     Answer.objects.bulk_create(answers)
     submission.status = Submission.Status.COMPLETED
     submission.completed_at = timezone.now()

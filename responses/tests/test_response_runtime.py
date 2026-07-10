@@ -192,3 +192,69 @@ class ResponseRuntimeTests(TestCase):
             fetch_redirect_response=False,
         )
         self.assertEqual(Submission.objects.count(), 1)
+
+    def test_guest_can_save_and_resume_progress_in_same_browser(self):
+        self.start()
+        submission = Submission.objects.get()
+
+        saved = self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {
+                f'q_{self.question.id}': 'Campus library',
+                'action': 'save',
+            },
+        )
+
+        self.assertRedirects(saved, reverse('response_form', args=[submission.id]))
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, Submission.Status.IN_PROGRESS)
+        self.assertEqual(submission.answers.get().value, 'Campus library')
+        resumed = self.client.get(reverse('response_form', args=[submission.id]))
+        self.assertContains(resumed, 'value="Campus library"')
+
+    def test_required_answers_may_be_blank_while_saving_progress(self):
+        self.start()
+        submission = Submission.objects.get()
+
+        response = self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {'action': 'save'},
+        )
+
+        self.assertRedirects(response, reverse('response_form', args=[submission.id]))
+        self.assertFalse(submission.answers.exists())
+
+    def test_authenticated_progress_resumes_in_another_browser(self):
+        respondent = get_user_model().objects.create_user(email='resume@example.com')
+        self.client.force_login(respondent)
+        self.start()
+        submission = Submission.objects.get()
+        self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Study hall', 'action': 'save'},
+        )
+        other_browser = self.client_class()
+        other_browser.force_login(respondent)
+
+        response = other_browser.post(reverse('respond_survey', args=[self.survey.slug]))
+
+        self.assertRedirects(response, reverse('response_form', args=[submission.id]))
+        self.assertEqual(Submission.objects.count(), 1)
+
+    def test_submission_replaces_saved_draft_answers_atomically(self):
+        self.start()
+        submission = Submission.objects.get()
+        url = reverse('response_form', args=[submission.id])
+        self.client.post(
+            url,
+            {f'q_{self.question.id}': 'Library', 'action': 'save'},
+        )
+
+        response = self.client.post(
+            url,
+            {f'q_{self.question.id}': 'Home', 'action': 'submit'},
+        )
+
+        self.assertRedirects(response, reverse('response_complete', args=[submission.id]))
+        self.assertEqual(submission.answers.count(), 1)
+        self.assertEqual(submission.answers.get().value, 'Home')

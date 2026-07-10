@@ -1,5 +1,6 @@
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import Http404
+from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -13,6 +14,7 @@ from .services import (
     can_access_submission,
     complete_submission,
     current_published_version,
+    save_progress,
     start_submission,
 )
 
@@ -171,6 +173,29 @@ def _presented_sections(submission, data=None, errors=None):
     return presented
 
 
+def _saved_answer_data(submission):
+    data = QueryDict('', mutable=True)
+    for answer in submission.answers.select_related('question'):
+        name = f'q_{answer.question_id}'
+        value = answer.value
+        if answer.question.type in {
+            answer.question.Type.SINGLE_CHOICE,
+            answer.question.Type.DROPDOWN,
+        }:
+            data[name] = value['choice_id']
+        elif answer.question.type in {
+            answer.question.Type.MULTIPLE_CHOICE,
+            answer.question.Type.RANKING,
+        }:
+            data.setlist(name, [choice['choice_id'] for choice in value])
+        elif answer.question.type == answer.question.Type.LIKERT_MATRIX:
+            for row_id, row_value in value.items():
+                data[f'{name}_{row_id}'] = row_value['choice_id']
+        else:
+            data[name] = str(value)
+    return data
+
+
 @require_http_methods(['GET', 'POST'])
 def submission_form(request, submission_id):
     submission = _accessible_submission(request, submission_id)
@@ -179,18 +204,30 @@ def submission_form(request, submission_id):
     errors = {}
     if request.method == 'POST':
         try:
-            complete_submission(
-                submission.id,
-                request.user,
-                _session_key(request),
-                request.POST,
-            )
+            if request.POST.get('action') == 'save':
+                save_progress(
+                    submission.id,
+                    request.user,
+                    _session_key(request),
+                    request.POST,
+                )
+            else:
+                complete_submission(
+                    submission.id,
+                    request.user,
+                    _session_key(request),
+                    request.POST,
+                )
         except ResponseValidationError as error:
             errors = error.errors
         except DuplicateSubmission as error:
             return redirect('response_complete', submission_id=error.submission.id)
         else:
+            if request.POST.get('action') == 'save':
+                messages.success(request, 'Progress saved. You can return from this browser later.')
+                return redirect('response_form', submission_id=submission.id)
             return redirect('response_complete', submission_id=submission.id)
+    form_data = request.POST if request.method == 'POST' else _saved_answer_data(submission)
     return render(
         request,
         'responses/submission_form.html',
@@ -199,7 +236,7 @@ def submission_form(request, submission_id):
             'survey': submission.survey,
             'presented_sections': _presented_sections(
                 submission,
-                request.POST if request.method == 'POST' else None,
+                form_data,
                 errors,
             ),
             'answer_errors': errors,
