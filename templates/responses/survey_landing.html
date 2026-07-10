@@ -20,6 +20,7 @@
                     {% for topic in survey.topics.all %}<span class="topic-chip">{{ topic.name }}</span>{% endfor %}
                 </div>
             {% endif %}
+            {% if eligibility_notice and not criteria %}<div class="message message-error" role="alert">{{ eligibility_notice }}</div>{% endif %}
             <form method="post">
                 {% csrf_token %}
                 {% if criteria %}

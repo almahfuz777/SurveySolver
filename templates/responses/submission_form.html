@@ -22,7 +22,7 @@
         {% csrf_token %}
         {% if answer_errors %}
             <div class="message message-error" role="alert" tabindex="-1">
-                Review the highlighted questions before submitting.
+                {% if answer_errors.submission %}{{ answer_errors.submission }}{% else %}Review the highlighted questions before submitting.{% endif %}
             </div>
         {% endif %}
         {% for presented in presented_sections %}

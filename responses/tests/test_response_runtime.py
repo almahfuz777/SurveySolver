@@ -89,6 +89,17 @@ class ResponseRuntimeTests(TestCase):
         self.question = self.published.sections.order_by('order').first().questions.get()
         return self.published.sections.order_by('order').last().questions.get()
 
+    def add_total_quota(self, limit=1):
+        draft = self.survey.draft_version
+        _, revision = survey_services.add_quota(
+            draft.id,
+            draft.revision,
+            {'name': 'Total responses', 'limit': limit, 'is_active': True},
+        )
+        self.published, _ = publish_survey(self.survey.id, self.owner, revision)
+        self.survey.refresh_from_db()
+        self.question = Question.objects.get(section__version=self.published)
+
     def test_guest_response_is_bound_to_published_version_and_session(self):
         response = self.start()
 
@@ -431,3 +442,43 @@ class ResponseRuntimeTests(TestCase):
         submission.refresh_from_db()
         self.assertEqual(submission.status, Submission.Status.IN_PROGRESS)
         self.assertFalse(submission.answers.filter(question=second_question).exists())
+
+    def test_quota_is_checked_atomically_again_at_completion(self):
+        self.add_total_quota(limit=1)
+        first_browser = self.client
+        second_browser = self.client_class()
+        first_browser.post(reverse('respond_survey', args=[self.survey.slug]))
+        second_browser.post(reverse('respond_survey', args=[self.survey.slug]))
+        submissions = list(Submission.objects.order_by('started_at'))
+        self.assertEqual(len(submissions), 2)
+
+        first_browser.post(
+            reverse('response_form', args=[submissions[0].id]),
+            {f'q_{self.question.id}': 'First response'},
+        )
+        blocked = second_browser.post(
+            reverse('response_form', args=[submissions[1].id]),
+            {f'q_{self.question.id}': 'Second response'},
+        )
+
+        self.assertEqual(blocked.status_code, 422)
+        self.assertContains(blocked, 'reached its response quota', status_code=422)
+        submissions[1].refresh_from_db()
+        self.assertEqual(submissions[1].status, Submission.Status.IN_PROGRESS)
+
+    def test_full_quota_blocks_new_starts(self):
+        self.add_total_quota(limit=1)
+        self.start()
+        submission = Submission.objects.get()
+        self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Only response'},
+        )
+
+        response = self.client_class().post(
+            reverse('respond_survey', args=[self.survey.slug]),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'reached its response quota', status_code=403)
+        self.assertEqual(Submission.objects.count(), 1)

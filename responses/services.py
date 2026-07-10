@@ -41,6 +41,10 @@ class IneligibleRespondent(Exception):
     pass
 
 
+class QuotaReached(Exception):
+    pass
+
+
 def hash_session_key(session_key):
     return salted_hmac('responses.session', session_key, algorithm='sha256').hexdigest()
 
@@ -188,6 +192,13 @@ def _validated_eligibility(version, user, screener_data):
     return snapshot, timezone.now()
 
 
+def _ensure_quota_available(version):
+    completed = version.submissions.filter(status=Submission.Status.COMPLETED).count()
+    for quota in version.quotas.filter(is_active=True, criteria={}):
+        if completed >= quota.limit:
+            raise QuotaReached('This survey has reached its response quota.')
+
+
 @transaction.atomic
 def start_submission(
     survey,
@@ -223,6 +234,7 @@ def start_submission(
     ).first()
     if completed:
         return completed
+    _ensure_quota_available(version)
     eligibility_data, eligibility_checked_at = _validated_eligibility(
         version,
         respondent,
@@ -506,6 +518,7 @@ def complete_submission(submission_id, user, session_key, data):
     ).exclude(pk=submission.pk).first()
     if duplicate:
         raise DuplicateSubmission(duplicate)
+    _ensure_quota_available(submission.version)
 
     answers, errors = _completion_answers(submission, data)
     if errors:

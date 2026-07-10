@@ -13,6 +13,7 @@ from .services import (
     DuplicateSubmission,
     EligibilityUnknown,
     IneligibleRespondent,
+    QuotaReached,
     ResponseUnavailable,
     ResponseValidationError,
     can_access_submission,
@@ -64,7 +65,7 @@ def survey_landing(request, slug):
             )
         except ResponseValidationError as error:
             identity_errors = error.errors
-        except (EligibilityUnknown, IneligibleRespondent) as error:
+        except (EligibilityUnknown, IneligibleRespondent, QuotaReached) as error:
             eligibility_notice = str(error)
         else:
             return redirect('response_form', submission_id=submission.id)
@@ -244,6 +245,8 @@ def submission_form(request, submission_id):
             errors = error.errors
         except DuplicateSubmission as error:
             return redirect('response_complete', submission_id=error.submission.id)
+        except QuotaReached as error:
+            errors = {'submission': str(error)}
         else:
             if request.POST.get('action') == 'save':
                 messages.success(request, 'Progress saved. You can return from this browser later.')
