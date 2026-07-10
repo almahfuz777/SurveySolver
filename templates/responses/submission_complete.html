@@ -12,6 +12,23 @@
             <p>Your response to <strong>{{ survey.title }}</strong> has been recorded.</p>
             {% if user.is_authenticated %}
                 <a class="button button-primary" href="{% url 'home' %}">Discover more surveys</a>
+            {% elif reward_claim %}
+                <div class="reward-claim-box">
+                    <span class="eyebrow">Earned with this response</span>
+                    <strong>{{ reward_claim.points_snapshot }} points</strong>
+                    <p>Create your account within seven days to claim these points. Your account identity will not be added to anonymous answers.</p>
+                    <form method="post" action="{% url 'prepare_reward_claim' reward_claim.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="claim_secret" value="{{ claim_secret }}">
+                        <button class="button button-primary button-block" type="submit">Create an account to claim {{ reward_claim.points_snapshot }} points</button>
+                    </form>
+                    <form method="post" action="{% url 'prepare_reward_claim' reward_claim.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="claim_secret" value="{{ claim_secret }}">
+                        <input type="hidden" name="destination" value="login">
+                        <button class="button button-quiet button-block" type="submit">Already have an account? Sign in</button>
+                    </form>
+                </div>
             {% else %}
                 <a class="button button-secondary" href="{% url 'home' %}">Return to SurveySolver</a>
             {% endif %}

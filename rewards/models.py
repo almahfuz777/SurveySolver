@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Sum
+from django.utils import timezone
 
 
 class PointTransactionQuerySet(models.QuerySet):
@@ -48,3 +49,53 @@ class PointTransaction(models.Model):
 
     def __str__(self):
         return f'{self.amount} points for {self.user.email}'
+
+
+class GuestRewardClaim(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.OneToOneField(
+        'responses.Submission',
+        on_delete=models.PROTECT,
+        related_name='guest_reward_claim',
+    )
+    survey = models.ForeignKey(
+        'surveys.Survey',
+        on_delete=models.PROTECT,
+        related_name='guest_reward_claims',
+    )
+    points_snapshot = models.PositiveIntegerField()
+    secret_hash = models.CharField(max_length=64)
+    session_key_hash = models.CharField(max_length=64, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    claimed_at = models.DateTimeField(blank=True, null=True)
+    claimed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='claimed_guest_rewards',
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(claimed_at__isnull=True, claimed_by__isnull=True)
+                    | models.Q(claimed_at__isnull=False, claimed_by__isnull=False)
+                ),
+                name='rewards_claim_status_consistent',
+            ),
+        ]
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    @property
+    def is_claimed(self):
+        return self.claimed_at is not None
+
+    def __str__(self):
+        return f'{self.points_snapshot} point claim for {self.survey.title}'

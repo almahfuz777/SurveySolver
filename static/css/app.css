@@ -1290,6 +1290,10 @@ form button[type="submit"] {
 .completion-card .completion-mark { height: 4rem; margin-bottom: 1.25rem; width: 4rem; }
 .completion-card h1 { margin: 0.55rem 0 0.75rem; }
 .completion-card p { color: var(--text-muted); margin-bottom: 1.5rem; }
+.reward-claim-box { background: var(--teal-50); border: 1px solid var(--teal-200); border-radius: var(--radius-lg); display: grid; gap: 0.75rem; margin-top: 1.5rem; padding: 1.35rem; text-align: left; }
+.reward-claim-box > strong { color: var(--teal-700); font-size: 2rem; }
+.reward-claim-box > p { margin: 0; }
+.reward-claim-box form { margin: 0; }
 
 @media (max-width: 760px) {
     .response-hero-inner { grid-template-columns: 1fr; }

@@ -1,11 +1,14 @@
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 from django_countries import countries
 
 from accounts.models import Profile
+from rewards.claims import claim_secret_from_session, create_guest_claim, store_claim_secret
+from rewards.models import GuestRewardClaim
 from surveys.models import Survey
 
 from .models import Submission
@@ -225,6 +228,8 @@ def submission_form(request, submission_id):
     if submission.status == Submission.Status.COMPLETED:
         return redirect('response_complete', submission_id=submission.id)
     errors = {}
+    claim = None
+    claim_secret = None
     if request.method == 'POST':
         try:
             if request.POST.get('action') == 'save':
@@ -235,12 +240,18 @@ def submission_form(request, submission_id):
                     request.POST,
                 )
             else:
-                complete_submission(
-                    submission.id,
-                    request.user,
-                    _session_key(request),
-                    request.POST,
-                )
+                with transaction.atomic():
+                    completed_submission = complete_submission(
+                        submission.id,
+                        request.user,
+                        _session_key(request),
+                        request.POST,
+                    )
+                    if not request.user.is_authenticated:
+                        claim, claim_secret = create_guest_claim(
+                            completed_submission.id,
+                            _session_key(request),
+                        )
         except ResponseValidationError as error:
             errors = error.errors
         except DuplicateSubmission as error:
@@ -251,6 +262,8 @@ def submission_form(request, submission_id):
             if request.POST.get('action') == 'save':
                 messages.success(request, 'Progress saved. You can return from this browser later.')
                 return redirect('response_form', submission_id=submission.id)
+            if claim and claim_secret:
+                store_claim_secret(request.session, claim, claim_secret)
             return redirect('response_complete', submission_id=submission.id)
     form_data = request.POST if request.method == 'POST' else _saved_answer_data(submission)
     branch_rules = [
@@ -289,8 +302,18 @@ def submission_complete(request, submission_id):
     submission = _accessible_submission(request, submission_id)
     if submission.status != Submission.Status.COMPLETED:
         return redirect('response_form', submission_id=submission.id)
+    try:
+        claim = submission.guest_reward_claim
+    except GuestRewardClaim.DoesNotExist:
+        claim = None
+    claim_secret = claim_secret_from_session(request.session, claim) if claim else None
     return render(
         request,
         'responses/submission_complete.html',
-        {'submission': submission, 'survey': submission.survey},
+        {
+            'submission': submission,
+            'survey': submission.survey,
+            'reward_claim': claim if claim_secret and not claim.is_expired else None,
+            'claim_secret': claim_secret,
+        },
     )
