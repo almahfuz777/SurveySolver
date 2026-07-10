@@ -22,6 +22,20 @@
             {% endif %}
             <form method="post">
                 {% csrf_token %}
+                {% if survey.identity_mode == 'identified' %}
+                    <fieldset class="identity-consent">
+                        <legend>Identified response</legend>
+                        <p>The researcher will be able to see the name and email entered below with your answers. Your SurveySolver account is not silently attached.</p>
+                        <label for="identity-name">Name shared with researcher</label>
+                        <input id="identity-name" name="identity_name" value="{{ identity_name }}" autocomplete="name"{% if identity_errors.identity_name %} aria-invalid="true" aria-describedby="identity-name-error"{% endif %}>
+                        {% if identity_errors.identity_name %}<span class="field-error" id="identity-name-error">{{ identity_errors.identity_name }}</span>{% endif %}
+                        <label for="identity-email">Email shared with researcher</label>
+                        <input id="identity-email" name="identity_email" type="email" value="{{ identity_email }}" autocomplete="email"{% if identity_errors.identity_email %} aria-invalid="true" aria-describedby="identity-email-error"{% endif %}>
+                        {% if identity_errors.identity_email %}<span class="field-error" id="identity-email-error">{{ identity_errors.identity_email }}</span>{% endif %}
+                        <label class="consent-check"><input name="identity_consent" type="checkbox" value="yes"{% if request.POST.identity_consent == 'yes' %} checked{% endif %}> <span>I consent to sharing this identity information with the researcher.</span></label>
+                        {% if identity_errors.identity_consent %}<span class="field-error">{{ identity_errors.identity_consent }}</span>{% endif %}
+                    </fieldset>
+                {% endif %}
                 <button class="button button-primary button-large" type="submit">Start survey</button>
             </form>
             <p class="privacy-note">Your response is only recorded when you submit the survey.</p>

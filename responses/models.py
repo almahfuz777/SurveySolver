@@ -39,6 +39,8 @@ class Submission(models.Model):
         db_index=True,
     )
     presentation = models.JSONField(default=dict)
+    identity_data = models.JSONField(default=dict, blank=True)
+    identity_consent_at = models.DateTimeField(blank=True, null=True)
     started_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(blank=True, null=True)
@@ -53,11 +55,27 @@ class Submission(models.Model):
                 ),
                 name='responses_submission_status_timestamp_valid',
             ),
+            models.UniqueConstraint(
+                fields=('survey', 'respondent'),
+                condition=models.Q(status='completed', respondent__isnull=False),
+                name='responses_one_completed_per_user_survey',
+            ),
+            models.UniqueConstraint(
+                fields=('survey', 'session_key_hash'),
+                condition=models.Q(status='completed'),
+                name='responses_one_completed_per_session_survey',
+            ),
         ]
 
     def clean(self):
         if self.version_id and self.survey_id and self.version.survey_id != self.survey_id:
             raise ValidationError('The response version must belong to the survey.')
+        if self.survey_id:
+            identified = self.survey.identity_mode == Survey.IdentityMode.IDENTIFIED
+            if identified and (not self.identity_consent_at or not self.identity_data):
+                raise ValidationError('Identified responses require explicit consent and identity data.')
+            if not identified and (self.identity_consent_at or self.identity_data):
+                raise ValidationError('Anonymous responses cannot contain creator-visible identity data.')
 
     def save(self, *args, **kwargs):
         if self.pk:

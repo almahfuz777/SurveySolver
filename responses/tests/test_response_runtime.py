@@ -123,3 +123,72 @@ class ResponseRuntimeTests(TestCase):
         response = self.client.get(reverse('respond_survey', args=[self.survey.slug]))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_identified_response_requires_disclosed_identity_and_consent(self):
+        self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
+        self.survey.save(update_fields=('identity_mode', 'updated_at'))
+        url = reverse('respond_survey', args=[self.survey.slug])
+
+        invalid = self.client.post(
+            url,
+            {'identity_name': '', 'identity_email': 'invalid'},
+        )
+
+        self.assertEqual(invalid.status_code, 422)
+        self.assertContains(invalid, 'Consent is required', status_code=422)
+        self.assertFalse(Submission.objects.exists())
+
+        valid = self.client.post(
+            url,
+            {
+                'identity_name': '  Samira Khan  ',
+                'identity_email': 'SAMIRA@example.com',
+                'identity_consent': 'yes',
+            },
+        )
+
+        submission = Submission.objects.get()
+        self.assertRedirects(valid, reverse('response_form', args=[submission.id]))
+        self.assertEqual(
+            submission.identity_data,
+            {'name': 'Samira Khan', 'email': 'samira@example.com'},
+        )
+        self.assertIsNotNone(submission.identity_consent_at)
+
+    def test_completed_guest_is_returned_to_existing_response(self):
+        self.start()
+        submission = Submission.objects.get()
+        self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Library'},
+        )
+
+        response = self.start()
+
+        self.assertRedirects(
+            response,
+            reverse('response_form', args=[submission.id]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(Submission.objects.count(), 1)
+
+    def test_authenticated_duplicate_is_prevented_across_browser_sessions(self):
+        respondent = get_user_model().objects.create_user(email='repeat@example.com')
+        self.client.force_login(respondent)
+        self.start()
+        submission = Submission.objects.get()
+        self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Quiet room'},
+        )
+        other_browser = self.client_class()
+        other_browser.force_login(respondent)
+
+        response = other_browser.post(reverse('respond_survey', args=[self.survey.slug]))
+
+        self.assertRedirects(
+            response,
+            reverse('response_form', args=[submission.id]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(Submission.objects.count(), 1)

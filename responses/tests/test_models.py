@@ -56,3 +56,16 @@ class SubmissionModelTests(TestCase):
 
         with self.assertRaisesMessage(ValidationError, 'immutable'):
             submission.save()
+
+    def test_anonymous_submission_rejects_creator_visible_identity(self):
+        submission = Submission(
+            survey=self.survey,
+            version=self.version,
+            session_key_hash='a' * 64,
+            presentation={'sections': []},
+            identity_data={'name': 'Hidden respondent'},
+            identity_consent_at=timezone.now(),
+        )
+
+        with self.assertRaisesMessage(ValidationError, 'cannot contain'):
+            submission.save()

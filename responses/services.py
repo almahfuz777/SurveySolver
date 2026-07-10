@@ -2,10 +2,12 @@ import random
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.signing import salted_hmac
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
+from django.core.validators import validate_email
 
 from surveys.models import Question, Survey, SurveyVersion
 
@@ -20,6 +22,12 @@ class ResponseValidationError(Exception):
     def __init__(self, errors):
         self.errors = errors
         super().__init__('Some answers need attention.')
+
+
+class DuplicateSubmission(Exception):
+    def __init__(self, submission):
+        self.submission = submission
+        super().__init__('A response has already been completed for this survey.')
 
 
 def hash_session_key(session_key):
@@ -60,8 +68,35 @@ def build_presentation(version):
     return {'sections': sections}
 
 
+def _validated_identity(survey, consent, identity_data):
+    if survey.identity_mode == Survey.IdentityMode.ANONYMOUS:
+        return {}, None
+    identity_data = identity_data or {}
+    name = identity_data.get('name', '').strip()
+    email = identity_data.get('email', '').strip().casefold()
+    errors = {}
+    if not consent:
+        errors['identity_consent'] = 'Consent is required for an identified response.'
+    if not name:
+        errors['identity_name'] = 'Enter the name that will be shared with the researcher.'
+    try:
+        validate_email(email)
+    except ValidationError:
+        errors['identity_email'] = 'Enter a valid email address.'
+    if errors:
+        raise ResponseValidationError(errors)
+    return {'name': name, 'email': email}, timezone.now()
+
+
 @transaction.atomic
-def start_submission(survey, user, session_key, source=Submission.Source.DIRECT):
+def start_submission(
+    survey,
+    user,
+    session_key,
+    source=Submission.Source.DIRECT,
+    identity_consent=False,
+    identity_data=None,
+):
     survey = Survey.objects.select_for_update().get(pk=survey.pk)
     version = current_published_version(survey)
     session_hash = hash_session_key(session_key)
@@ -74,6 +109,21 @@ def start_submission(survey, user, session_key, source=Submission.Source.DIRECT)
     if existing:
         return existing
     respondent = user if user and user.is_authenticated else None
+    completed_filter = Q(session_key_hash=session_hash)
+    if respondent:
+        completed_filter |= Q(respondent=respondent)
+    completed = Submission.objects.filter(
+        completed_filter,
+        survey=survey,
+        status=Submission.Status.COMPLETED,
+    ).first()
+    if completed:
+        return completed
+    identity_data, identity_consent_at = _validated_identity(
+        survey,
+        identity_consent,
+        identity_data,
+    )
     return Submission.objects.create(
         survey=survey,
         version=version,
@@ -81,6 +131,8 @@ def start_submission(survey, user, session_key, source=Submission.Source.DIRECT)
         session_key_hash=session_hash,
         source=source,
         presentation=build_presentation(version),
+        identity_data=identity_data,
+        identity_consent_at=identity_consent_at,
     )
 
 
@@ -208,6 +260,18 @@ def complete_submission(submission_id, user, session_key, data):
         raise PermissionDenied
     if submission.status == Submission.Status.COMPLETED:
         return submission
+
+    Survey.objects.select_for_update().get(pk=submission.survey_id)
+    duplicate_filter = Q(session_key_hash=submission.session_key_hash)
+    if submission.respondent_id:
+        duplicate_filter |= Q(respondent_id=submission.respondent_id)
+    duplicate = Submission.objects.filter(
+        duplicate_filter,
+        survey_id=submission.survey_id,
+        status=Submission.Status.COMPLETED,
+    ).exclude(pk=submission.pk).first()
+    if duplicate:
+        raise DuplicateSubmission(duplicate)
 
     questions = list(
         Question.objects.filter(section__version=submission.version)

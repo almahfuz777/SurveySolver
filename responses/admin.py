@@ -24,6 +24,8 @@ class SubmissionAdmin(admin.ModelAdmin):
         'source',
         'status',
         'presentation',
+        'identity_data',
+        'identity_consent_at',
         'started_at',
         'updated_at',
         'completed_at',
