@@ -250,6 +250,20 @@ def submission_form(request, submission_id):
                 return redirect('response_form', submission_id=submission.id)
             return redirect('response_complete', submission_id=submission.id)
     form_data = request.POST if request.method == 'POST' else _saved_answer_data(submission)
+    branch_rules = [
+        {
+            'source_question': str(rule.source_question_id),
+            'source_section': str(rule.source_question.section_id),
+            'operator': rule.operator,
+            'compare_value': rule.compare_value,
+            'action': rule.action,
+            'target_section': str(rule.target_section_id) if rule.target_section_id else None,
+        }
+        for rule in submission.version.branch_rules.select_related(
+            'source_question__section',
+            'target_section',
+        ).order_by('order')
+    ]
     return render(
         request,
         'responses/submission_form.html',
@@ -262,6 +276,7 @@ def submission_form(request, submission_id):
                 errors,
             ),
             'answer_errors': errors,
+            'branch_rules': branch_rules,
         },
         status=422 if errors else 200,
     )

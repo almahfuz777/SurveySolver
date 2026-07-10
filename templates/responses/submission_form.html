@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ survey.title }} | SurveySolver{% endblock %}
+
+{% block extra_head %}<script src="{% static 'js/response.js' %}" defer></script>{% endblock %}
 
 {% block content %}
 <section class="page-heading response-heading">
@@ -14,6 +17,7 @@
     </div>
 </section>
 <section class="page-content">
+    {{ branch_rules|json_script:"response-branch-rules" }}
     <form class="shell response-form" method="post" novalidate>
         {% csrf_token %}
         {% if answer_errors %}
@@ -22,14 +26,14 @@
             </div>
         {% endif %}
         {% for presented in presented_sections %}
-            <section class="panel response-section" aria-labelledby="section-{{ presented.section.id }}">
+            <section class="panel response-section" data-response-section="{{ presented.section.id }}" aria-labelledby="section-{{ presented.section.id }}">
                 <div class="response-section-heading">
                     <span class="section-number">Section {{ forloop.counter }}</span>
                     <h2 id="section-{{ presented.section.id }}">{{ presented.section.title }}</h2>
                     {% if presented.section.description %}<p>{{ presented.section.description }}</p>{% endif %}
                 </div>
                 {% for item in presented.items %}
-                    <fieldset class="response-question{% if item.error %} has-error{% endif %}"{% if item.error %} aria-describedby="error-{{ item.question.id }}"{% endif %}>
+                    <fieldset class="response-question{% if item.error %} has-error{% endif %}" data-question-id="{{ item.question.id }}"{% if item.error %} aria-describedby="error-{{ item.question.id }}"{% endif %}>
                         <legend>
                             <span class="question-number">{{ forloop.counter }}</span>
                             {{ item.question.prompt }}

@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from surveys.models import Question, Survey
+from surveys.models import BranchRule, Question, Survey
 from surveys.publication import publish_survey
 from surveys import services as survey_services
 
@@ -57,6 +57,37 @@ class ResponseRuntimeTests(TestCase):
         self.published, _ = publish_survey(self.survey.id, self.owner, revision)
         self.survey.refresh_from_db()
         self.question = Question.objects.get(section__version=self.published)
+
+    def add_branched_section(self):
+        draft = self.survey.draft_version
+        first_question = draft.sections.get().questions.get()
+        second_section, revision = survey_services.add_section(
+            draft.id,
+            draft.revision,
+        )
+        second_question, revision = survey_services.add_question(
+            second_section.id,
+            Question.Type.LONG_TEXT,
+            revision,
+        )
+        second_question.prompt = 'Explain your study routine'
+        second_question.required = True
+        second_question.save(update_fields=('prompt', 'required'))
+        _, revision = survey_services.add_branch_rule(
+            draft.id,
+            revision,
+            {
+                'source_question': first_question,
+                'operator': BranchRule.Operator.EQUALS,
+                'compare_value': 'Skip follow-up',
+                'action': BranchRule.Action.END_SURVEY,
+                'target_section': None,
+            },
+        )
+        self.published, _ = publish_survey(self.survey.id, self.owner, revision)
+        self.survey.refresh_from_db()
+        self.question = self.published.sections.order_by('order').first().questions.get()
+        return self.published.sections.order_by('order').last().questions.get()
 
     def test_guest_response_is_bound_to_published_version_and_session(self):
         response = self.start()
@@ -367,3 +398,36 @@ class ResponseRuntimeTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertContains(response, 'Complete the required research profile', status_code=403)
         self.assertFalse(Submission.objects.exists())
+
+    def test_matching_end_branch_skips_later_required_sections(self):
+        second_question = self.add_branched_section()
+        self.start()
+        submission = Submission.objects.get()
+        form_page = self.client.get(reverse('response_form', args=[submission.id]))
+
+        self.assertContains(form_page, 'response-branch-rules')
+        self.assertContains(form_page, f'data-question-id="{self.question.id}"')
+
+        response = self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Skip follow-up'},
+        )
+
+        self.assertRedirects(response, reverse('response_complete', args=[submission.id]))
+        self.assertFalse(submission.answers.filter(question=second_question).exists())
+
+    def test_default_branch_route_validates_later_required_sections(self):
+        second_question = self.add_branched_section()
+        self.start()
+        submission = Submission.objects.get()
+
+        response = self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Continue'},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertContains(response, 'This question is required.', status_code=422)
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, Submission.Status.IN_PROGRESS)
+        self.assertFalse(submission.answers.filter(question=second_question).exists())

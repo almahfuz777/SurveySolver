@@ -12,7 +12,7 @@ from django.core.validators import validate_email
 from accounts.models import Profile
 from django_countries import countries
 
-from surveys.models import EligibilityCriteria, Question, Survey, SurveyVersion
+from surveys.models import BranchRule, EligibilityCriteria, Question, Survey, SurveyVersion
 
 from .models import Answer, Submission
 
@@ -361,6 +361,87 @@ def normalize_answer(question, data, enforce_required=True):
     raise ValueError('This question type is not supported.')
 
 
+def _branch_values(value):
+    if value is None:
+        return []
+    if isinstance(value, dict):
+        if 'choice_id' in value:
+            return [value['choice_id'], value['label']]
+        values = []
+        for row_value in value.values():
+            values.extend((row_value['choice_id'], row_value['choice_label']))
+        return values
+    if isinstance(value, list):
+        values = []
+        for choice in value:
+            values.extend((choice['choice_id'], choice['label']))
+        return values
+    return [str(value)]
+
+
+def _branch_matches(rule, value):
+    if rule.operator == BranchRule.Operator.ANSWERED:
+        return bool(_branch_values(value))
+    compare_value = rule.compare_value.strip().casefold()
+    values = [str(item).strip().casefold() for item in _branch_values(value)]
+    if rule.operator == BranchRule.Operator.EQUALS:
+        return compare_value in values
+    if rule.operator == BranchRule.Operator.NOT_EQUALS:
+        return bool(values) and compare_value not in values
+    if rule.operator == BranchRule.Operator.CONTAINS:
+        return any(compare_value in item for item in values)
+    return False
+
+
+def _completion_answers(submission, data):
+    sections = list(
+        submission.version.sections.prefetch_related(
+            'questions__choices',
+            'questions__matrix_rows',
+        ).order_by('order')
+    )
+    section_positions = {section.id: index for index, section in enumerate(sections)}
+    rules_by_section = {}
+    for rule in submission.version.branch_rules.select_related(
+        'source_question__section',
+        'target_section',
+    ).order_by('order'):
+        rules_by_section.setdefault(rule.source_question.section_id, []).append(rule)
+
+    answers = []
+    errors = {}
+    position = 0
+    visited = set()
+    while position < len(sections):
+        section = sections[position]
+        if section.id in visited:
+            errors['submission'] = 'The survey logic could not determine a valid route.'
+            break
+        visited.add(section.id)
+        section_values = {}
+        for question in section.questions.all():
+            try:
+                value = normalize_answer(question, data)
+            except ValueError as error:
+                errors[str(question.id)] = str(error)
+                value = None
+            else:
+                if value is not None:
+                    answers.append(Answer(submission=submission, question=question, value=value))
+            section_values[question.id] = value
+
+        next_position = position + 1
+        for rule in rules_by_section.get(section.id, []):
+            if not _branch_matches(rule, section_values.get(rule.source_question_id)):
+                continue
+            if rule.action == BranchRule.Action.END_SURVEY:
+                return answers, errors
+            next_position = section_positions.get(rule.target_section_id, len(sections))
+            break
+        position = next_position
+    return answers, errors
+
+
 @transaction.atomic
 def save_progress(submission_id, user, session_key, data):
     submission = (
@@ -426,22 +507,7 @@ def complete_submission(submission_id, user, session_key, data):
     if duplicate:
         raise DuplicateSubmission(duplicate)
 
-    questions = list(
-        Question.objects.filter(section__version=submission.version)
-        .select_related('section')
-        .prefetch_related('choices', 'matrix_rows')
-        .order_by('section__order', 'order')
-    )
-    errors = {}
-    answers = []
-    for question in questions:
-        try:
-            value = normalize_answer(question, data)
-        except ValueError as error:
-            errors[str(question.id)] = str(error)
-        else:
-            if value is not None:
-                answers.append(Answer(submission=submission, question=question, value=value))
+    answers, errors = _completion_answers(submission, data)
     if errors:
         raise ResponseValidationError(errors)
 
