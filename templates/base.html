@@ -9,6 +9,7 @@
     <title>{% block title %}SurveySolver{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     <script src="{% static 'js/app.js' %}" defer></script>
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>

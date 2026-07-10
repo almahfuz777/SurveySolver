@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Build {{ survey.title }} | SurveySolver{% endblock %}
+{% block extra_head %}<script src="{% static 'js/builder.js' %}" defer></script>{% endblock %}
+
+{% block content %}
+<header class="builder-header">
+    <div>
+        <a href="{% url 'survey_detail' survey.id %}">← Survey overview</a>
+        <h1>{{ survey.title }}</h1>
+    </div>
+    <div class="builder-status" aria-live="polite">
+        <span data-save-status>All changes saved</span>
+        <a class="button button-secondary button-small" href="{% url 'survey_preview' survey.id %}">Preview</a>
+    </div>
+</header>
+
+<div class="builder-layout" data-builder>
+    <aside class="builder-palette" aria-labelledby="palette-heading">
+        <h2 id="palette-heading">Question types</h2>
+        <form method="post" action="{% url 'question_add' survey.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="revision" value="{{ version.revision }}">
+            <label for="target-section">Add to section</label>
+            <select id="target-section" name="section_id">
+                {% for section in version.sections.all %}<option value="{{ section.id }}">{{ section.title }}</option>{% endfor %}
+            </select>
+            <div class="question-type-list">
+                {% for value, label in question_types %}
+                    <button type="submit" name="type" value="{{ value }}">+ {{ label }}</button>
+                {% endfor %}
+            </div>
+        </form>
+        <form method="post" action="{% url 'section_add' survey.id %}">
+            {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+            <button class="button button-secondary button-block" type="submit">Add section</button>
+        </form>
+    </aside>
+
+    <main class="builder-canvas" aria-label="Survey questionnaire">
+        {% for section in version.sections.all %}
+            <section class="builder-section">
+                <div class="builder-section-heading">
+                    <form class="autosave-form section-autosave" method="post" action="{% url 'section_update' survey.id section.id %}">
+                        {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                        <label class="sr-only" for="section-title-{{ section.id }}">Section title</label>
+                        <input id="section-title-{{ section.id }}" name="title" value="{{ section.title }}" maxlength="160">
+                        <label class="sr-only" for="section-description-{{ section.id }}">Section description</label>
+                        <textarea id="section-description-{{ section.id }}" name="description" rows="2" placeholder="Optional section description">{{ section.description }}</textarea>
+                    </form>
+                    <div class="order-actions">
+                        <form method="post" action="{% url 'section_move' survey.id section.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"><button name="direction" value="up" aria-label="Move {{ section.title }} up">↑</button><button name="direction" value="down" aria-label="Move {{ section.title }} down">↓</button></form>
+                        <form method="post" action="{% url 'section_delete' survey.id section.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"><button aria-label="Delete {{ section.title }}">Delete</button></form>
+                    </div>
+                </div>
+                <div class="builder-question-list">
+                    {% for question in section.questions.all %}
+                        <article class="builder-question{% if selected_question.id == question.id %} is-selected{% endif %}">
+                            <a href="{% url 'survey_builder' survey.id %}?question={{ question.id }}">
+                                <span>{{ question.get_type_display }}{% if question.required %} · Required{% endif %}</span>
+                                <strong>{{ question.prompt }}</strong>
+                            </a>
+                            <form method="post" action="{% url 'question_move' survey.id question.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"><button name="direction" value="up" aria-label="Move question up">↑</button><button name="direction" value="down" aria-label="Move question down">↓</button></form>
+                        </article>
+                    {% empty %}
+                        <p class="builder-empty">Add a question from the palette.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    </main>
+
+    <aside class="builder-settings" aria-labelledby="settings-panel-heading">
+        <h2 id="settings-panel-heading">Question settings</h2>
+        {% if selected_question %}
+            <form class="autosave-form question-autosave" method="post" action="{% url 'question_update' survey.id selected_question.id %}">
+                {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                {% for field in editor_form %}
+                    <div class="field-group">
+                        {{ field.label_tag }}{{ field }}
+                        {% if field.help_text %}<small class="helptext">{{ field.help_text }}</small>{% endif %}
+                        <div class="field-errors" data-errors-for="{{ field.name }}">{{ field.errors }}</div>
+                    </div>
+                {% endfor %}
+            </form>
+            <form method="post" action="{% url 'question_delete' survey.id selected_question.id %}">
+                {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                <button class="button button-quiet button-block" type="submit">Delete question</button>
+            </form>
+        {% else %}
+            <p>Select a question to edit its wording, requirements, choices, and validation.</p>
+        {% endif %}
+    </aside>
+</div>
+{% endblock %}

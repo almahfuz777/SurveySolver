@@ -1,10 +1,14 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .forms import SurveyMetadataForm
-from .models import Survey
+from . import services
+from .forms import QuestionEditorForm, SectionForm, SurveyMetadataForm
+from .models import Question, Section, Survey, SurveyVersion
 
 
 @login_required
@@ -41,7 +45,11 @@ def survey_detail(request, survey_id):
         id=survey_id,
         owner=request.user,
     )
-    return render(request, 'surveys/survey_detail.html', {'survey': survey})
+    return render(
+        request,
+        'surveys/survey_detail.html',
+        {'survey': survey, 'draft_version': survey.draft_version},
+    )
 
 
 @login_required
@@ -70,3 +78,193 @@ def survey_archive(request, survey_id):
     survey.archive()
     messages.success(request, 'Survey archived.')
     return redirect('survey_list')
+
+
+def _owned_survey(request, survey_id):
+    return get_object_or_404(Survey, id=survey_id, owner=request.user)
+
+
+def _draft_version(survey):
+    return get_object_or_404(
+        SurveyVersion.objects.prefetch_related('sections__questions__choices'),
+        survey=survey,
+        status=SurveyVersion.Status.DRAFT,
+    )
+
+
+def _revision(request):
+    try:
+        return int(request.POST.get('revision', ''))
+    except (TypeError, ValueError):
+        return -1
+
+
+def _mutation_error(request, survey, error):
+    if request.headers.get('Accept') == 'application/json':
+        status = 409 if isinstance(error, services.StaleVersionError) else 422
+        message = 'This draft changed in another tab. Reload before continuing.'
+        if isinstance(error, ValidationError):
+            message = '; '.join(error.messages)
+        return JsonResponse({'error': message}, status=status)
+    if isinstance(error, services.StaleVersionError):
+        messages.error(request, 'This draft changed in another tab. Reload before continuing.')
+    else:
+        messages.error(request, '; '.join(error.messages))
+    return redirect('survey_builder', survey_id=survey.id)
+
+
+@login_required
+def survey_builder(request, survey_id):
+    survey = _owned_survey(request, survey_id)
+    version = _draft_version(survey)
+    selected_question = None
+    selected_id = request.GET.get('question')
+    if selected_id:
+        selected_question = get_object_or_404(
+            Question.objects.prefetch_related('choices'),
+            id=selected_id,
+            section__version=version,
+        )
+    if selected_question is None:
+        selected_question = (
+            Question.objects.filter(section__version=version)
+            .prefetch_related('choices')
+            .order_by('section__order', 'order')
+            .first()
+        )
+    editor_form = QuestionEditorForm(instance=selected_question) if selected_question else None
+    return render(
+        request,
+        'surveys/builder.html',
+        {
+            'survey': survey,
+            'version': version,
+            'question_types': Question.Type.choices,
+            'selected_question': selected_question,
+            'editor_form': editor_form,
+        },
+    )
+
+
+@login_required
+def survey_preview(request, survey_id):
+    survey = _owned_survey(request, survey_id)
+    version = _draft_version(survey)
+    return render(request, 'surveys/preview.html', {'survey': survey, 'version': version})
+
+
+@require_POST
+@login_required
+def section_add(request, survey_id):
+    survey = _owned_survey(request, survey_id)
+    version = _draft_version(survey)
+    try:
+        services.add_section(version.id, _revision(request))
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return redirect('survey_builder', survey_id=survey.id)
+
+
+@require_POST
+@login_required
+def section_update(request, survey_id, section_id):
+    survey = _owned_survey(request, survey_id)
+    section = get_object_or_404(Section, id=section_id, version__survey=survey)
+    form = SectionForm(request.POST, instance=section)
+    if not form.is_valid():
+        return JsonResponse({'errors': form.errors.get_json_data()}, status=422)
+    try:
+        _, revision = services.update_section(section.id, _revision(request), form.cleaned_data)
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return JsonResponse({'revision': revision})
+
+
+@require_POST
+@login_required
+def section_move(request, survey_id, section_id):
+    survey = _owned_survey(request, survey_id)
+    section = get_object_or_404(Section, id=section_id, version__survey=survey)
+    direction = request.POST.get('direction')
+    if direction not in {'up', 'down'}:
+        return JsonResponse({'error': 'Invalid direction.'}, status=422)
+    try:
+        services.move_section(section.id, _revision(request), direction)
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return redirect('survey_builder', survey_id=survey.id)
+
+
+@require_POST
+@login_required
+def section_delete(request, survey_id, section_id):
+    survey = _owned_survey(request, survey_id)
+    section = get_object_or_404(Section, id=section_id, version__survey=survey)
+    try:
+        services.delete_section(section.id, _revision(request))
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return redirect('survey_builder', survey_id=survey.id)
+
+
+@require_POST
+@login_required
+def question_add(request, survey_id):
+    survey = _owned_survey(request, survey_id)
+    section = get_object_or_404(Section, id=request.POST.get('section_id'), version__survey=survey)
+    question_type = request.POST.get('type')
+    if question_type not in Question.Type.values:
+        return JsonResponse({'error': 'Invalid question type.'}, status=422)
+    try:
+        question, _ = services.add_question(section.id, question_type, _revision(request))
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return redirect(f"{reverse('survey_builder', args=[survey.id])}?question={question.id}")
+
+
+@require_POST
+@login_required
+def question_update(request, survey_id, question_id):
+    survey = _owned_survey(request, survey_id)
+    question = get_object_or_404(Question, id=question_id, section__version__survey=survey)
+    form = QuestionEditorForm(request.POST, instance=question)
+    if not form.is_valid():
+        return JsonResponse({'errors': form.errors.get_json_data()}, status=422)
+    try:
+        _, revision = services.update_question(
+            question.id,
+            _revision(request),
+            form.cleaned_data,
+            form.question_config(),
+            form.cleaned_data['choice_labels'],
+        )
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return JsonResponse({'revision': revision})
+
+
+@require_POST
+@login_required
+def question_move(request, survey_id, question_id):
+    survey = _owned_survey(request, survey_id)
+    question = get_object_or_404(Question, id=question_id, section__version__survey=survey)
+    direction = request.POST.get('direction')
+    if direction not in {'up', 'down'}:
+        return JsonResponse({'error': 'Invalid direction.'}, status=422)
+    try:
+        services.move_question(question.id, _revision(request), direction)
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return redirect(f"{reverse('survey_builder', args=[survey.id])}?question={question.id}")
+
+
+@require_POST
+@login_required
+def question_delete(request, survey_id, question_id):
+    survey = _owned_survey(request, survey_id)
+    question = get_object_or_404(Question, id=question_id, section__version__survey=survey)
+    try:
+        services.delete_question(question.id, _revision(request))
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return redirect('survey_builder', survey_id=survey.id)

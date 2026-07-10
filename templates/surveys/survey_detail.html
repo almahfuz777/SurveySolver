@@ -17,6 +17,7 @@
         <h1>{{ survey.title }}</h1>
         <p>{{ survey.summary }}</p>
         <div class="hero-actions">
+            <a class="button button-primary" href="{% url 'survey_builder' survey.id %}">Open builder</a>
             <a class="button button-primary" href="{% url 'survey_edit' survey.id %}">Edit details</a>
             <a class="button button-secondary" href="{% url 'survey_list' %}">All surveys</a>
         </div>
@@ -37,6 +38,8 @@
         <aside class="panel survey-settings" aria-labelledby="settings-heading">
             <h2 id="settings-heading">Collection settings</h2>
             <dl>
+                <div><dt>Draft version</dt><dd>v{{ draft_version.number }} · revision {{ draft_version.revision }}</dd></div>
+                <div><dt>Questions</dt><dd>{{ draft_version.sections.all|length }} section{{ draft_version.sections.all|length|pluralize }}</dd></div>
                 <div><dt>Visibility</dt><dd>{{ survey.get_visibility_display }}</dd></div>
                 <div><dt>Identity</dt><dd>{{ survey.get_identity_mode_display }}</dd></div>
                 <div><dt>Estimated time</dt><dd>{{ survey.estimated_minutes }} minutes</dd></div>
