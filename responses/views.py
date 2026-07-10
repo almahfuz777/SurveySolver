@@ -3,12 +3,16 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
+from django_countries import countries
 
+from accounts.models import Profile
 from surveys.models import Survey
 
 from .models import Submission
 from .services import (
     DuplicateSubmission,
+    EligibilityUnknown,
+    IneligibleRespondent,
     ResponseUnavailable,
     ResponseValidationError,
     can_access_submission,
@@ -38,6 +42,7 @@ def _public_survey(slug):
 def survey_landing(request, slug):
     survey, version = _public_survey(slug)
     identity_errors = {}
+    eligibility_notice = ''
     if request.method == 'POST':
         try:
             submission = start_submission(
@@ -49,13 +54,23 @@ def survey_landing(request, slug):
                     'name': request.POST.get('identity_name', ''),
                     'email': request.POST.get('identity_email', ''),
                 },
+                screener_data={
+                    'birth_date': request.POST.get('eligibility_birth_date', ''),
+                    'education_level': request.POST.get('eligibility_education_level', ''),
+                    'country': request.POST.get('eligibility_country', ''),
+                    'gender': request.POST.get('eligibility_gender', ''),
+                    'employment_status': request.POST.get('eligibility_employment_status', ''),
+                },
             )
         except ResponseValidationError as error:
             identity_errors = error.errors
+        except (EligibilityUnknown, IneligibleRespondent) as error:
+            eligibility_notice = str(error)
         else:
             return redirect('response_form', submission_id=submission.id)
     default_name = request.user.get_full_name() if request.user.is_authenticated else ''
     default_email = request.user.email if request.user.is_authenticated else ''
+    criteria = getattr(version, 'eligibility_criteria', None)
     return render(
         request,
         'responses/survey_landing.html',
@@ -65,8 +80,15 @@ def survey_landing(request, slug):
             'identity_errors': identity_errors,
             'identity_name': request.POST.get('identity_name', default_name),
             'identity_email': request.POST.get('identity_email', default_email),
+            'criteria': criteria if criteria and criteria.is_targeted else None,
+            'eligibility_errors': identity_errors,
+            'eligibility_notice': eligibility_notice,
+            'education_choices': Profile.EducationLevel.choices,
+            'gender_choices': Profile.Gender.choices,
+            'employment_choices': Profile.EmploymentStatus.choices,
+            'country_choices': countries,
         },
-        status=422 if identity_errors else 200,
+        status=403 if eligibility_notice else (422 if identity_errors else 200),
     )
 
 

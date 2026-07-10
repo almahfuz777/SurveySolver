@@ -9,7 +9,10 @@ from django.db.models import Q
 from django.utils import timezone
 from django.core.validators import validate_email
 
-from surveys.models import Question, Survey, SurveyVersion
+from accounts.models import Profile
+from django_countries import countries
+
+from surveys.models import EligibilityCriteria, Question, Survey, SurveyVersion
 
 from .models import Answer, Submission
 
@@ -28,6 +31,14 @@ class DuplicateSubmission(Exception):
     def __init__(self, submission):
         self.submission = submission
         super().__init__('A response has already been completed for this survey.')
+
+
+class EligibilityUnknown(Exception):
+    pass
+
+
+class IneligibleRespondent(Exception):
+    pass
 
 
 def hash_session_key(session_key):
@@ -88,6 +99,95 @@ def _validated_identity(survey, consent, identity_data):
     return {'name': name, 'email': email}, timezone.now()
 
 
+def _current_age(birth_date):
+    today = timezone.localdate()
+    return today.year - birth_date.year - (
+        (today.month, today.day) < (birth_date.month, birth_date.day)
+    )
+
+
+def _eligibility_values(criteria, user, screener_data):
+    targeted_fields = {
+        'birth_date': criteria.min_age is not None or criteria.max_age is not None,
+        'education_level': bool(criteria.education_levels),
+        'country': bool(criteria.countries),
+        'gender': bool(criteria.genders),
+        'employment_status': bool(criteria.employment_statuses),
+    }
+    if user and user.is_authenticated:
+        profile = user.profile
+        values = {
+            'birth_date': profile.birth_date,
+            'education_level': profile.education_level,
+            'country': profile.country.code if profile.country else '',
+            'gender': profile.gender,
+            'employment_status': profile.employment_status,
+        }
+        missing = [field for field, required in targeted_fields.items() if required and not values[field]]
+        if missing:
+            raise EligibilityUnknown('Complete the required research profile fields to continue.')
+        return values
+
+    screener_data = screener_data or {}
+    values = {}
+    errors = {}
+    if targeted_fields['birth_date']:
+        try:
+            values['birth_date'] = date.fromisoformat(screener_data.get('birth_date', ''))
+        except (TypeError, ValueError):
+            errors['eligibility_birth_date'] = 'Enter a valid date of birth.'
+    for field, allowed, error_message in (
+        ('education_level', set(Profile.EducationLevel.values), 'Select your education level.'),
+        ('gender', set(Profile.Gender.values), 'Select your gender.'),
+        ('employment_status', set(Profile.EmploymentStatus.values), 'Select your employment status.'),
+    ):
+        if targeted_fields[field]:
+            value = screener_data.get(field, '')
+            if value not in allowed:
+                errors[f'eligibility_{field}'] = error_message
+            else:
+                values[field] = value
+    if targeted_fields['country']:
+        value = screener_data.get('country', '')
+        if value not in {code for code, _ in countries}:
+            errors['eligibility_country'] = 'Select your country.'
+        else:
+            values['country'] = value
+    if errors:
+        raise ResponseValidationError(errors)
+    return values
+
+
+def _validated_eligibility(version, user, screener_data):
+    try:
+        criteria = version.eligibility_criteria
+    except EligibilityCriteria.DoesNotExist:
+        return {'targeted': False}, timezone.now()
+    if not criteria.is_targeted:
+        return {'targeted': False}, timezone.now()
+    values = _eligibility_values(criteria, user, screener_data)
+    age = _current_age(values['birth_date']) if values.get('birth_date') else None
+    eligible = (
+        (criteria.min_age is None or age >= criteria.min_age)
+        and (criteria.max_age is None or age <= criteria.max_age)
+        and (not criteria.education_levels or values['education_level'] in criteria.education_levels)
+        and (not criteria.countries or values['country'] in criteria.countries)
+        and (not criteria.genders or values['gender'] in criteria.genders)
+        and (
+            not criteria.employment_statuses
+            or values['employment_status'] in criteria.employment_statuses
+        )
+    )
+    if not eligible:
+        raise IneligibleRespondent('Your screener does not match this study’s eligibility criteria.')
+    snapshot = {
+        key: value.isoformat() if isinstance(value, date) else value
+        for key, value in values.items()
+    }
+    snapshot['targeted'] = True
+    return snapshot, timezone.now()
+
+
 @transaction.atomic
 def start_submission(
     survey,
@@ -96,6 +196,7 @@ def start_submission(
     source=Submission.Source.DIRECT,
     identity_consent=False,
     identity_data=None,
+    screener_data=None,
 ):
     survey = Survey.objects.select_for_update().get(pk=survey.pk)
     version = current_published_version(survey)
@@ -122,6 +223,11 @@ def start_submission(
     ).first()
     if completed:
         return completed
+    eligibility_data, eligibility_checked_at = _validated_eligibility(
+        version,
+        respondent,
+        screener_data,
+    )
     identity_data, identity_consent_at = _validated_identity(
         survey,
         identity_consent,
@@ -136,6 +242,9 @@ def start_submission(
         presentation=build_presentation(version),
         identity_data=identity_data,
         identity_consent_at=identity_consent_at,
+        is_eligible=True,
+        eligibility_data=eligibility_data,
+        eligibility_checked_at=eligibility_checked_at,
     )
 
 

@@ -1,9 +1,12 @@
+from datetime import date
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
 from surveys.models import Question, Survey
 from surveys.publication import publish_survey
+from surveys import services as survey_services
 
 from responses.models import Answer, Submission
 from responses.services import hash_session_key
@@ -34,6 +37,26 @@ class ResponseRuntimeTests(TestCase):
 
     def start(self):
         return self.client.post(reverse('respond_survey', args=[self.survey.slug]))
+
+    def target_survey(self, **overrides):
+        draft = self.survey.draft_version
+        values = {
+            'min_age': 18,
+            'max_age': 30,
+            'education_levels': ['undergraduate'],
+            'countries': ['BD'],
+            'genders': [],
+            'employment_statuses': ['student'],
+        }
+        values.update(overrides)
+        _, revision = survey_services.update_eligibility(
+            draft.id,
+            draft.revision,
+            values,
+        )
+        self.published, _ = publish_survey(self.survey.id, self.owner, revision)
+        self.survey.refresh_from_db()
+        self.question = Question.objects.get(section__version=self.published)
 
     def test_guest_response_is_bound_to_published_version_and_session(self):
         response = self.start()
@@ -258,3 +281,89 @@ class ResponseRuntimeTests(TestCase):
         self.assertRedirects(response, reverse('response_complete', args=[submission.id]))
         self.assertEqual(submission.answers.count(), 1)
         self.assertEqual(submission.answers.get().value, 'Home')
+
+    def test_targeted_guest_must_complete_generated_screener(self):
+        self.target_survey()
+        url = reverse('respond_survey', args=[self.survey.slug])
+
+        page = self.client.get(url)
+        invalid = self.client.post(url, {})
+
+        self.assertContains(page, 'Eligibility check')
+        self.assertContains(page, 'name="eligibility_birth_date"')
+        self.assertEqual(invalid.status_code, 422)
+        self.assertContains(invalid, 'Select your education level', status_code=422)
+        self.assertFalse(Submission.objects.exists())
+
+    def test_ineligible_guest_cannot_start_targeted_survey(self):
+        self.target_survey()
+
+        response = self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            {
+                'eligibility_birth_date': '2002-04-10',
+                'eligibility_education_level': 'undergraduate',
+                'eligibility_country': 'US',
+                'eligibility_employment_status': 'student',
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'does not match', status_code=403)
+        self.assertFalse(Submission.objects.exists())
+
+    def test_eligible_guest_screener_is_snapshotted_separately(self):
+        self.target_survey()
+
+        response = self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            {
+                'eligibility_birth_date': '2002-04-10',
+                'eligibility_education_level': 'undergraduate',
+                'eligibility_country': 'BD',
+                'eligibility_employment_status': 'student',
+            },
+        )
+
+        submission = Submission.objects.get()
+        self.assertRedirects(response, reverse('response_form', args=[submission.id]))
+        self.assertTrue(submission.is_eligible)
+        self.assertTrue(submission.eligibility_data['targeted'])
+        self.assertEqual(submission.eligibility_data['country'], 'BD')
+        self.assertIsNotNone(submission.eligibility_checked_at)
+
+    def test_authenticated_targeting_uses_profile_not_posted_screener(self):
+        self.target_survey()
+        respondent = get_user_model().objects.create_user(email='eligible@example.com')
+        respondent.profile.birth_date = date(2001, 5, 2)
+        respondent.profile.education_level = 'undergraduate'
+        respondent.profile.country = 'BD'
+        respondent.profile.employment_status = 'student'
+        respondent.profile.save()
+        self.client.force_login(respondent)
+
+        response = self.start()
+
+        submission = Submission.objects.get()
+        self.assertRedirects(response, reverse('response_form', args=[submission.id]))
+        self.assertEqual(submission.respondent, respondent)
+        self.assertEqual(submission.eligibility_data['country'], 'BD')
+
+    def test_incomplete_authenticated_profile_cannot_use_guest_screener(self):
+        self.target_survey()
+        respondent = get_user_model().objects.create_user(email='incomplete@example.com')
+        self.client.force_login(respondent)
+
+        response = self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            {
+                'eligibility_birth_date': '2002-04-10',
+                'eligibility_education_level': 'undergraduate',
+                'eligibility_country': 'BD',
+                'eligibility_employment_status': 'student',
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'Complete the required research profile', status_code=403)
+        self.assertFalse(Submission.objects.exists())

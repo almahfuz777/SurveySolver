@@ -22,6 +22,23 @@
             {% endif %}
             <form method="post">
                 {% csrf_token %}
+                {% if criteria %}
+                    <fieldset class="identity-consent eligibility-screener">
+                        <legend>Eligibility check</legend>
+                        {% if user.is_authenticated %}
+                            <p>We’ll privately check the relevant fields in your research profile. These profile details are not added to your survey answers.</p>
+                            {% if eligibility_notice %}<div class="message message-error" role="alert">{{ eligibility_notice }} {% if 'profile' in eligibility_notice %}<a href="{% url 'profile_edit' %}">Complete your profile</a>{% endif %}</div>{% endif %}
+                        {% else %}
+                            <p>Answer only the fields required for this study. Screener details are kept separate from the researcher-visible answers.</p>
+                            {% if criteria.min_age != None or criteria.max_age != None %}<label for="eligibility-birth-date">Date of birth</label><input id="eligibility-birth-date" name="eligibility_birth_date" type="date" value="{{ request.POST.eligibility_birth_date }}">{% if eligibility_errors.eligibility_birth_date %}<span class="field-error">{{ eligibility_errors.eligibility_birth_date }}</span>{% endif %}{% endif %}
+                            {% if criteria.education_levels %}<label for="eligibility-education">Education level</label><select id="eligibility-education" name="eligibility_education_level"><option value="">Select</option>{% for value, label in education_choices %}<option value="{{ value }}"{% if request.POST.eligibility_education_level == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% if eligibility_errors.eligibility_education_level %}<span class="field-error">{{ eligibility_errors.eligibility_education_level }}</span>{% endif %}{% endif %}
+                            {% if criteria.countries %}<label for="eligibility-country">Country</label><select id="eligibility-country" name="eligibility_country"><option value="">Select</option>{% for value, label in country_choices %}<option value="{{ value }}"{% if request.POST.eligibility_country == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% if eligibility_errors.eligibility_country %}<span class="field-error">{{ eligibility_errors.eligibility_country }}</span>{% endif %}{% endif %}
+                            {% if criteria.genders %}<label for="eligibility-gender">Gender</label><select id="eligibility-gender" name="eligibility_gender"><option value="">Select</option>{% for value, label in gender_choices %}<option value="{{ value }}"{% if request.POST.eligibility_gender == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% if eligibility_errors.eligibility_gender %}<span class="field-error">{{ eligibility_errors.eligibility_gender }}</span>{% endif %}{% endif %}
+                            {% if criteria.employment_statuses %}<label for="eligibility-employment">Employment status</label><select id="eligibility-employment" name="eligibility_employment_status"><option value="">Select</option>{% for value, label in employment_choices %}<option value="{{ value }}"{% if request.POST.eligibility_employment_status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% if eligibility_errors.eligibility_employment_status %}<span class="field-error">{{ eligibility_errors.eligibility_employment_status }}</span>{% endif %}{% endif %}
+                            {% if eligibility_notice %}<div class="message message-error" role="alert">{{ eligibility_notice }}</div>{% endif %}
+                        {% endif %}
+                    </fieldset>
+                {% endif %}
                 {% if survey.identity_mode == 'identified' %}
                     <fieldset class="identity-consent">
                         <legend>Identified response</legend>
