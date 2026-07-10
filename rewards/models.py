@@ -15,6 +15,7 @@ class PointTransactionQuerySet(models.QuerySet):
 class PointTransaction(models.Model):
     class Reason(models.TextChoices):
         PROFILE_COMPLETION = 'profile_completion', 'Profile completion'
+        SURVEY_COMPLETION = 'survey_completion', 'Survey completion'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
@@ -26,6 +27,20 @@ class PointTransaction(models.Model):
     reason = models.CharField(max_length=32, choices=Reason.choices)
     idempotency_key = models.CharField(max_length=160, unique=True)
     metadata = models.JSONField(default=dict, blank=True)
+    survey = models.ForeignKey(
+        'surveys.Survey',
+        on_delete=models.PROTECT,
+        related_name='point_transactions',
+        blank=True,
+        null=True,
+    )
+    submission = models.OneToOneField(
+        'responses.Submission',
+        on_delete=models.PROTECT,
+        related_name='point_transaction',
+        blank=True,
+        null=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = PointTransactionQuerySet.as_manager()
@@ -36,6 +51,26 @@ class PointTransaction(models.Model):
             models.CheckConstraint(
                 condition=~models.Q(amount=0),
                 name='rewards_point_transaction_nonzero',
+            ),
+            models.UniqueConstraint(
+                fields=('user', 'survey', 'reason'),
+                condition=models.Q(reason='survey_completion'),
+                name='rewards_one_completion_per_user_survey',
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        reason='profile_completion',
+                        survey__isnull=True,
+                        submission__isnull=True,
+                    )
+                    | models.Q(
+                        reason='survey_completion',
+                        survey__isnull=False,
+                        submission__isnull=False,
+                    )
+                ),
+                name='rewards_transaction_context_valid',
             ),
         ]
 
@@ -99,3 +134,40 @@ class GuestRewardClaim(models.Model):
 
     def __str__(self):
         return f'{self.points_snapshot} point claim for {self.survey.title}'
+
+
+class Badge(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(max_length=50, unique=True)
+    name = models.CharField(max_length=80)
+    description = models.CharField(max_length=240)
+    completion_threshold = models.PositiveIntegerField(unique=True)
+
+    class Meta:
+        ordering = ('completion_threshold',)
+
+    def __str__(self):
+        return self.name
+
+
+class BadgeAward(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='badge_awards',
+    )
+    badge = models.ForeignKey(Badge, on_delete=models.PROTECT, related_name='awards')
+    awarded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-awarded_at',)
+        constraints = [
+            models.UniqueConstraint(
+                fields=('user', 'badge'),
+                name='rewards_one_badge_award_per_user',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.badge.name} awarded to {self.user.email}'

@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from allauth.account.models import EmailAddress
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -10,7 +11,7 @@ from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 
 from rewards.claims import CLAIM_SECRET_SESSION_KEY, PENDING_CLAIM_SESSION_KEY
-from rewards.models import GuestRewardClaim
+from rewards.models import BadgeAward, GuestRewardClaim, PointTransaction
 
 
 class GuestRewardClaimTests(TestCase):
@@ -72,7 +73,11 @@ class GuestRewardClaimTests(TestCase):
         self.assertRedirects(response, reverse('account_signup'))
         self.assertEqual(
             self.client.session[PENDING_CLAIM_SESSION_KEY],
-            {'claim_id': str(claim.id), 'secret': secret},
+            {
+                'claim_id': str(claim.id),
+                'secret': secret,
+                'session_key_hash': claim.session_key_hash,
+            },
         )
 
     def test_existing_user_path_preserves_claim_before_login(self):
@@ -133,3 +138,61 @@ class GuestRewardClaimTests(TestCase):
         )
 
         self.assertFalse(GuestRewardClaim.objects.exists())
+        transaction = PointTransaction.objects.get(user=respondent)
+        self.assertEqual(transaction.amount, 10)
+        self.assertEqual(transaction.survey, self.survey)
+        self.assertEqual(transaction.submission, submission)
+        self.assertEqual(
+            BadgeAward.objects.get(user=respondent).badge.slug,
+            'first-response',
+        )
+
+    def test_verified_login_consumes_claim_without_reidentifying_answers(self):
+        submission = self.complete_guest_response()
+        claim = GuestRewardClaim.objects.get()
+        secret = self.client.session[CLAIM_SECRET_SESSION_KEY][str(claim.id)]
+        self.client.post(
+            reverse('prepare_reward_claim', args=[claim.id]),
+            {'claim_secret': secret, 'destination': 'login'},
+        )
+        user = get_user_model().objects.create_user(
+            email='claimant@example.com',
+            password='correct-horse-battery-staple',
+        )
+        EmailAddress.objects.create(
+            user=user,
+            email=user.email,
+            primary=True,
+            verified=True,
+        )
+
+        response = self.client.post(
+            reverse('account_login'),
+            {'login': user.email, 'password': 'correct-horse-battery-staple'},
+        )
+
+        self.assertRedirects(response, reverse('dashboard'))
+        claim.refresh_from_db()
+        submission.refresh_from_db()
+        self.assertEqual(claim.claimed_by, user)
+        self.assertIsNotNone(claim.claimed_at)
+        self.assertEqual(PointTransaction.objects.get(user=user).amount, 10)
+        self.assertIsNone(submission.respondent)
+        self.assertNotIn(PENDING_CLAIM_SESSION_KEY, self.client.session)
+
+    def test_survey_owner_never_receives_completion_points(self):
+        self.client.force_login(self.owner)
+        self.client.post(reverse('respond_survey', args=[self.survey.slug]))
+        submission = Submission.objects.get()
+
+        self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Owner test response'},
+        )
+
+        self.assertFalse(
+            PointTransaction.objects.filter(
+                user=self.owner,
+                reason=PointTransaction.Reason.SURVEY_COMPLETION,
+            ).exists()
+        )

@@ -7,8 +7,9 @@ from django.views.decorators.http import require_http_methods
 from django_countries import countries
 
 from accounts.models import Profile
-from rewards.claims import claim_secret_from_session, create_guest_claim, store_claim_secret
+from rewards.claims import BASE_COMPLETION_POINTS, claim_secret_from_session, create_guest_claim, store_claim_secret
 from rewards.models import GuestRewardClaim
+from rewards.services import award_survey_completion
 from surveys.models import Survey
 
 from .models import Submission
@@ -251,6 +252,12 @@ def submission_form(request, submission_id):
                         claim, claim_secret = create_guest_claim(
                             completed_submission.id,
                             _session_key(request),
+                        )
+                    else:
+                        award_survey_completion(
+                            request.user,
+                            completed_submission,
+                            BASE_COMPLETION_POINTS,
                         )
         except ResponseValidationError as error:
             errors = error.errors

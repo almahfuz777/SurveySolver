@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import GuestRewardClaim, PointTransaction
+from .models import Badge, BadgeAward, GuestRewardClaim, PointTransaction
 
 
 @admin.register(PointTransaction)
@@ -42,6 +42,25 @@ class GuestRewardClaimAdmin(admin.ModelAdmin):
         'claimed_by',
         'created_at',
     )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Badge)
+class BadgeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'completion_threshold')
+    search_fields = ('name', 'description')
+
+
+@admin.register(BadgeAward)
+class BadgeAwardAdmin(admin.ModelAdmin):
+    list_display = ('badge', 'user', 'awarded_at')
+    search_fields = ('badge__name', 'user__email')
+    readonly_fields = ('id', 'badge', 'user', 'awarded_at')
 
     def has_add_permission(self, request):
         return False
