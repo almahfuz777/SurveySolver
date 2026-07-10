@@ -12,6 +12,7 @@
     </div>
     <div class="builder-status" aria-live="polite">
         <span data-save-status>All changes saved</span>
+        <a class="button button-secondary button-small" href="{% url 'survey_logic' survey.id %}">Logic & quotas</a>
         <a class="button button-secondary button-small" href="{% url 'survey_preview' survey.id %}">Preview</a>
     </div>
 </header>

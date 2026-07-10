@@ -1053,6 +1053,14 @@ form button[type="submit"] {
 .preview-option input { width: auto !important; min-height: auto !important; }
 .scale-preview { display: flex; align-items: center; gap: 0.75rem; }
 .scale-preview input { flex: 1; }
+.logic-grid { display: grid; align-items: start; gap: 1rem; grid-template-columns: 1fr 1fr; }
+.logic-grid .panel > h2 { margin-top: 0; }
+.logic-list { display: grid; gap: 0.6rem; margin-bottom: 1.5rem; }
+.logic-list > div { display: grid; padding: 0.8rem; background: var(--surface-muted); border-radius: var(--radius-sm); }
+.logic-list span { color: var(--ink-600); font-size: 0.85rem; }
+.logic-form { padding-top: 1rem; border-top: 1px solid var(--border); }
+.matrix-preview { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.matrix-preview th, .matrix-preview td { padding: 0.5rem; border: 1px solid var(--border); text-align: center; }
 
 @media (max-width: 860px) {
     .nav-toggle {
@@ -1127,6 +1135,7 @@ form button[type="submit"] {
     .survey-detail-grid {
         grid-template-columns: 1fr;
     }
+    .logic-grid { grid-template-columns: 1fr; }
 
     .builder-layout { grid-template-columns: 12rem minmax(24rem, 1fr); }
     .builder-settings { grid-column: 1 / -1; border-top: 1px solid var(--border); border-left: 0; }

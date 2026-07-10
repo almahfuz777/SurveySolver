@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Max
 
-from .models import Question, QuestionChoice, Section, SurveyVersion
+from .models import BranchRule, MatrixRow, Question, QuestionChoice, Quota, Section, SurveyVersion
 
 
 class StaleVersionError(Exception):
@@ -38,7 +38,8 @@ def update_section(section_id, expected_revision, cleaned_data):
     version = _lock_version(section.version_id, expected_revision)
     section.title = cleaned_data['title']
     section.description = cleaned_data['description']
-    section.save(update_fields=('title', 'description'))
+    section.randomize_questions = cleaned_data['randomize_questions']
+    section.save(update_fields=('title', 'description', 'randomize_questions'))
     return section, _bump_revision(version)
 
 
@@ -84,8 +85,13 @@ def _default_question_values(question_type):
         Question.Type.SINGLE_CHOICE,
         Question.Type.MULTIPLE_CHOICE,
         Question.Type.DROPDOWN,
+        Question.Type.RANKING,
     } else []
-    return config, choices
+    rows = []
+    if question_type == Question.Type.LIKERT_MATRIX:
+        choices = ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree']
+        rows = ['Statement 1', 'Statement 2']
+    return config, choices, rows
 
 
 @transaction.atomic
@@ -93,7 +99,7 @@ def add_question(section_id, question_type, expected_revision):
     section = Section.objects.select_related('version').get(pk=section_id)
     version = _lock_version(section.version_id, expected_revision)
     order = (section.questions.aggregate(max_order=Max('order'))['max_order'] or 0) + 1
-    config, choices = _default_question_values(question_type)
+    config, choices, rows = _default_question_values(question_type)
     question = Question.objects.create(
         section=section,
         type=question_type,
@@ -104,24 +110,47 @@ def add_question(section_id, question_type, expected_revision):
     QuestionChoice.objects.bulk_create(
         [QuestionChoice(question=question, label=label, order=index) for index, label in enumerate(choices, 1)]
     )
+    MatrixRow.objects.bulk_create([MatrixRow(question=question, label=label, order=index) for index, label in enumerate(rows, 1)])
     return question, _bump_revision(version)
 
 
 @transaction.atomic
-def update_question(question_id, expected_revision, cleaned_data, config, choice_labels):
+def update_question(question_id, expected_revision, cleaned_data, config, choice_labels, row_labels=None):
     question = Question.objects.select_related('section__version').get(pk=question_id)
     version = _lock_version(question.section.version_id, expected_revision)
     question.type = cleaned_data['type']
     question.prompt = cleaned_data['prompt']
     question.help_text = cleaned_data['help_text']
     question.required = cleaned_data['required']
+    question.randomize_choices = cleaned_data['randomize_choices']
     question.config = config
-    question.save(update_fields=('type', 'prompt', 'help_text', 'required', 'config'))
+    question.save(update_fields=('type', 'prompt', 'help_text', 'required', 'randomize_choices', 'config'))
     question.choices.all().delete()
     QuestionChoice.objects.bulk_create(
         [QuestionChoice(question=question, label=label, order=index) for index, label in enumerate(choice_labels, 1)]
     )
+    question.matrix_rows.all().delete()
+    MatrixRow.objects.bulk_create([MatrixRow(question=question, label=label, order=index) for index, label in enumerate(row_labels or [], 1)])
     return question, _bump_revision(version)
+
+
+@transaction.atomic
+def add_branch_rule(version_id, expected_revision, cleaned_data):
+    version = _lock_version(version_id, expected_revision)
+    order = (version.branch_rules.aggregate(max_order=Max('order'))['max_order'] or 0) + 1
+    rule = BranchRule(version=version, order=order, **cleaned_data)
+    rule.full_clean()
+    rule.save()
+    return rule, _bump_revision(version)
+
+
+@transaction.atomic
+def add_quota(version_id, expected_revision, cleaned_data):
+    version = _lock_version(version_id, expected_revision)
+    quota = Quota(version=version, **cleaned_data)
+    quota.full_clean()
+    quota.save()
+    return quota, _bump_revision(version)
 
 
 @transaction.atomic

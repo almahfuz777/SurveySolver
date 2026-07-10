@@ -200,6 +200,7 @@ class Section(models.Model):
     title = models.CharField(max_length=160, default='Untitled section')
     description = models.TextField(blank=True)
     order = models.PositiveIntegerField()
+    randomize_questions = models.BooleanField(default=False)
 
     class Meta:
         ordering = ('order',)
@@ -237,6 +238,8 @@ class Question(models.Model):
         MULTIPLE_CHOICE = 'multiple_choice', 'Multiple choice'
         DROPDOWN = 'dropdown', 'Dropdown'
         SCALE = 'scale', 'Scale'
+        RANKING = 'ranking', 'Ranking'
+        LIKERT_MATRIX = 'likert_matrix', 'Likert matrix'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='questions')
@@ -244,6 +247,7 @@ class Question(models.Model):
     prompt = models.CharField(max_length=500)
     help_text = models.CharField(max_length=300, blank=True)
     required = models.BooleanField(default=False)
+    randomize_choices = models.BooleanField(default=False)
     order = models.PositiveIntegerField()
     config = models.JSONField(default=dict, blank=True)
 
@@ -262,7 +266,13 @@ class Question(models.Model):
             self.Type.SINGLE_CHOICE,
             self.Type.MULTIPLE_CHOICE,
             self.Type.DROPDOWN,
+            self.Type.RANKING,
+            self.Type.LIKERT_MATRIX,
         }
+
+    @property
+    def uses_matrix_rows(self):
+        return self.type == self.Type.LIKERT_MATRIX
 
     def __str__(self):
         return self.prompt
@@ -318,4 +328,105 @@ class QuestionChoice(models.Model):
 
     def delete(self, *args, **kwargs):
         self._ensure_editable()
+        return super().delete(*args, **kwargs)
+
+
+class MatrixRow(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='matrix_rows')
+    label = models.CharField(max_length=240)
+    order = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ('order',)
+        constraints = [models.UniqueConstraint(fields=('question', 'order'), name='surveys_matrix_row_order_unique')]
+
+    def __str__(self):
+        return self.label
+
+    def _ensure_editable(self):
+        status = Question.objects.values_list('section__version__status', flat=True).get(pk=self.question_id)
+        if status != SurveyVersion.Status.DRAFT:
+            raise ValidationError('Published survey versions are immutable.')
+
+    def save(self, *args, **kwargs):
+        self._ensure_editable()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        self._ensure_editable()
+        return super().delete(*args, **kwargs)
+
+
+class BranchRule(models.Model):
+    class Operator(models.TextChoices):
+        EQUALS = 'equals', 'Equals'
+        NOT_EQUALS = 'not_equals', 'Does not equal'
+        CONTAINS = 'contains', 'Contains'
+        ANSWERED = 'answered', 'Is answered'
+
+    class Action(models.TextChoices):
+        GO_TO_SECTION = 'go_to_section', 'Go to section'
+        END_SURVEY = 'end_survey', 'End survey'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = models.ForeignKey(SurveyVersion, on_delete=models.CASCADE, related_name='branch_rules')
+    source_question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='branch_rules')
+    operator = models.CharField(max_length=16, choices=Operator.choices)
+    compare_value = models.CharField(max_length=240, blank=True)
+    action = models.CharField(max_length=20, choices=Action.choices)
+    target_section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='incoming_branch_rules', blank=True, null=True)
+    order = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ('order',)
+        constraints = [models.UniqueConstraint(fields=('version', 'order'), name='surveys_branch_rule_order_unique')]
+
+    def clean(self):
+        if self.source_question_id and self.source_question.section.version_id != self.version_id:
+            raise ValidationError('Branch question must belong to this survey version.')
+        if self.action == self.Action.GO_TO_SECTION and not self.target_section_id:
+            raise ValidationError('A target section is required for this action.')
+        if self.target_section_id and self.target_section.version_id != self.version_id:
+            raise ValidationError('Branch target must belong to this survey version.')
+
+    def save(self, *args, **kwargs):
+        if self.version_id:
+            status = SurveyVersion.objects.values_list('status', flat=True).get(pk=self.version_id)
+            if status != SurveyVersion.Status.DRAFT:
+                raise ValidationError('Published survey versions are immutable.')
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.version.status != SurveyVersion.Status.DRAFT:
+            raise ValidationError('Published survey versions are immutable.')
+        return super().delete(*args, **kwargs)
+
+
+class Quota(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = models.ForeignKey(SurveyVersion, on_delete=models.CASCADE, related_name='quotas')
+    name = models.CharField(max_length=120)
+    limit = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    criteria = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('name',)
+        constraints = [models.UniqueConstraint(fields=('version', 'name'), name='surveys_quota_name_unique')]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if self.version_id:
+            status = SurveyVersion.objects.values_list('status', flat=True).get(pk=self.version_id)
+            if status != SurveyVersion.Status.DRAFT:
+                raise ValidationError('Published survey versions are immutable.')
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.version.status != SurveyVersion.Status.DRAFT:
+            raise ValidationError('Published survey versions are immutable.')
         return super().delete(*args, **kwargs)

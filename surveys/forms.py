@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Question, Section, Survey, Topic
+from .models import BranchRule, Question, Quota, Section, Survey, Topic
 
 
 class SurveyMetadataForm(forms.ModelForm):
@@ -45,7 +45,7 @@ class SurveyMetadataForm(forms.ModelForm):
 class SectionForm(forms.ModelForm):
     class Meta:
         model = Section
-        fields = ('title', 'description')
+        fields = ('title', 'description', 'randomize_questions')
         widgets = {'description': forms.Textarea(attrs={'rows': 2})}
 
 
@@ -55,6 +55,7 @@ class QuestionEditorForm(forms.ModelForm):
         widget=forms.Textarea(attrs={'rows': 5}),
         help_text='Enter one choice per line.',
     )
+    rows_text = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 4}), help_text='Enter one matrix statement per line.')
     min_value = forms.DecimalField(required=False)
     max_value = forms.DecimalField(required=False)
     min_length = forms.IntegerField(required=False, min_value=0)
@@ -66,7 +67,7 @@ class QuestionEditorForm(forms.ModelForm):
 
     class Meta:
         model = Question
-        fields = ('type', 'prompt', 'help_text', 'required')
+        fields = ('type', 'prompt', 'help_text', 'required', 'randomize_choices')
         widgets = {'help_text': forms.Textarea(attrs={'rows': 2})}
 
     def __init__(self, *args, **kwargs):
@@ -87,6 +88,7 @@ class QuestionEditorForm(forms.ModelForm):
             self.fields['choices_text'].initial = '\n'.join(
                 self.instance.choices.values_list('label', flat=True)
             )
+            self.fields['rows_text'].initial = '\n'.join(self.instance.matrix_rows.values_list('label', flat=True))
 
     def clean(self):
         cleaned_data = super().clean()
@@ -96,6 +98,8 @@ class QuestionEditorForm(forms.ModelForm):
             Question.Type.SINGLE_CHOICE,
             Question.Type.MULTIPLE_CHOICE,
             Question.Type.DROPDOWN,
+            Question.Type.RANKING,
+            Question.Type.LIKERT_MATRIX,
         }:
             choices = [
                 line.strip()
@@ -109,6 +113,14 @@ class QuestionEditorForm(forms.ModelForm):
             cleaned_data['choice_labels'] = choices
         else:
             cleaned_data['choice_labels'] = []
+            cleaned_data['randomize_choices'] = False
+
+        rows = [line.strip() for line in cleaned_data.get('rows_text', '').splitlines() if line.strip()]
+        if question_type == Question.Type.LIKERT_MATRIX and len(rows) < 2:
+            self.add_error('rows_text', 'Add at least two matrix statements.')
+        if len({row.casefold() for row in rows}) != len(rows):
+            self.add_error('rows_text', 'Matrix statements must be unique.')
+        cleaned_data['row_labels'] = rows if question_type == Question.Type.LIKERT_MATRIX else []
 
         minimum = cleaned_data.get('min_value')
         maximum = cleaned_data.get('max_value')
@@ -153,3 +165,27 @@ class QuestionEditorForm(forms.ModelForm):
                 if value not in (None, ''):
                     config[key] = value
         return config
+
+
+class BranchRuleForm(forms.ModelForm):
+    class Meta:
+        model = BranchRule
+        fields = ('source_question', 'operator', 'compare_value', 'action', 'target_section')
+
+    def __init__(self, *args, version, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance.version = version
+        self.fields['source_question'].queryset = Question.objects.filter(section__version=version)
+        self.fields['target_section'].queryset = Section.objects.filter(version=version)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('operator') != BranchRule.Operator.ANSWERED and not cleaned_data.get('compare_value', '').strip():
+            self.add_error('compare_value', 'Enter the answer value used by this condition.')
+        return cleaned_data
+
+
+class QuotaForm(forms.ModelForm):
+    class Meta:
+        model = Quota
+        fields = ('name', 'limit', 'is_active')

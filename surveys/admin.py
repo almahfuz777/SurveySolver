@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Question, QuestionChoice, Section, Survey, SurveyVersion, Topic
+from .models import BranchRule, MatrixRow, Question, QuestionChoice, Quota, Section, Survey, SurveyVersion, Topic
 
 
 @admin.register(Topic)
@@ -40,9 +40,18 @@ class QuestionChoiceInline(admin.TabularInline):
     extra = 0
 
 
+class MatrixRowInline(admin.TabularInline):
+    model = MatrixRow
+    extra = 0
+
+
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     list_display = ('prompt', 'type', 'section', 'order', 'required')
     list_filter = ('type', 'required')
     search_fields = ('prompt', 'section__version__survey__title')
-    inlines = (QuestionChoiceInline,)
+    inlines = (QuestionChoiceInline, MatrixRowInline)
+
+
+admin.site.register(BranchRule)
+admin.site.register(Quota)

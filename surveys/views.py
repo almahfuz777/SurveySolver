@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from . import services
-from .forms import QuestionEditorForm, SectionForm, SurveyMetadataForm
+from .forms import BranchRuleForm, QuestionEditorForm, QuotaForm, SectionForm, SurveyMetadataForm
 from .models import Question, Section, Survey, SurveyVersion
 
 
@@ -153,6 +153,32 @@ def survey_preview(request, survey_id):
     return render(request, 'surveys/preview.html', {'survey': survey, 'version': version})
 
 
+@login_required
+def survey_logic(request, survey_id):
+    survey = _owned_survey(request, survey_id)
+    version = _draft_version(survey)
+    branch_form = BranchRuleForm(version=version)
+    quota_form = QuotaForm()
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        try:
+            if action == 'add_branch':
+                branch_form = BranchRuleForm(request.POST, version=version)
+                if branch_form.is_valid():
+                    services.add_branch_rule(version.id, _revision(request), branch_form.cleaned_data)
+                    messages.success(request, 'Branch rule added.')
+                    return redirect('survey_logic', survey_id=survey.id)
+            elif action == 'add_quota':
+                quota_form = QuotaForm(request.POST)
+                if quota_form.is_valid():
+                    services.add_quota(version.id, _revision(request), quota_form.cleaned_data)
+                    messages.success(request, 'Quota added.')
+                    return redirect('survey_logic', survey_id=survey.id)
+        except (services.StaleVersionError, ValidationError) as error:
+            return _mutation_error(request, survey, error)
+    return render(request, 'surveys/logic.html', {'survey': survey, 'version': version, 'branch_form': branch_form, 'quota_form': quota_form})
+
+
 @require_POST
 @login_required
 def section_add(request, survey_id):
@@ -237,6 +263,7 @@ def question_update(request, survey_id, question_id):
             form.cleaned_data,
             form.question_config(),
             form.cleaned_data['choice_labels'],
+            form.cleaned_data['row_labels'],
         )
     except (services.StaleVersionError, ValidationError) as error:
         return _mutation_error(request, survey, error)
