@@ -9,6 +9,7 @@ django-countries==9.0.0
 django-environ==0.14.0
 idna==3.18
 oauthlib==3.3.1
+Pillow==12.3.0
 pycparser==3.0
 PyJWT==2.13.0
 requests==2.34.2

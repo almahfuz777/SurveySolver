@@ -24,7 +24,7 @@
             </article>
             <article class="metric-card">
                 <span>Total responses</span>
-                <strong>0</strong>
+                <strong>{{ active_survey_count }}</strong>
                 <small>Across all survey versions</small>
             </article>
             <article class="metric-card metric-card-reward">
@@ -41,12 +41,25 @@
                         <span class="panel-kicker">Your research</span>
                         <h2 id="surveys-heading">Surveys</h2>
                     </div>
+                    <a class="button button-primary button-small" href="{% url 'survey_create' %}">Create survey</a>
                 </div>
-                <div class="empty-state">
-                    <span class="empty-icon" aria-hidden="true">✦</span>
-                    <h3>Your first survey starts here</h3>
-                    <p>The research builder is the next workspace capability being prepared.</p>
-                </div>
+                {% if recent_surveys %}
+                    <div class="mini-survey-list">
+                        {% for survey in recent_surveys %}
+                            <a class="mini-survey" href="{% url 'survey_detail' survey.id %}">
+                                <span class="status-label status-{{ survey.status }}">{{ survey.get_status_display }}</span>
+                                <strong>{{ survey.title }}</strong>
+                                <small>{{ survey.estimated_minutes }} min · Updated {{ survey.updated_at|timesince }} ago</small>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <span class="empty-icon" aria-hidden="true">✦</span>
+                        <h3>Your first survey starts here</h3>
+                        <p>Create the research overview now, then build the questions and logic.</p>
+                    </div>
+                {% endif %}
             </section>
 
             <aside class="panel progress-panel" aria-labelledby="profile-progress-heading">
