@@ -35,7 +35,7 @@
                 <a href="{% url 'home' %}">Discover</a>
                 {% if user.is_authenticated %}
                     <a href="{% url 'dashboard' %}">Dashboard</a>
-                    <a href="{% url 'account_email' %}">Account</a>
+                    <a href="{% url 'profile_detail' %}">Profile</a>
                     <a class="button button-quiet button-small" href="{% url 'account_logout' %}">Sign out</a>
                 {% else %}
                     <a href="{% url 'account_login' %}">Sign in</a>

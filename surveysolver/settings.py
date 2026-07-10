@@ -43,6 +43,7 @@ ALLOWED_HOSTS = env.list(
 INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'core.apps.CoreConfig',
+    'rewards.apps.RewardsConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -53,6 +54,7 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+    'django_countries',
 ]
 
 MIDDLEWARE = [

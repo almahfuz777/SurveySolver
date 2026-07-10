@@ -5,6 +5,7 @@ charset-normalizer==3.4.9
 cryptography==49.0.0
 Django==5.2.16
 django-allauth==65.18.0
+django-countries==9.0.0
 django-environ==0.14.0
 idna==3.18
 oauthlib==3.3.1
@@ -13,4 +14,5 @@ PyJWT==2.13.0
 requests==2.34.2
 sqlparse==0.5.5
 tzdata==2026.2
+typing_extensions==4.16.0
 urllib3==2.7.0

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}Research profile | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div class="shell page-heading-inner">
+        <div>
+            <span class="eyebrow">Respondent profile</span>
+            <h1>Your research profile</h1>
+            <p>These details determine which targeted surveys you are eligible to discover.</p>
+        </div>
+        <a class="button button-primary" href="{% url 'profile_edit' %}">Edit profile</a>
+    </div>
+</section>
+
+<section class="page-content">
+    <div class="shell profile-layout">
+        <aside class="panel profile-summary">
+            <div class="progress-ring" style="--progress: {{ user.profile.completion_percentage }}%" aria-label="Profile is {{ user.profile.completion_percentage }}% complete">
+                <span>{{ user.profile.completion_percentage }}%</span>
+            </div>
+            <h2>Profile completion</h2>
+            {% if user.profile.is_complete %}
+                <p>Your profile is ready for personalized survey matching.</p>
+            {% else %}
+                <p>Complete every core field to unlock better matches and the 50-point bonus.</p>
+            {% endif %}
+        </aside>
+
+        <section class="panel profile-details" aria-labelledby="details-heading">
+            <h2 id="details-heading">Research demographics</h2>
+            <dl class="detail-grid">
+                <div><dt>Name</dt><dd>{{ user.get_full_name|default:'Not provided' }}</dd></div>
+                <div><dt>Email</dt><dd>{{ user.email }}</dd></div>
+                <div><dt>Birth date</dt><dd>{{ user.profile.birth_date|default:'Not provided' }}</dd></div>
+                <div><dt>Gender</dt><dd>{{ user.profile.get_gender_display|default:'Not provided' }}</dd></div>
+                <div><dt>Country</dt><dd>{{ user.profile.country.name|default:'Not provided' }}</dd></div>
+                <div><dt>Education</dt><dd>{{ user.profile.get_education_level_display|default:'Not provided' }}</dd></div>
+                <div><dt>Field of study</dt><dd>{{ user.profile.field_of_study|default:'Not provided' }}</dd></div>
+                <div><dt>Employment</dt><dd>{{ user.profile.get_employment_status_display|default:'Not provided' }}</dd></div>
+                <div class="detail-wide"><dt>Research interests</dt><dd>{{ user.profile.research_interests|default:'Not provided' }}</dd></div>
+            </dl>
+        </section>
+    </div>
+</section>
+{% endblock %}

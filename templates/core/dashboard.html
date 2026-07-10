@@ -19,7 +19,7 @@
         <div class="metric-grid" aria-label="Account summary">
             <article class="metric-card">
                 <span>Active surveys</span>
-                <strong>0</strong>
+                <strong>{{ points_balance }}</strong>
                 <small>Your published studies</small>
             </article>
             <article class="metric-card">
@@ -52,11 +52,11 @@
             <aside class="panel progress-panel" aria-labelledby="profile-progress-heading">
                 <span class="panel-kicker">Unlock better matches</span>
                 <h2 id="profile-progress-heading">Complete your profile</h2>
-                <div class="progress-ring" aria-label="Profile is not yet complete">
-                    <span>0%</span>
+                <div class="progress-ring" style="--progress: {{ profile.completion_percentage }}%" aria-label="Profile is {{ profile.completion_percentage }}% complete">
+                    <span>{{ profile.completion_percentage }}%</span>
                 </div>
                 <p>A complete research profile will unlock targeted surveys and a one-time points bonus.</p>
-                <a class="button button-secondary button-block" href="{% url 'account_email' %}">Review account settings</a>
+                <a class="button button-secondary button-block" href="{% url 'profile_edit' %}">Complete your profile</a>
             </aside>
         </div>
     </div>

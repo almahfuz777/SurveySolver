@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit research profile | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div class="shell page-heading-inner">
+        <div>
+            <span class="eyebrow">Profile matching</span>
+            <h1>Tell us about yourself</h1>
+            <p>SurveySolver uses these details privately to match you with eligible research.</p>
+        </div>
+        <span class="account-chip profile-chip">{{ user.profile.completion_percentage }}% complete</span>
+    </div>
+</section>
+
+<section class="page-content">
+    <div class="shell form-shell">
+        <form class="panel profile-form" method="post" novalidate>
+            {% csrf_token %}
+            {% if user_form.non_field_errors or profile_form.non_field_errors %}
+                {{ user_form.non_field_errors }}
+                {{ profile_form.non_field_errors }}
+            {% endif %}
+
+            <fieldset>
+                <legend>Identity</legend>
+                <div class="form-grid">
+                    {% for field in user_form %}
+                        <div class="field-group">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {{ field.errors }}
+                        </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Research demographics</legend>
+                <div class="form-grid">
+                    {% for field in profile_form %}
+                        <div class="field-group{% if field.name == 'research_interests' %} field-wide{% endif %}">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.help_text %}<small class="helptext">{{ field.help_text }}</small>{% endif %}
+                            {{ field.errors }}
+                        </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <div class="form-actions">
+                <a class="button button-quiet" href="{% url 'profile_detail' %}">Cancel</a>
+                <button class="button button-primary" type="submit">Save profile</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

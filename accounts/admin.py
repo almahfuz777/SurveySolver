@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import User
+from .models import Profile, User
 
 
 @admin.register(User)
@@ -36,3 +36,11 @@ class SurveySolverUserAdmin(UserAdmin):
             },
         ),
     )
+
+
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'country', 'education_level', 'completion_percentage')
+    list_select_related = ('user',)
+    search_fields = ('user__email', 'field_of_study', 'institution')
+    list_filter = ('country', 'education_level', 'employment_status')
