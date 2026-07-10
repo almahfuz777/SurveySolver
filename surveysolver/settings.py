@@ -42,6 +42,7 @@ ALLOWED_HOSTS = env.list(
 
 INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
+    'core.apps.CoreConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -132,6 +133,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -146,8 +148,8 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 LOGIN_URL = 'account_login'
-LOGIN_REDIRECT_URL = 'account_email'
-LOGOUT_REDIRECT_URL = 'account_login'
+LOGIN_REDIRECT_URL = 'dashboard'
+LOGOUT_REDIRECT_URL = 'home'
 
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_LOGIN_METHODS = {'email'}

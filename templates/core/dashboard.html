@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="dashboard-hero">
+    <div class="shell dashboard-heading">
+        <div>
+            <span class="eyebrow">Research dashboard</span>
+            <h1>Welcome to your research workspace</h1>
+            <p>Everything you create, collect, and contribute will be organized here.</p>
+        </div>
+        <span class="account-chip">{{ user.email }}</span>
+    </div>
+</section>
+
+<section class="dashboard-content">
+    <div class="shell">
+        <div class="metric-grid" aria-label="Account summary">
+            <article class="metric-card">
+                <span>Active surveys</span>
+                <strong>0</strong>
+                <small>Your published studies</small>
+            </article>
+            <article class="metric-card">
+                <span>Total responses</span>
+                <strong>0</strong>
+                <small>Across all survey versions</small>
+            </article>
+            <article class="metric-card metric-card-reward">
+                <span>Reward points</span>
+                <strong>0</strong>
+                <small>Earned through contributions</small>
+            </article>
+        </div>
+
+        <div class="dashboard-grid">
+            <section class="panel empty-panel" aria-labelledby="surveys-heading">
+                <div class="panel-heading">
+                    <div>
+                        <span class="panel-kicker">Your research</span>
+                        <h2 id="surveys-heading">Surveys</h2>
+                    </div>
+                </div>
+                <div class="empty-state">
+                    <span class="empty-icon" aria-hidden="true">✦</span>
+                    <h3>Your first survey starts here</h3>
+                    <p>The research builder is the next workspace capability being prepared.</p>
+                </div>
+            </section>
+
+            <aside class="panel progress-panel" aria-labelledby="profile-progress-heading">
+                <span class="panel-kicker">Unlock better matches</span>
+                <h2 id="profile-progress-heading">Complete your profile</h2>
+                <div class="progress-ring" aria-label="Profile is not yet complete">
+                    <span>0%</span>
+                </div>
+                <p>A complete research profile will unlock targeted surveys and a one-time points bonus.</p>
+                <a class="button button-secondary button-block" href="{% url 'account_email' %}">Review account settings</a>
+            </aside>
+        </div>
+    </div>
+</section>
+{% endblock %}

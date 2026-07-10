@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}SurveySolver | Research surveys that reach the right people{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="shell hero-grid">
+        <div class="hero-copy">
+            <span class="eyebrow">Research surveys, reimagined</span>
+            <h1>Research deserves <span>better responses.</span></h1>
+            <p class="hero-lead">
+                Create rigorous, targeted surveys and connect with respondents who
+                are genuinely motivated to contribute.
+            </p>
+            <div class="hero-actions">
+                {% if user.is_authenticated %}
+                    <a class="button button-primary" href="{% url 'dashboard' %}">Open your dashboard</a>
+                {% else %}
+                    <a class="button button-primary" href="{% url 'account_signup' %}">Start researching</a>
+                    <a class="button button-secondary" href="{% url 'account_login' %}">I want to respond</a>
+                {% endif %}
+            </div>
+            <div class="trust-row" aria-label="Platform benefits">
+                <span><strong>Targeted</strong> audiences</span>
+                <span><strong>Rewarded</strong> responses</span>
+                <span><strong>Private</strong> by design</span>
+            </div>
+        </div>
+
+        <div class="hero-preview" aria-label="Example survey discovery card">
+            <div class="preview-glow"></div>
+            <article class="survey-preview-card">
+                <div class="preview-banner">
+                    <span class="status-pill"><span></span> Matched to your profile</span>
+                </div>
+                <div class="preview-content">
+                    <div class="tag-row">
+                        <span class="tag">Mental health</span>
+                        <span class="tag">Students</span>
+                    </div>
+                    <h2>Digital wellbeing and academic focus</h2>
+                    <p>Help researchers understand how screen habits influence study routines.</p>
+                    <div class="preview-meta">
+                        <span>8 min</span>
+                        <strong>+10 points</strong>
+                    </div>
+                    <div class="preview-progress" aria-hidden="true"><span></span></div>
+                    <button class="button button-primary button-block" type="button" disabled>Take this survey</button>
+                </div>
+            </article>
+            <div class="floating-stat floating-stat-left"><strong>92%</strong><span>profile match</span></div>
+            <div class="floating-stat floating-stat-right"><strong>+10</strong><span>points earned</span></div>
+        </div>
+    </div>
+</section>
+
+<section class="section section-muted" aria-labelledby="why-heading">
+    <div class="shell">
+        <div class="section-heading">
+            <span class="eyebrow">One platform, two communities</span>
+            <h2 id="why-heading">Designed around the hardest part of survey research</h2>
+            <p>SurveySolver helps researchers find relevant participants while making every contribution feel worthwhile.</p>
+        </div>
+        <div class="feature-grid">
+            <article class="feature-card">
+                <span class="feature-number">01</span>
+                <h3>Build with research-grade controls</h3>
+                <p>Structure complex studies with branching, validation, targeting, quotas, and clear consent.</p>
+            </article>
+            <article class="feature-card feature-card-accent">
+                <span class="feature-number">02</span>
+                <h3>Reach people who actually qualify</h3>
+                <p>Profile-aware discovery brings relevant surveys to eligible respondents instead of broadcasting blindly.</p>
+            </article>
+            <article class="feature-card">
+                <span class="feature-number">03</span>
+                <h3>Reward meaningful participation</h3>
+                <p>Points, progress, and badges create a healthier exchange between researchers and their communities.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="shell split-callout">
+        <div>
+            <span class="eyebrow">Built for credible work</span>
+            <h2>From first question to defensible dataset.</h2>
+        </div>
+        <ul class="check-list">
+            <li>Anonymous or identified collection</li>
+            <li>Version-aware response history</li>
+            <li>Transparent eligibility rules</li>
+            <li>Dashboard analytics and clean exports</li>
+        </ul>
+    </div>
+</section>
+{% endblock %}
