@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ survey.title }} | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="response-hero">
+    <div class="shell response-hero-inner">
+        <div class="response-intro">
+            <span class="eyebrow">Research survey</span>
+            <h1>{{ survey.title }}</h1>
+            <p class="response-summary">{{ survey.summary }}</p>
+            {% if survey.description %}<div class="response-description">{{ survey.description|linebreaks }}</div>{% endif %}
+            <div class="survey-meta" aria-label="Survey details">
+                <span>{{ survey.estimated_minutes }} minute{{ survey.estimated_minutes|pluralize }}</span>
+                <span>{{ version.sections.count }} section{{ version.sections.count|pluralize }}</span>
+                <span>{{ survey.get_identity_mode_display }}</span>
+            </div>
+            {% if survey.topics.exists %}
+                <div class="topic-list" aria-label="Survey topics">
+                    {% for topic in survey.topics.all %}<span class="topic-chip">{{ topic.name }}</span>{% endfor %}
+                </div>
+            {% endif %}
+            <form method="post">
+                {% csrf_token %}
+                <button class="button button-primary button-large" type="submit">Start survey</button>
+            </form>
+            <p class="privacy-note">Your response is only recorded when you submit the survey.</p>
+        </div>
+        <aside class="panel response-sidecard" aria-label="Before you begin">
+            <span class="sidecard-icon" aria-hidden="true">✓</span>
+            <h2>Before you begin</h2>
+            <ul>
+                <li>Set aside about {{ survey.estimated_minutes }} minutes.</li>
+                <li>Answer from your own experience.</li>
+                <li>You can review your answers before submitting.</li>
+            </ul>
+        </aside>
+    </div>
+</section>
+{% endblock %}
