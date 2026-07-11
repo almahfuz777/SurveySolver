@@ -1318,6 +1318,32 @@ form button[type="submit"] {
 .badge-summary { border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 1.25rem; padding-top: 1rem; }
 .badge-summary h3 { flex-basis: 100%; font-size: 0.9rem; margin: 0; }
 .badge-summary span { background: var(--teal-50); border: 1px solid var(--teal-200); border-radius: 999px; color: var(--teal-700); font-size: 0.72rem; font-weight: 750; padding: 0.35rem 0.55rem; }
+.creator-responses { display: grid; gap: 1.25rem; }
+.response-table-panel { overflow: hidden; padding: 0; }
+.response-table-panel .panel-heading { padding: 1.25rem 1.5rem; }
+.table-count { color: var(--text-muted); font-size: 0.85rem; }
+.table-scroll { overflow-x: auto; }
+.response-table { border-collapse: collapse; min-width: 62rem; width: 100%; }
+.response-table th, .response-table td { border-top: 1px solid var(--border); padding: 0.8rem 1rem; text-align: left; vertical-align: middle; }
+.response-table th { background: var(--surface-warm); color: var(--text-muted); font-size: 0.74rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.response-table td { font-size: 0.88rem; }
+.response-table td small { color: var(--text-muted); display: block; }
+.pagination { align-items: center; border-top: 1px solid var(--border); display: flex; gap: 1rem; justify-content: flex-end; padding: 1rem 1.5rem; }
+.pagination span { color: var(--text-muted); font-size: 0.85rem; }
+.response-detail-layout { align-items: start; display: grid; gap: 1.25rem; grid-template-columns: minmax(14rem, .55fr) minmax(0, 1.45fr); }
+.response-identity-card { position: sticky; top: 6rem; }
+.response-identity-card h2 { margin: 0.6rem 0 0.2rem; }
+.response-identity-card p, .response-identity-card small { color: var(--text-muted); }
+.response-answer-list { display: grid; gap: 1rem; }
+.response-answer-section { padding: 1.5rem; }
+.response-answer-section > h2 { margin: 0.35rem 0 1.25rem; }
+.response-answer { border-top: 1px solid var(--border); padding: 1rem 0; }
+.response-answer h3 { font-size: 0.95rem; margin: 0 0 0.5rem; }
+.response-answer p, .response-answer ol { color: var(--text-muted); margin: 0; }
+.response-answer dl { display: grid; gap: 0.45rem; margin: 0; }
+.response-answer dl div { display: flex; gap: 1rem; justify-content: space-between; }
+.response-answer dt { color: var(--text-muted); }
+.response-answer dd { font-weight: 700; margin: 0; }
 
 @media (max-width: 760px) {
     .response-hero-inner { grid-template-columns: 1fr; }
@@ -1329,6 +1355,8 @@ form button[type="submit"] {
     .discovery-filters { align-items: stretch; flex-direction: column; }
     .discovery-filters select, .discovery-filters .button { width: 100%; }
     .discovery-grid { grid-template-columns: 1fr; }
+    .response-detail-layout { grid-template-columns: 1fr; }
+    .response-identity-card { position: static; }
 }
 
 @media (prefers-reduced-motion: reduce) {

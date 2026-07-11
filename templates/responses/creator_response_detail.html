@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Response detail · {{ survey.title }} | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div class="shell page-heading-inner">
+        <div><span class="eyebrow">Submitted response · version {{ submission.version.number }}</span><h1>Individual response</h1><p>Submitted {{ submission.completed_at|date:'M j, Y \a\t H:i' }} · {{ duration_display }} · {{ submission.get_source_display }}</p></div>
+        <a class="button button-secondary" href="{% url 'creator_response_list' survey.id %}">All responses</a>
+    </div>
+</section>
+<section class="page-content">
+    <div class="shell response-detail-layout">
+        <aside class="panel response-identity-card"><span class="panel-kicker">Respondent identity</span>{% if creator_identity %}<h2>{{ creator_identity.name }}</h2><p>{{ creator_identity.email }}</p><small>Explicitly shared with this identified response.</small>{% else %}<h2>Anonymous</h2><p>Platform account data is hidden from the researcher.</p>{% endif %}</aside>
+        <div class="response-answer-list">
+            {% for section in sections %}<section class="panel response-answer-section"><span class="section-number">Section {{ forloop.counter }}</span><h2>{{ section.section.title }}</h2>{% for answer in section.answers %}<article class="response-answer"><h3>{{ answer.question.prompt }}</h3>{% if answer.question.type == 'ranking' %}<ol>{% for item in answer.value %}<li>{{ item }}</li>{% endfor %}</ol>{% elif answer.question.type == 'likert_matrix' %}<dl>{% for row, choice in answer.value %}<div><dt>{{ row }}</dt><dd>{{ choice }}</dd></div>{% endfor %}</dl>{% else %}<p>{{ answer.value|linebreaksbr }}</p>{% endif %}</article>{% endfor %}</section>{% empty %}<section class="panel empty-state"><h2>No answer values</h2><p>This completed route contained no answered questions.</p></section>{% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

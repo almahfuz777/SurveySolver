@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Responses · {{ survey.title }} | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div class="shell page-heading-inner">
+        <div><span class="eyebrow">Creator response dashboard</span><h1>{{ survey.title }}</h1><p>Monitor collection and inspect submitted responses without changing respondent answers.</p></div>
+        <a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a>
+    </div>
+</section>
+<section class="page-content">
+    <div class="shell creator-responses">
+        <div class="metric-grid response-metrics" aria-label="Response summary">
+            <article class="metric-card"><span>Starts</span><strong>{{ metrics.starts }}</strong><small>All response sessions</small></article>
+            <article class="metric-card"><span>Completed</span><strong>{{ metrics.completions }}</strong><small>{{ metrics.completion_rate }}% completion rate</small></article>
+            <article class="metric-card"><span>Median duration</span><strong>{% if metrics.median_duration_seconds != None %}{{ metrics.median_duration_seconds }}s{% else %}—{% endif %}</strong><small>Completed responses</small></article>
+        </div>
+        <section class="panel response-table-panel" aria-labelledby="response-table-heading">
+            <div class="panel-heading"><div><span class="panel-kicker">Version-aware records</span><h2 id="response-table-heading">Responses</h2></div><span class="table-count">{{ page_obj.paginator.count }} total</span></div>
+            {% if page_obj.object_list %}
+                <div class="table-scroll" tabindex="0">
+                    <table class="response-table">
+                        <thead><tr><th scope="col">Started</th><th scope="col">Status</th><th scope="col">Version</th><th scope="col">Source</th><th scope="col">Duration</th><th scope="col">Respondent</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+                        <tbody>{% for submission in page_obj %}<tr><td>{{ submission.started_at|date:'M j, Y H:i' }}</td><td><span class="status-label status-{{ submission.status }}">{{ submission.get_status_display }}</span></td><td>v{{ submission.version.number }}</td><td>{{ submission.get_source_display }}</td><td>{{ submission.duration_display }}</td><td>{% if submission.creator_identity %}{{ submission.creator_identity.name }}<small>{{ submission.creator_identity.email }}</small>{% elif submission.status == 'completed' %}Anonymous{% else %}Not submitted{% endif %}</td><td>{% if submission.status == 'completed' %}<a class="button button-quiet button-small" href="{% url 'creator_response_detail' survey.id submission.id %}">View</a>{% else %}<span aria-label="No submitted answers">—</span>{% endif %}</td></tr>{% endfor %}</tbody>
+                    </table>
+                </div>
+                {% if page_obj.paginator.num_pages > 1 %}<nav class="pagination" aria-label="Response pages">{% if page_obj.has_previous %}<a class="button button-secondary button-small" href="?page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="button button-secondary button-small" href="?page={{ page_obj.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
+            {% else %}
+                <div class="empty-state"><span class="empty-icon" aria-hidden="true">⌁</span><h3>No response activity yet</h3><p>Share the respondent link to begin collecting responses.</p></div>
+            {% endif %}
+        </section>
+    </div>
+</section>
+{% endblock %}
