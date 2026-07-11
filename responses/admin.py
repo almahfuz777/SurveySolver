@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Answer, Submission
+from .models import Answer, ResponseAuditEvent, Submission
 
 
 class AnswerInline(admin.TabularInline):
@@ -29,11 +29,29 @@ class SubmissionAdmin(admin.ModelAdmin):
         'is_eligible',
         'eligibility_data',
         'eligibility_checked_at',
+        'is_excluded',
+        'exclusion_reason',
+        'excluded_at',
+        'excluded_by',
         'started_at',
         'updated_at',
         'completed_at',
     )
     inlines = (AnswerInline,)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ResponseAuditEvent)
+class ResponseAuditEventAdmin(admin.ModelAdmin):
+    list_display = ('submission_id', 'survey', 'action', 'actor', 'created_at')
+    list_filter = ('action', 'created_at')
+    search_fields = ('submission_id', 'survey__title', 'actor__email')
+    readonly_fields = ('id', 'survey', 'submission_id', 'actor', 'action', 'metadata', 'created_at')
 
     def has_add_permission(self, request):
         return False

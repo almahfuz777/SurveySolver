@@ -36,7 +36,7 @@ class PointTransaction(models.Model):
     )
     submission = models.OneToOneField(
         'responses.Submission',
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         related_name='point_transaction',
         blank=True,
         null=True,
@@ -67,7 +67,6 @@ class PointTransaction(models.Model):
                     | models.Q(
                         reason='survey_completion',
                         survey__isnull=False,
-                        submission__isnull=False,
                     )
                 ),
                 name='rewards_transaction_context_valid',
@@ -90,7 +89,7 @@ class GuestRewardClaim(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     submission = models.OneToOneField(
         'responses.Submission',
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name='guest_reward_claim',
     )
     survey = models.ForeignKey(

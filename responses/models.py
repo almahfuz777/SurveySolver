@@ -44,6 +44,16 @@ class Submission(models.Model):
     is_eligible = models.BooleanField(default=True)
     eligibility_data = models.JSONField(default=dict, blank=True)
     eligibility_checked_at = models.DateTimeField(blank=True, null=True)
+    is_excluded = models.BooleanField(default=False, db_index=True)
+    exclusion_reason = models.CharField(max_length=240, blank=True)
+    excluded_at = models.DateTimeField(blank=True, null=True)
+    excluded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='excluded_survey_submissions',
+        blank=True,
+        null=True,
+    )
     started_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(blank=True, null=True)
@@ -132,3 +142,32 @@ class Answer(models.Model):
         if self.submission.status == Submission.Status.COMPLETED:
             raise ValidationError('Completed answers are immutable.')
         return super().delete(*args, **kwargs)
+
+
+class ResponseAuditEvent(models.Model):
+    class Action(models.TextChoices):
+        EXCLUDED = 'excluded', 'Excluded from analytics'
+        INCLUDED = 'included', 'Included in analytics'
+        DELETED = 'deleted', 'Permanently deleted'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    survey = models.ForeignKey(
+        Survey,
+        on_delete=models.PROTECT,
+        related_name='response_audit_events',
+    )
+    submission_id = models.UUIDField(db_index=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='response_audit_events',
+    )
+    action = models.CharField(max_length=16, choices=Action.choices)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return f'{self.get_action_display()} · {self.submission_id}'
