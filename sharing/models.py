@@ -3,6 +3,7 @@ import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 
 class SurveyCollaborator(models.Model):
@@ -49,3 +50,38 @@ class SurveyCollaborator(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class CollaborationLink(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    survey = models.ForeignKey(
+        'surveys.Survey',
+        on_delete=models.CASCADE,
+        related_name='collaboration_links',
+    )
+    role = models.CharField(max_length=12, choices=SurveyCollaborator.Role.choices)
+    token_hash = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_collaboration_links',
+    )
+    expires_at = models.DateTimeField(db_index=True)
+    revoked_at = models.DateTimeField(blank=True, null=True)
+    accepted_count = models.PositiveIntegerField(default=0)
+    last_accepted_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None and not self.is_expired
+
+    def __str__(self):
+        return f'{self.survey.title} · {self.get_role_display()} link'

@@ -15,3 +15,17 @@ if (navToggle && primaryNavigation) {
         }
     });
 }
+
+document.querySelectorAll('[data-copy-previous]').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const input = button.previousElementSibling;
+        if (!input) return;
+        try {
+            await navigator.clipboard.writeText(input.value);
+        } catch {
+            input.select();
+            document.execCommand('copy');
+        }
+        button.textContent = 'Copied';
+    });
+});

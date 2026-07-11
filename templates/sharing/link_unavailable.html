@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+
+{% block title %}Collaboration link unavailable | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="completion-page"><div class="shell completion-shell"><div class="panel completion-card"><span class="completion-mark" aria-hidden="true">×</span><span class="eyebrow">Link unavailable</span><h1>This collaboration link is no longer active</h1><p>It may have expired, been revoked, or contain an invalid secret. Ask the survey owner for a new link.</p><a class="button button-secondary" href="{% url 'home' %}">Return home</a></div></div></section>
+{% endblock %}
