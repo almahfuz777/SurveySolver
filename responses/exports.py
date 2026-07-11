@@ -1,8 +1,13 @@
 import csv
 import json
+from tempfile import SpooledTemporaryFile
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
+from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+from openpyxl.styles import Font, PatternFill
 
 from surveys.models import Question, SurveyVersion
 
@@ -64,6 +69,16 @@ def _serialized_value(value):
 def _csv_safe(value):
     if isinstance(value, str) and value.startswith(('=', '+', '-', '@', '\t', '\r')):
         return f"'{value}"
+    return value
+
+
+def _excel_safe(value):
+    value = _csv_safe(value)
+    if not isinstance(value, str):
+        return value
+    value = ILLEGAL_CHARACTERS_RE.sub('', value)
+    if len(value) > 32767:
+        value = f'{value[:32740]}… [truncated for Excel]'
     return value
 
 
@@ -137,3 +152,36 @@ def iter_json(survey, submissions):
         yield encoder.encode(response_record(submission))
         first = False
     yield ']}'
+
+
+def build_excel(survey, submissions, questions):
+    output = SpooledTemporaryFile(max_size=5 * 1024 * 1024, mode='w+b')
+    workbook = Workbook(write_only=True)
+    worksheet = workbook.create_sheet('Responses')
+    worksheet.freeze_panes = 'A2'
+    headers = (*FIXED_COLUMNS, *(question_column(question) for question in questions))
+    header_cells = []
+    for header in headers:
+        cell = WriteOnlyCell(worksheet, value=_excel_safe(header))
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill('solid', fgColor='312E81')
+        header_cells.append(cell)
+    worksheet.append(header_cells)
+    question_ids = [str(question.id) for question in questions]
+    for submission in submissions.iterator(chunk_size=500):
+        record = response_record(submission)
+        answer_values = {
+            answer['question_id']: _serialized_value(answer['value'])
+            for answer in record.pop('answers')
+        }
+        worksheet.append(
+            [_excel_safe(record[column]) for column in FIXED_COLUMNS]
+            + [_excel_safe(answer_values.get(question_id, '')) for question_id in question_ids]
+        )
+    metadata = workbook.create_sheet('About')
+    metadata.append(('Survey', _excel_safe(survey.title)))
+    metadata.append(('Survey ID', str(survey.id)))
+    metadata.append(('Generated at', timezone.now().isoformat()))
+    workbook.save(output)
+    output.seek(0)
+    return output

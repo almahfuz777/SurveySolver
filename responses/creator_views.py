@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.http import HttpResponseBadRequest, StreamingHttpResponse
+from django.http import FileResponse, HttpResponseBadRequest, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -10,7 +10,7 @@ from sharing.permissions import EDIT_ROLES, OWNER_ROLES, VIEW_ROLES, get_accessi
 
 from .dashboard import creator_identity, filter_submissions, format_answer, format_duration, response_metrics
 from .forms import ResponseFilterForm
-from .exports import filtered_export_data, iter_csv, iter_json
+from .exports import build_excel, filtered_export_data, iter_csv, iter_json
 from .management import permanently_delete_submission, set_analytics_exclusion
 from .models import Submission
 
@@ -166,3 +166,17 @@ def response_export_json(request, survey_id):
     )
     response['Content-Disposition'] = f'attachment; filename="{survey.slug}-responses.json"'
     return response
+
+
+@login_required
+def response_export_excel(request, survey_id):
+    survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
+    submissions, questions, error = _export_data(request, survey)
+    if error:
+        return error
+    return FileResponse(
+        build_excel(survey, submissions, questions),
+        as_attachment=True,
+        filename=f'{survey.slug}-responses.xlsx',
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )

@@ -5,6 +5,7 @@ import json
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import load_workbook
 
 from sharing.models import SurveyCollaborator
 from surveys.models import Question, Survey
@@ -105,6 +106,33 @@ class ResponseExportTests(TestCase):
         self.assertEqual(self.client.get(url).status_code, 200)
         self.client.force_login(self.outsider)
         self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_excel_exports_filtered_rows_as_safe_unicode_cells(self):
+        submission = self.complete_response()
+        Submission.objects.create(
+            survey=self.survey,
+            version=self.version,
+            session_key_hash='e' * 64,
+            presentation={'sections': []},
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse('response_export_excel', args=[self.survey.id]),
+            {'completion': Submission.Status.COMPLETED, 'exclusion': 'included'},
+        )
+        workbook = load_workbook(io.BytesIO(self.body(response)), read_only=True)
+        rows = list(workbook['Responses'].iter_rows(values_only=False))
+        values = [cell.value for cell in rows[1]]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(rows), 2)
+        self.assertIn(str(submission.id), values)
+        self.assertIn("'=1+1\nবাংলা response", values)
+        formula_safe_cell = next(cell for cell in rows[1] if cell.value == "'=1+1\nবাংলা response")
+        self.assertEqual(formula_safe_cell.data_type, 's')
+        self.assertNotIn(self.respondent.email, values)
+        self.assertEqual(workbook['About']['B1'].value, self.survey.title)
 
     def test_invalid_filters_return_bad_request(self):
         self.client.force_login(self.owner)
