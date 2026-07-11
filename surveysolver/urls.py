@@ -25,6 +25,7 @@ urlpatterns = [
     path('', include('sharing.urls')),
     path('rewards/', include('rewards.urls')),
     path('dashboard/surveys/', include('surveys.urls')),
+    path('dashboard/analytics/', include('analytics.urls')),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('accounts/', include('allauth.urls')),

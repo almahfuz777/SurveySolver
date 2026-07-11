@@ -43,6 +43,7 @@ ALLOWED_HOSTS = env.list(
 
 INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
+    'analytics.apps.AnalyticsConfig',
     'core.apps.CoreConfig',
     'rewards.apps.RewardsConfig',
     'responses.apps.ResponsesConfig',

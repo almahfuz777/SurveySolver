@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics · {{ survey.title }} | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div class="shell page-heading-inner">
+    <div><span class="eyebrow">Version-aware analytics</span><h1>{{ survey.title }}</h1><p>Included response activity and question summaries. Excluded responses never affect these results.</p></div>
+    <div class="hero-actions"><a class="button button-secondary" href="{% url 'creator_response_list' survey.id %}">View responses</a><a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a></div>
+  </div>
+</section>
+<section class="page-content">
+  <div class="shell analytics-layout">
+    <form class="panel analytics-filter" method="get">
+      <label for="analytics-version">Survey version</label>
+      <select id="analytics-version" name="version">
+        <option value="">All published versions</option>
+        {% for version in versions %}<option value="{{ version.id }}"{% if selected_version.id == version.id %} selected{% endif %}>Version {{ version.number }}</option>{% endfor %}
+      </select>
+      <button class="button button-primary" type="submit">Apply</button>
+    </form>
+    <div class="metric-grid analytics-metrics" aria-label="Survey analytics summary">
+      <article class="metric-card"><span>Starts</span><strong>{{ metrics.starts }}</strong><small>Included response sessions</small></article>
+      <article class="metric-card"><span>Completed</span><strong>{{ metrics.completions }}</strong><small>{{ metrics.completion_rate }}% completion rate</small></article>
+      <article class="metric-card"><span>Abandoned</span><strong>{{ metrics.abandonments }}</strong><small>Started but not submitted</small></article>
+      <article class="metric-card"><span>Median duration</span><strong>{% if metrics.median_duration_seconds != None %}{{ metrics.median_duration_seconds }}s{% else %}—{% endif %}</strong><small>Completed responses</small></article>
+    </div>
+    <section class="panel analytics-section" aria-labelledby="trend-heading">
+      <div class="panel-heading"><div><span class="panel-kicker">Collection over time</span><h2 id="trend-heading">Response trend</h2></div></div>
+      {% if metrics.trend %}<div class="table-scroll" tabindex="0"><table class="analytics-table"><thead><tr><th scope="col">Date</th><th scope="col">Starts</th><th scope="col">Completions</th></tr></thead><tbody>{% for row in metrics.trend %}<tr><td>{{ row.date|date:'M j, Y' }}</td><td>{{ row.starts }}</td><td>{{ row.completions }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>No response activity for this selection.</p></div>{% endif %}
+    </section>
+    <section class="analytics-grid" aria-labelledby="questions-heading">
+      <div class="analytics-grid-heading"><span class="panel-kicker">Question summaries</span><h2 id="questions-heading">Answer patterns</h2></div>
+      {% for summary in questions %}<article class="panel question-summary"><small>Version {{ summary.version_number }} · {{ summary.question.get_type_display }}</small><h3>{{ summary.question.prompt }}</h3><p>{{ summary.answered }} answered</p>{% if summary.distribution %}<dl>{% for group in summary.distribution %}<div><dt>{{ group.label }}</dt><dd><meter min="0" max="{{ summary.max_count }}" value="{{ group.count }}">{{ group.count }}</meter><strong>{{ group.count }}</strong></dd></div>{% endfor %}</dl>{% else %}<p class="privacy-note">Free-form answers are available only in the response dashboard.</p>{% endif %}</article>{% empty %}<div class="panel empty-state"><p>No completed answers for this selection.</p></div>{% endfor %}
+    </section>
+    <section class="analytics-grid" aria-labelledby="demographics-heading">
+      <div class="analytics-grid-heading"><span class="panel-kicker">Privacy-protected breakdowns</span><h2 id="demographics-heading">Eligibility demographics</h2><p>Groups with fewer than {{ privacy_threshold }} responses are suppressed.</p></div>
+      {% for summary in demographics %}<article class="panel question-summary"><h3>{{ summary.label }}</h3>{% if summary.groups %}<dl>{% for group in summary.groups %}<div><dt>{{ group.label }}</dt><dd><meter min="0" max="{{ summary.max_count }}" value="{{ group.count }}">{{ group.count }}</meter><strong>{{ group.count }}</strong></dd></div>{% endfor %}</dl>{% endif %}{% if summary.has_suppressed_groups %}<p class="privacy-note">One or more small groups are hidden to protect respondents.</p>{% endif %}</article>{% empty %}<div class="panel empty-state"><p>No eligible demographic breakdowns are available yet.</p></div>{% endfor %}
+    </section>
+  </div>
+</section>
+{% endblock %}

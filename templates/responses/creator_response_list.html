@@ -6,7 +6,7 @@
 <section class="page-heading">
     <div class="shell page-heading-inner">
         <div><span class="eyebrow">Creator response dashboard</span><h1>{{ survey.title }}</h1><p>Monitor collection and inspect submitted responses without changing respondent answers.</p></div>
-        <a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a>
+        <div class="hero-actions"><a class="button button-primary" href="{% url 'survey_analytics' survey.id %}">View analytics</a><a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a></div>
     </div>
 </section>
 <section class="page-content">

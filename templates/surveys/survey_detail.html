@@ -19,6 +19,7 @@
         <div class="hero-actions">
             {% if access_role == 'owner' or access_role == 'editor' %}<a class="button button-primary" href="{% url 'survey_builder' survey.id %}">Open builder</a>{% endif %}
             <a class="button button-secondary" href="{% url 'creator_response_list' survey.id %}">View responses</a>
+            <a class="button button-secondary" href="{% url 'survey_analytics' survey.id %}">View analytics</a>
             {% if access_role == 'owner' %}<a class="button button-secondary" href="{% url 'sharing_settings' survey.id %}">Share access</a>{% endif %}
             {% if survey.status == 'published' and survey.visibility != 'invitation_only' %}<a class="button button-secondary" href="{% url 'respond_survey' survey.slug %}">Open respondent link</a>{% endif %}
             {% if access_role == 'owner' or access_role == 'editor' %}{% if not readiness_errors %}<form method="post" action="{% url 'survey_publish' survey.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ draft_version.revision }}"><button class="button button-primary" type="submit">Publish version {{ draft_version.number }}</button></form>{% endif %}<a class="button button-primary" href="{% url 'survey_edit' survey.id %}">Edit details</a>{% endif %}
