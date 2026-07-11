@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'core.apps.CoreConfig',
     'rewards.apps.RewardsConfig',
     'responses.apps.ResponsesConfig',
+    'sharing.apps.SharingConfig',
     'surveys.apps.SurveysConfig',
     'django.contrib.admin',
     'django.contrib.auth',
