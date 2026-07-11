@@ -7,7 +7,14 @@ from django.views.decorators.http import require_POST
 
 from surveys.models import Survey
 
-from .models import CollaborationLink, SurveyCollaborator
+from .invitations import (
+    accept_collaborator_invitation,
+    create_collaborator_invitation,
+    deliver_collaborator_invitation,
+    invitation_token_is_valid,
+    revoke_collaborator_invitation,
+)
+from .models import CollaborationLink, CollaboratorInvitation, SurveyCollaborator
 from .services import (
     accept_collaboration_link,
     create_collaboration_link,
@@ -54,6 +61,10 @@ def sharing_settings(request, survey_id):
             'survey': survey,
             'collaborators': survey.collaborators.select_related('user', 'added_by'),
             'collaboration_links': survey.collaboration_links.select_related('created_by'),
+            'collaborator_invitations': survey.collaborator_invitations.select_related(
+                'created_by',
+                'accepted_by',
+            ),
             'roles': SurveyCollaborator.Role.choices,
             'new_link_url': new_link_url,
         },
@@ -75,6 +86,48 @@ def revoke_link(request, survey_id, link_id):
         messages.error(request, 'Collaboration link not found.')
     else:
         messages.success(request, 'Collaboration link revoked.')
+    return redirect('sharing_settings', survey_id=survey_id)
+
+
+@require_POST
+@login_required
+def send_collaborator_invitation(request, survey_id):
+    survey = get_object_or_404(Survey, id=survey_id, owner=request.user)
+    try:
+        invitation, token = create_collaborator_invitation(
+            survey.id,
+            request.user,
+            request.POST.get('email', ''),
+            request.POST.get('role', ''),
+        )
+    except ValidationError as error:
+        messages.error(request, '; '.join(error.messages))
+    else:
+        invitation_url = request.build_absolute_uri(
+            reverse('accept_collaborator_invitation', args=[invitation.id, token])
+        )
+        if deliver_collaborator_invitation(invitation, invitation_url):
+            messages.success(request, f'Invitation sent to {invitation.email}.')
+        else:
+            messages.error(request, 'The invitation was saved, but email delivery failed.')
+    return redirect('sharing_settings', survey_id=survey.id)
+
+
+@require_POST
+@login_required
+def revoke_invitation(request, survey_id, invitation_id):
+    get_object_or_404(
+        CollaboratorInvitation,
+        id=invitation_id,
+        survey_id=survey_id,
+        survey__owner=request.user,
+    )
+    try:
+        revoke_collaborator_invitation(invitation_id, request.user)
+    except CollaboratorInvitation.DoesNotExist:
+        messages.error(request, 'Invitation not found.')
+    else:
+        messages.success(request, 'Invitation revoked.')
     return redirect('sharing_settings', survey_id=survey_id)
 
 
@@ -116,3 +169,27 @@ def accept_link(request, link_id, token):
         messages.success(request, f'You now have {link.get_role_display().lower()} access.')
         return redirect('survey_detail', survey_id=link.survey_id)
     return render(request, 'sharing/accept_link.html', {'link': link})
+
+
+@login_required
+def accept_invitation(request, invitation_id, token):
+    invitation = get_object_or_404(
+        CollaboratorInvitation.objects.select_related('survey'),
+        id=invitation_id,
+    )
+    if not invitation_token_is_valid(invitation, token):
+        return render(request, 'sharing/invitation_unavailable.html', status=410)
+    email_matches = request.user.email.casefold() == invitation.email
+    if request.method == 'POST' and email_matches:
+        try:
+            accept_collaborator_invitation(invitation.id, token, request.user)
+        except PermissionDenied:
+            return render(request, 'sharing/invitation_unavailable.html', status=410)
+        messages.success(request, f'You now have {invitation.get_role_display().lower()} access.')
+        return redirect('survey_detail', survey_id=invitation.survey_id)
+    return render(
+        request,
+        'sharing/accept_invitation.html',
+        {'invitation': invitation, 'email_matches': email_matches},
+        status=200 if email_matches else 403,
+    )

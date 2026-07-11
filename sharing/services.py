@@ -38,6 +38,25 @@ def link_token_is_valid(link, token):
     return link.is_active and secrets.compare_digest(link.token_hash, _hash_token(token))
 
 
+def _grant_collaboration(survey, user, role, added_by):
+    existing = SurveyCollaborator.objects.filter(survey=survey, user=user).first()
+    if existing:
+        created = False
+        if existing.role == SurveyCollaborator.Role.VIEWER and role == SurveyCollaborator.Role.EDITOR:
+            existing.role = SurveyCollaborator.Role.EDITOR
+            existing.added_by = added_by
+            existing.save(update_fields=('role', 'added_by', 'updated_at'))
+    else:
+        existing = SurveyCollaborator.objects.create(
+            survey=survey,
+            user=user,
+            role=role,
+            added_by=added_by,
+        )
+        created = True
+    return existing, created
+
+
 @transaction.atomic
 def accept_collaboration_link(link_id, token, user):
     link = CollaborationLink.objects.select_for_update().select_related('survey').get(id=link_id)
@@ -45,21 +64,12 @@ def accept_collaboration_link(link_id, token, user):
         raise PermissionDenied('This collaboration link is invalid or no longer active.')
     if link.survey.owner_id == user.id:
         return None, False
-    existing = SurveyCollaborator.objects.filter(survey=link.survey, user=user).first()
-    if existing:
-        created = False
-        if existing.role == SurveyCollaborator.Role.VIEWER and link.role == SurveyCollaborator.Role.EDITOR:
-            existing.role = SurveyCollaborator.Role.EDITOR
-            existing.added_by = link.created_by
-            existing.save(update_fields=('role', 'added_by', 'updated_at'))
-    else:
-        existing = SurveyCollaborator.objects.create(
-            survey=link.survey,
-            user=user,
-            role=link.role,
-            added_by=link.created_by,
-        )
-        created = True
+    existing, created = _grant_collaboration(
+        link.survey,
+        user,
+        link.role,
+        link.created_by,
+    )
     CollaborationLink.objects.filter(pk=link.pk).update(
         accepted_count=F('accepted_count') + 1,
         last_accepted_at=timezone.now(),

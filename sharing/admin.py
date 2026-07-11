@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import CollaborationLink, SurveyCollaborator
+from .models import CollaborationLink, CollaboratorInvitation, SurveyCollaborator
 
 
 @admin.register(SurveyCollaborator)
@@ -26,6 +26,35 @@ class CollaborationLinkAdmin(admin.ModelAdmin):
         'revoked_at',
         'accepted_count',
         'last_accepted_at',
+        'created_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CollaboratorInvitation)
+class CollaboratorInvitationAdmin(admin.ModelAdmin):
+    list_display = ('email', 'survey', 'role', 'delivery_status', 'expires_at', 'accepted_at')
+    list_filter = ('role', 'delivery_status', 'revoked_at', 'accepted_at')
+    search_fields = ('email', 'survey__title', 'created_by__email')
+    readonly_fields = (
+        'id',
+        'survey',
+        'email',
+        'role',
+        'token_hash',
+        'created_by',
+        'expires_at',
+        'revoked_at',
+        'accepted_at',
+        'accepted_by',
+        'delivery_status',
+        'delivery_error',
+        'sent_at',
         'created_at',
     )
 

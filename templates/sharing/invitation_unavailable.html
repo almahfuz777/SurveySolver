@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+
+{% block title %}Invitation unavailable | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="completion-page"><div class="shell completion-shell"><div class="panel completion-card"><span class="completion-mark" aria-hidden="true">×</span><span class="eyebrow">Invitation unavailable</span><h1>This invitation cannot be accepted</h1><p>It may have expired, been revoked, already been accepted, or contain an invalid secret.</p><a class="button button-secondary" href="{% url 'home' %}">Return home</a></div></div></section>
+{% endblock %}

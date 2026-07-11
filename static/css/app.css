@@ -1388,6 +1388,9 @@ form button[type="submit"] {
 .collaboration-invite h1 { margin: 0.5rem 0; }
 .collaboration-invite > p, .collaboration-invite li { color: var(--text-muted); }
 .collaboration-invite form { margin-top: 1.5rem; }
+.invitation-panel { overflow: hidden; padding: 0; }
+.invite-form { align-items: end; display: grid; gap: 0.7rem; grid-template-columns: minmax(14rem, 1fr) minmax(10rem, .45fr) auto; padding: 0 1.25rem 1.25rem; }
+.invite-form label { color: var(--text-muted); display: grid; font-size: 0.78rem; font-weight: 700; gap: 0.3rem; }
 
 @media (max-width: 760px) {
     .response-hero-inner { grid-template-columns: 1fr; }
@@ -1404,6 +1407,7 @@ form button[type="submit"] {
     .response-filter-grid { grid-template-columns: 1fr; }
     .sharing-grid { grid-template-columns: 1fr; }
     .copy-link-row, .collaborator-list article, .link-management-list article { align-items: stretch; flex-direction: column; }
+    .invite-form { align-items: stretch; grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

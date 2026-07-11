@@ -1,0 +1,6 @@
+{{ invitation.created_by.email }} invited you to collaborate on “{{ invitation.survey.title }}” as {{ invitation.get_role_display|lower }}.
+
+Review and accept the invitation:
+{{ invitation_url }}
+
+You must sign in with {{ invitation.email }}. This invitation expires in seven days and can be revoked by the survey owner.
