@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.http import HttpResponseBadRequest, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -9,6 +10,7 @@ from sharing.permissions import EDIT_ROLES, OWNER_ROLES, VIEW_ROLES, get_accessi
 
 from .dashboard import creator_identity, filter_submissions, format_answer, format_duration, response_metrics
 from .forms import ResponseFilterForm
+from .exports import filtered_export_data, iter_csv, iter_json
 from .management import permanently_delete_submission, set_analytics_exclusion
 from .models import Submission
 
@@ -129,3 +131,38 @@ def response_delete(request, survey_id, submission_id):
         'responses/creator_response_delete.html',
         {'survey': survey, 'submission': submission},
     )
+
+
+def _export_data(request, survey):
+    form, submissions, questions = filtered_export_data(request.GET, survey)
+    if not form.is_valid():
+        return None, None, HttpResponseBadRequest('One or more export filters are invalid.')
+    return submissions, questions, None
+
+
+@login_required
+def response_export_csv(request, survey_id):
+    survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
+    submissions, questions, error = _export_data(request, survey)
+    if error:
+        return error
+    response = StreamingHttpResponse(
+        iter_csv(submissions, questions),
+        content_type='text/csv; charset=utf-8',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{survey.slug}-responses.csv"'
+    return response
+
+
+@login_required
+def response_export_json(request, survey_id):
+    survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
+    submissions, _, error = _export_data(request, survey)
+    if error:
+        return error
+    response = StreamingHttpResponse(
+        iter_json(survey, submissions),
+        content_type='application/json; charset=utf-8',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{survey.slug}-responses.json"'
+    return response

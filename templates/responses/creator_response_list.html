@@ -34,6 +34,7 @@
             <article class="metric-card"><span>Completed</span><strong>{{ metrics.completions }}</strong><small>{{ metrics.completion_rate }}% completion rate</small></article>
             <article class="metric-card"><span>Median duration</span><strong>{% if metrics.median_duration_seconds != None %}{{ metrics.median_duration_seconds }}s{% else %}—{% endif %}</strong><small>Completed responses</small></article>
         </div>
+        <div class="export-actions" aria-label="Export filtered responses"><span>Export this filtered result set</span><a class="button button-secondary button-small" href="{% url 'response_export_csv' survey.id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">CSV</a><a class="button button-secondary button-small" href="{% url 'response_export_json' survey.id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">JSON</a></div>
         <section class="panel response-table-panel" aria-labelledby="response-table-heading">
             <div class="panel-heading"><div><span class="panel-kicker">Version-aware records</span><h2 id="response-table-heading">Responses</h2></div><span class="table-count">{{ page_obj.paginator.count }} total</span></div>
             {% if page_obj.object_list %}
