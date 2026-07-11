@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -184,5 +185,22 @@ SOCIALACCOUNT_PROVIDERS = {
     },
 }
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'SurveySolver <noreply@surveysolver.com>'
+EMAIL_BACKEND = env(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = env('EMAIL_HOST', default='')
+EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+EMAIL_USE_SSL = env.bool('EMAIL_USE_SSL', default=False)
+EMAIL_TIMEOUT = env.int('EMAIL_TIMEOUT', default=10)
+DEFAULT_FROM_EMAIL = env(
+    'DEFAULT_FROM_EMAIL',
+    default='SurveySolver <noreply@localhost>',
+)
+SERVER_EMAIL = env('SERVER_EMAIL', default=DEFAULT_FROM_EMAIL)
+
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise ImproperlyConfigured('EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled.')
