@@ -1,7 +1,11 @@
 from collections import Counter
 from statistics import median
+from uuid import UUID
 
-from .models import Submission
+from django.db.models import Exists, OuterRef, Q, TextField
+from django.db.models.functions import Cast
+
+from .models import Answer, Submission
 
 
 def response_metrics(submissions):
@@ -28,6 +32,49 @@ def response_metrics(submissions):
         'median_duration_seconds': round(median(durations)) if durations else None,
         'completion_trend': sorted(trend.items()),
     }
+
+
+def filter_submissions(queryset, filters, survey):
+    version = filters.get('version')
+    if version:
+        queryset = queryset.filter(version_id=version)
+    if filters.get('date_from'):
+        queryset = queryset.filter(started_at__date__gte=filters['date_from'])
+    if filters.get('date_to'):
+        queryset = queryset.filter(started_at__date__lte=filters['date_to'])
+    completion = filters.get('completion')
+    if completion in Submission.Status.values:
+        queryset = queryset.filter(status=completion)
+    if filters.get('source'):
+        queryset = queryset.filter(source=filters['source'])
+    eligibility = filters.get('eligibility')
+    if eligibility == 'eligible':
+        queryset = queryset.filter(is_eligible=True)
+    elif eligibility == 'ineligible':
+        queryset = queryset.filter(is_eligible=False)
+    exclusion = filters.get('exclusion') or 'included'
+    if exclusion == 'included':
+        queryset = queryset.filter(is_excluded=False)
+    elif exclusion == 'excluded':
+        queryset = queryset.filter(is_excluded=True)
+    search = filters.get('search', '').strip()
+    if search:
+        answer_matches = (
+            Answer.objects.filter(submission_id=OuterRef('pk'))
+            .annotate(search_text=Cast('value', TextField()))
+            .filter(search_text__icontains=search)
+        )
+        queryset = queryset.annotate(has_matching_answer=Exists(answer_matches))
+        search_query = Q(has_matching_answer=True)
+        if survey.identity_mode == survey.IdentityMode.IDENTIFIED:
+            queryset = queryset.annotate(identity_text=Cast('identity_data', TextField()))
+            search_query |= Q(identity_text__icontains=search)
+        try:
+            search_query |= Q(id=UUID(search))
+        except ValueError:
+            pass
+        queryset = queryset.filter(search_query)
+    return queryset
 
 
 def creator_identity(submission):

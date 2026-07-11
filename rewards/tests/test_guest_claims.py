@@ -196,3 +196,16 @@ class GuestRewardClaimTests(TestCase):
                 reason=PointTransaction.Reason.SURVEY_COMPLETION,
             ).exists()
         )
+
+    def test_deleting_response_invalidates_unclaimed_guest_claim(self):
+        submission = self.complete_guest_response()
+        claim_id = GuestRewardClaim.objects.get(submission=submission).id
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse('creator_response_delete', args=[self.survey.id, submission.id]),
+            {'confirmation': 'DELETE'},
+        )
+
+        self.assertRedirects(response, reverse('creator_response_list', args=[self.survey.id]))
+        self.assertFalse(GuestRewardClaim.objects.filter(pk=claim_id).exists())

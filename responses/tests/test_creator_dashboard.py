@@ -1,11 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
+from rewards.models import PointTransaction
 from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 
-from responses.models import Submission
+from responses.models import ResponseAuditEvent, Submission
 
 
 class CreatorResponseDashboardTests(TestCase):
@@ -131,3 +133,95 @@ class CreatorResponseDashboardTests(TestCase):
         self.assertEqual(first_page.context['page_obj'].paginator.count, 26)
         self.assertEqual(len(first_page.context['page_obj'].object_list), 25)
         self.assertEqual(len(second_page.context['page_obj'].object_list), 1)
+
+    def test_filters_search_and_column_selection_apply_to_current_result_set(self):
+        submission = self.complete_response()
+        Submission.objects.create(
+            survey=self.survey,
+            version=self.version,
+            session_key_hash='c' * 64,
+            presentation={'sections': []},
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse('creator_response_list', args=[self.survey.id]),
+            {
+                'version': str(self.version.id),
+                'date_from': timezone.localdate().isoformat(),
+                'date_to': timezone.localdate().isoformat(),
+                'completion': Submission.Status.COMPLETED,
+                'source': Submission.Source.DIRECT,
+                'eligibility': 'eligible',
+                'exclusion': 'included',
+                'search': 'detailed response',
+                'columns': ['status', 'duration'],
+            },
+        )
+
+        self.assertEqual(response.context['page_obj'].paginator.count, 1)
+        self.assertEqual(response.context['page_obj'].object_list[0].id, submission.id)
+        self.assertEqual(response.context['selected_columns'], ['status', 'duration'])
+        self.assertNotContains(response, '<th scope="col">Version</th>', html=True)
+
+    def test_exclude_and_include_actions_are_audited(self):
+        submission = self.complete_response()
+        self.client.force_login(self.owner)
+        action_url = reverse(
+            'creator_response_exclusion',
+            args=[self.survey.id, submission.id],
+        )
+
+        excluded = self.client.post(
+            action_url,
+            {'action': 'exclude', 'reason': 'Failed attention check'},
+        )
+
+        self.assertRedirects(
+            excluded,
+            reverse('creator_response_detail', args=[self.survey.id, submission.id]),
+        )
+        submission.refresh_from_db()
+        self.assertTrue(submission.is_excluded)
+        self.assertEqual(submission.exclusion_reason, 'Failed attention check')
+        event = ResponseAuditEvent.objects.get()
+        self.assertEqual(event.action, ResponseAuditEvent.Action.EXCLUDED)
+        self.assertEqual(event.metadata['reason'], 'Failed attention check')
+        default_list = self.client.get(reverse('creator_response_list', args=[self.survey.id]))
+        excluded_list = self.client.get(
+            reverse('creator_response_list', args=[self.survey.id]),
+            {'exclusion': 'excluded'},
+        )
+        self.assertEqual(default_list.context['page_obj'].paginator.count, 0)
+        self.assertEqual(excluded_list.context['page_obj'].paginator.count, 1)
+
+        self.client.post(action_url, {'action': 'include'})
+        submission.refresh_from_db()
+        self.assertFalse(submission.is_excluded)
+        self.assertEqual(
+            ResponseAuditEvent.objects.filter(action=ResponseAuditEvent.Action.INCLUDED).count(),
+            1,
+        )
+
+    def test_permanent_deletion_requires_confirmation_and_preserves_audit_and_ledger(self):
+        submission = self.complete_response()
+        transaction = PointTransaction.objects.get(submission=submission)
+        self.client.force_login(self.owner)
+        delete_url = reverse(
+            'creator_response_delete',
+            args=[self.survey.id, submission.id],
+        )
+
+        rejected = self.client.post(delete_url, {'confirmation': 'delete'})
+        self.assertEqual(rejected.status_code, 200)
+        self.assertTrue(Submission.objects.filter(pk=submission.id).exists())
+
+        deleted = self.client.post(delete_url, {'confirmation': 'DELETE'})
+
+        self.assertRedirects(deleted, reverse('creator_response_list', args=[self.survey.id]))
+        self.assertFalse(Submission.objects.filter(pk=submission.id).exists())
+        event = ResponseAuditEvent.objects.get(action=ResponseAuditEvent.Action.DELETED)
+        self.assertEqual(event.submission_id, submission.id)
+        transaction.refresh_from_db()
+        self.assertIsNone(transaction.submission)
+        self.assertEqual(transaction.metadata['submission_id'], str(submission.id))
