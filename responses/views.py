@@ -11,6 +11,7 @@ from rewards.claims import BASE_COMPLETION_POINTS, claim_secret_from_session, cr
 from rewards.models import GuestRewardClaim
 from rewards.services import award_survey_completion
 from surveys.models import Survey
+from sharing.respondent_invitations import invitation_from_session
 
 from .models import Submission
 from .services import (
@@ -34,10 +35,10 @@ def _session_key(request):
     return request.session.session_key
 
 
-def _public_survey(slug):
+def _public_survey(slug, invitation_access=False):
     survey = get_object_or_404(Survey.objects.prefetch_related('topics'), slug=slug)
     try:
-        version = current_published_version(survey)
+        version = current_published_version(survey, invitation_access=invitation_access)
     except ResponseUnavailable as error:
         raise Http404(str(error)) from error
     return survey, version
@@ -45,7 +46,13 @@ def _public_survey(slug):
 
 @require_http_methods(['GET', 'POST'])
 def survey_landing(request, slug):
-    survey, version = _public_survey(slug)
+    survey = get_object_or_404(Survey.objects.prefetch_related('topics'), slug=slug)
+    invitation = invitation_from_session(
+        request.session,
+        survey,
+        _session_key(request),
+    )
+    survey, version = _public_survey(slug, invitation_access=bool(invitation))
     identity_errors = {}
     eligibility_notice = ''
     if request.method == 'POST':
@@ -66,10 +73,11 @@ def survey_landing(request, slug):
                     'gender': request.POST.get('eligibility_gender', ''),
                     'employment_status': request.POST.get('eligibility_employment_status', ''),
                 },
+                respondent_invitation_id=invitation.id if invitation else None,
             )
         except ResponseValidationError as error:
             identity_errors = error.errors
-        except (EligibilityUnknown, IneligibleRespondent, QuotaReached) as error:
+        except (EligibilityUnknown, IneligibleRespondent, QuotaReached, PermissionDenied) as error:
             eligibility_notice = str(error)
         else:
             return redirect('response_form', submission_id=submission.id)

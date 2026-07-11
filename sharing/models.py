@@ -152,3 +152,63 @@ class CollaboratorInvitation(models.Model):
 
     def __str__(self):
         return f'{self.email} · {self.get_role_display()} invitation'
+
+
+class RespondentInvitation(models.Model):
+    class DeliveryStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        SENT = 'sent', 'Sent'
+        FAILED = 'failed', 'Failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    survey = models.ForeignKey(
+        'surveys.Survey',
+        on_delete=models.CASCADE,
+        related_name='respondent_invitations',
+    )
+    email = models.EmailField()
+    token_hash = models.CharField(max_length=64)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_respondent_invitations',
+    )
+    expires_at = models.DateTimeField(db_index=True)
+    revoked_at = models.DateTimeField(blank=True, null=True)
+    consumed_at = models.DateTimeField(blank=True, null=True)
+    bound_submission_id = models.UUIDField(blank=True, null=True, db_index=True)
+    delivery_status = models.CharField(
+        max_length=12,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.PENDING,
+    )
+    delivery_error = models.CharField(max_length=240, blank=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(consumed_at__isnull=True, bound_submission_id__isnull=True)
+                    | models.Q(consumed_at__isnull=False, bound_submission_id__isnull=False)
+                ),
+                name='sharing_respondent_invitation_binding_consistent',
+            ),
+        ]
+
+    @property
+    def is_active(self):
+        return (
+            self.revoked_at is None
+            and self.consumed_at is None
+            and timezone.now() < self.expires_at
+        )
+
+    def save(self, *args, **kwargs):
+        self.email = self.email.strip().casefold()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.email} · respondent invitation'

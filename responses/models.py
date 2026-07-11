@@ -15,6 +15,7 @@ class Submission(models.Model):
     class Source(models.TextChoices):
         DIRECT = 'direct', 'Direct link'
         DISCOVERY = 'discovery', 'Survey discovery'
+        INVITATION = 'invitation', 'Respondent invitation'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     survey = models.ForeignKey(Survey, on_delete=models.PROTECT, related_name='submissions')

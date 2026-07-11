@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block title %}Invitation unavailable | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="page-content">
+  <div class="shell narrow-shell">
+    <div class="panel empty-state">
+      <span class="panel-kicker">Respondent invitation</span>
+      <h1>This invitation is unavailable</h1>
+      <p>It may have expired, been revoked, or already been used to start a response.</p>
+      <a class="button button-secondary" href="{% url 'home' %}">Browse public surveys</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

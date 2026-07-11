@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<body style="margin:0;background:#f5f3ef;color:#20233a;font-family:Arial,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;padding:32px 20px;">
+    <div style="background:#ffffff;border-radius:16px;padding:32px;border:1px solid #e3e0d8;">
+      <p style="margin:0 0 8px;color:#0f766e;font-weight:700;">SurveySolver research invitation</p>
+      <h1 style="margin:0 0 16px;font-size:24px;">You are invited to take “{{ invitation.survey.title }}”</h1>
+      <p style="line-height:1.6;">Use this private link to view the study and start one response. You do not need an account to participate.</p>
+      <p style="margin:28px 0;"><a href="{{ invitation_url }}" style="background:#3730a3;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:700;">Open survey invitation</a></p>
+      <p style="font-size:14px;color:#646878;">This single-use link expires on {{ invitation.expires_at|date:"M j, Y H:i T" }}.</p>
+    </div>
+  </div>
+</body>
+</html>

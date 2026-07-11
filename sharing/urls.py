@@ -25,6 +25,16 @@ urlpatterns = [
         name='revoke_collaborator_invitation',
     ),
     path(
+        'dashboard/surveys/<uuid:survey_id>/sharing/respondents/send/',
+        views.send_respondent_invitation,
+        name='send_respondent_invitation',
+    ),
+    path(
+        'dashboard/surveys/<uuid:survey_id>/sharing/respondents/<uuid:invitation_id>/revoke/',
+        views.revoke_respondent_invite,
+        name='revoke_respondent_invitation',
+    ),
+    path(
         'dashboard/surveys/<uuid:survey_id>/sharing/collaborators/<uuid:collaborator_id>/',
         views.manage_collaborator,
         name='manage_collaborator',
@@ -38,5 +48,10 @@ urlpatterns = [
         'collaborate/invitation/<uuid:invitation_id>/<str:token>/',
         views.accept_invitation,
         name='accept_collaborator_invitation',
+    ),
+    path(
+        'invitation/respond/<uuid:invitation_id>/<str:token>/',
+        views.open_respondent_invitation,
+        name='open_respondent_invitation',
     ),
 ]

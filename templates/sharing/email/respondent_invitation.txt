@@ -1,0 +1,6 @@
+You have been invited to take “{{ invitation.survey.title }}” on SurveySolver.
+
+Open your private, single-use invitation:
+{{ invitation_url }}
+
+This link expires on {{ invitation.expires_at|date:"M j, Y H:i T" }}. It can be used to start one response. You do not need an account to participate.

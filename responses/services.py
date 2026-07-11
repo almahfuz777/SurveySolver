@@ -49,10 +49,10 @@ def hash_session_key(session_key):
     return salted_hmac('responses.session', session_key, algorithm='sha256').hexdigest()
 
 
-def current_published_version(survey):
+def current_published_version(survey, invitation_access=False):
     if survey.status != Survey.Status.PUBLISHED:
         raise ResponseUnavailable('This survey is not accepting responses.')
-    if survey.visibility == Survey.Visibility.INVITATION_ONLY:
+    if survey.visibility == Survey.Visibility.INVITATION_ONLY and not invitation_access:
         raise ResponseUnavailable('This survey requires an invitation.')
     try:
         return survey.versions.get(status=SurveyVersion.Status.PUBLISHED)
@@ -208,11 +208,28 @@ def start_submission(
     identity_consent=False,
     identity_data=None,
     screener_data=None,
+    respondent_invitation_id=None,
 ):
+    from sharing.respondent_invitations import (
+        bind_respondent_invitation,
+        lock_respondent_invitation,
+    )
+
     survey = Survey.objects.select_for_update().get(pk=survey.pk)
-    version = current_published_version(survey)
+    invitation = None
+    if respondent_invitation_id:
+        invitation = lock_respondent_invitation(respondent_invitation_id, survey.id)
+    version = current_published_version(survey, invitation_access=bool(invitation))
     session_hash = hash_session_key(session_key)
     respondent = user if user and user.is_authenticated else None
+    if invitation and invitation.bound_submission_id:
+        bound_submission = Submission.objects.filter(
+            id=invitation.bound_submission_id,
+            survey=survey,
+        ).first()
+        if bound_submission and can_access_submission(bound_submission, user, session_key):
+            return bound_submission
+        raise PermissionDenied('This respondent invitation has already been used.')
     in_progress_filter = Q(session_key_hash=session_hash)
     if respondent:
         in_progress_filter |= Q(respondent=respondent)
@@ -223,6 +240,11 @@ def start_submission(
         status=Submission.Status.IN_PROGRESS,
     ).first()
     if existing:
+        if invitation:
+            if existing.source != Submission.Source.INVITATION:
+                existing.source = Submission.Source.INVITATION
+                existing.save(update_fields=('source', 'updated_at'))
+            bind_respondent_invitation(invitation, existing)
         return existing
     completed_filter = Q(session_key_hash=session_hash)
     if respondent:
@@ -245,12 +267,12 @@ def start_submission(
         identity_consent,
         identity_data,
     )
-    return Submission.objects.create(
+    submission = Submission.objects.create(
         survey=survey,
         version=version,
         respondent=respondent,
         session_key_hash=session_hash,
-        source=source,
+        source=(Submission.Source.INVITATION if invitation else source),
         presentation=build_presentation(version),
         identity_data=identity_data,
         identity_consent_at=identity_consent_at,
@@ -258,6 +280,9 @@ def start_submission(
         eligibility_data=eligibility_data,
         eligibility_checked_at=eligibility_checked_at,
     )
+    if invitation:
+        bind_respondent_invitation(invitation, submission)
+    return submission
 
 
 def can_access_submission(submission, user, session_key):

@@ -15,6 +15,14 @@ from .invitations import (
     revoke_collaborator_invitation,
 )
 from .models import CollaborationLink, CollaboratorInvitation, SurveyCollaborator
+from .models import RespondentInvitation
+from .respondent_invitations import (
+    create_respondent_invitation,
+    deliver_respondent_invitation,
+    invitation_token_is_valid as respondent_invitation_token_is_valid,
+    revoke_respondent_invitation,
+    store_invitation_grant,
+)
 from .services import (
     accept_collaboration_link,
     create_collaboration_link,
@@ -64,6 +72,9 @@ def sharing_settings(request, survey_id):
             'collaborator_invitations': survey.collaborator_invitations.select_related(
                 'created_by',
                 'accepted_by',
+            ),
+            'respondent_invitations': survey.respondent_invitations.select_related(
+                'created_by',
             ),
             'roles': SurveyCollaborator.Role.choices,
             'new_link_url': new_link_url,
@@ -133,6 +144,47 @@ def revoke_invitation(request, survey_id, invitation_id):
 
 @require_POST
 @login_required
+def send_respondent_invitation(request, survey_id):
+    survey = get_object_or_404(Survey, id=survey_id, owner=request.user)
+    try:
+        invitation, token = create_respondent_invitation(
+            survey.id,
+            request.user,
+            request.POST.get('email', ''),
+        )
+    except ValidationError as error:
+        messages.error(request, '; '.join(error.messages))
+    else:
+        invitation_url = request.build_absolute_uri(
+            reverse('open_respondent_invitation', args=[invitation.id, token])
+        )
+        if deliver_respondent_invitation(invitation, invitation_url):
+            messages.success(request, f'Respondent invitation sent to {invitation.email}.')
+        else:
+            messages.error(request, 'The invitation was saved, but email delivery failed.')
+    return redirect('sharing_settings', survey_id=survey.id)
+
+
+@require_POST
+@login_required
+def revoke_respondent_invite(request, survey_id, invitation_id):
+    get_object_or_404(
+        RespondentInvitation,
+        id=invitation_id,
+        survey_id=survey_id,
+        survey__owner=request.user,
+    )
+    try:
+        revoke_respondent_invitation(invitation_id, request.user)
+    except RespondentInvitation.DoesNotExist:
+        messages.error(request, 'Respondent invitation not found.')
+    else:
+        messages.success(request, 'Respondent invitation revoked.')
+    return redirect('sharing_settings', survey_id=survey_id)
+
+
+@require_POST
+@login_required
 def manage_collaborator(request, survey_id, collaborator_id):
     get_object_or_404(
         SurveyCollaborator,
@@ -193,3 +245,14 @@ def accept_invitation(request, invitation_id, token):
         {'invitation': invitation, 'email_matches': email_matches},
         status=200 if email_matches else 403,
     )
+
+
+def open_respondent_invitation(request, invitation_id, token):
+    invitation = get_object_or_404(
+        RespondentInvitation.objects.select_related('survey'),
+        id=invitation_id,
+    )
+    if not respondent_invitation_token_is_valid(invitation, token):
+        return render(request, 'sharing/respondent_invitation_unavailable.html', status=410)
+    store_invitation_grant(request.session, invitation)
+    return redirect('respond_survey', slug=invitation.survey.slug)
