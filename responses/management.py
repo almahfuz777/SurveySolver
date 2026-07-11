@@ -2,14 +2,17 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from sharing.permissions import EDIT_ROLES, accessible_surveys
+
 from .models import ResponseAuditEvent, Submission
 
 
 @transaction.atomic
 def set_analytics_exclusion(submission_id, user, *, excluded, reason=''):
+    editable_surveys = accessible_surveys(user, EDIT_ROLES)
     submission = Submission.objects.select_for_update().select_related('survey').get(
         id=submission_id,
-        survey__owner=user,
+        survey__in=editable_surveys,
         status=Submission.Status.COMPLETED,
     )
     reason = reason.strip()

@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from responses.models import Submission
+from sharing.models import SurveyCollaborator
 from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 
@@ -209,3 +210,27 @@ class GuestRewardClaimTests(TestCase):
 
         self.assertRedirects(response, reverse('creator_response_list', args=[self.survey.id]))
         self.assertFalse(GuestRewardClaim.objects.filter(pk=claim_id).exists())
+
+    def test_collaborator_never_receives_completion_points(self):
+        collaborator = get_user_model().objects.create_user(email='collaborator@example.com')
+        SurveyCollaborator.objects.create(
+            survey=self.survey,
+            user=collaborator,
+            role=SurveyCollaborator.Role.VIEWER,
+            added_by=self.owner,
+        )
+        self.client.force_login(collaborator)
+        self.client.post(reverse('respond_survey', args=[self.survey.slug]))
+        submission = Submission.objects.get()
+
+        self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Collaborator test response'},
+        )
+
+        self.assertFalse(
+            PointTransaction.objects.filter(
+                user=collaborator,
+                reason=PointTransaction.Reason.SURVEY_COMPLETION,
+            ).exists()
+        )

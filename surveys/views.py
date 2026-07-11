@@ -6,6 +6,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from sharing.permissions import EDIT_ROLES, OWNER_ROLES, VIEW_ROLES, accessible_surveys, get_accessible_survey
+
 from . import services
 from .publication import PublicationError, publish_survey, readiness_errors
 from .forms import BranchRuleForm, EligibilityCriteriaForm, QuestionEditorForm, QuotaForm, SectionForm, SurveyMetadataForm
@@ -14,7 +16,7 @@ from .models import Question, Section, Survey, SurveyVersion
 
 @login_required
 def survey_list(request):
-    surveys = Survey.objects.owned_by(request.user).prefetch_related('topics')
+    surveys = accessible_surveys(request.user, VIEW_ROLES).prefetch_related('topics')
     return render(request, 'surveys/survey_list.html', {'surveys': surveys})
 
 
@@ -41,11 +43,7 @@ def survey_create(request):
 
 @login_required
 def survey_detail(request, survey_id):
-    survey = get_object_or_404(
-        Survey.objects.prefetch_related('topics'),
-        id=survey_id,
-        owner=request.user,
-    )
+    survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
     return render(
         request,
         'surveys/survey_detail.html',
@@ -53,13 +51,14 @@ def survey_detail(request, survey_id):
             'survey': survey,
             'draft_version': survey.draft_version,
             'readiness_errors': readiness_errors(survey.draft_version),
+            'access_role': survey.access_role,
         },
     )
 
 
 @login_required
 def survey_edit(request, survey_id):
-    survey = get_object_or_404(Survey, id=survey_id, owner=request.user)
+    survey = get_accessible_survey(request.user, survey_id, EDIT_ROLES)
     if request.method == 'POST':
         form = SurveyMetadataForm(request.POST, request.FILES, instance=survey)
         if form.is_valid():
@@ -79,7 +78,7 @@ def survey_edit(request, survey_id):
 @require_POST
 @login_required
 def survey_archive(request, survey_id):
-    survey = get_object_or_404(Survey, id=survey_id, owner=request.user)
+    survey = get_accessible_survey(request.user, survey_id, OWNER_ROLES)
     survey.archive()
     messages.success(request, 'Survey archived.')
     return redirect('survey_list')
@@ -88,7 +87,7 @@ def survey_archive(request, survey_id):
 @require_POST
 @login_required
 def survey_publish(request, survey_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     try:
         published_version, _ = publish_survey(survey.id, request.user, _revision(request))
     except services.StaleVersionError:
@@ -101,8 +100,8 @@ def survey_publish(request, survey_id):
     return redirect('survey_detail', survey_id=survey.id)
 
 
-def _owned_survey(request, survey_id):
-    return get_object_or_404(Survey, id=survey_id, owner=request.user)
+def _editable_survey(request, survey_id):
+    return get_accessible_survey(request.user, survey_id, EDIT_ROLES)
 
 
 def _draft_version(survey):
@@ -136,7 +135,7 @@ def _mutation_error(request, survey, error):
 
 @login_required
 def survey_builder(request, survey_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     version = _draft_version(survey)
     selected_question = None
     selected_id = request.GET.get('question')
@@ -169,14 +168,14 @@ def survey_builder(request, survey_id):
 
 @login_required
 def survey_preview(request, survey_id):
-    survey = _owned_survey(request, survey_id)
+    survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
     version = _draft_version(survey)
     return render(request, 'surveys/preview.html', {'survey': survey, 'version': version})
 
 
 @login_required
 def survey_logic(request, survey_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     version = _draft_version(survey)
     branch_form = BranchRuleForm(version=version)
     quota_form = QuotaForm()
@@ -234,7 +233,7 @@ def survey_logic(request, survey_id):
 @require_POST
 @login_required
 def section_add(request, survey_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     version = _draft_version(survey)
     try:
         services.add_section(version.id, _revision(request))
@@ -246,7 +245,7 @@ def section_add(request, survey_id):
 @require_POST
 @login_required
 def section_update(request, survey_id, section_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     section = get_object_or_404(Section, id=section_id, version__survey=survey)
     form = SectionForm(request.POST, instance=section)
     if not form.is_valid():
@@ -261,7 +260,7 @@ def section_update(request, survey_id, section_id):
 @require_POST
 @login_required
 def section_move(request, survey_id, section_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     section = get_object_or_404(Section, id=section_id, version__survey=survey)
     direction = request.POST.get('direction')
     if direction not in {'up', 'down'}:
@@ -276,7 +275,7 @@ def section_move(request, survey_id, section_id):
 @require_POST
 @login_required
 def section_delete(request, survey_id, section_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     section = get_object_or_404(Section, id=section_id, version__survey=survey)
     try:
         services.delete_section(section.id, _revision(request))
@@ -288,7 +287,7 @@ def section_delete(request, survey_id, section_id):
 @require_POST
 @login_required
 def question_add(request, survey_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     section = get_object_or_404(Section, id=request.POST.get('section_id'), version__survey=survey)
     question_type = request.POST.get('type')
     if question_type not in Question.Type.values:
@@ -303,7 +302,7 @@ def question_add(request, survey_id):
 @require_POST
 @login_required
 def question_update(request, survey_id, question_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     question = get_object_or_404(Question, id=question_id, section__version__survey=survey)
     form = QuestionEditorForm(request.POST, instance=question)
     if not form.is_valid():
@@ -325,7 +324,7 @@ def question_update(request, survey_id, question_id):
 @require_POST
 @login_required
 def question_move(request, survey_id, question_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     question = get_object_or_404(Question, id=question_id, section__version__survey=survey)
     direction = request.POST.get('direction')
     if direction not in {'up', 'down'}:
@@ -340,7 +339,7 @@ def question_move(request, survey_id, question_id):
 @require_POST
 @login_required
 def question_delete(request, survey_id, question_id):
-    survey = _owned_survey(request, survey_id)
+    survey = _editable_survey(request, survey_id)
     question = get_object_or_404(Question, id=question_id, section__version__survey=survey)
     try:
         services.delete_question(question.id, _revision(request))

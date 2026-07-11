@@ -1,6 +1,7 @@
 from django.db import transaction
 
 from responses.models import Submission
+from sharing.models import SurveyCollaborator
 
 from .models import Badge, BadgeAward, PointTransaction
 
@@ -32,6 +33,7 @@ def award_survey_completion(user, submission, points):
         submission.status != Submission.Status.COMPLETED
         or not submission.is_eligible
         or user.id == submission.survey.owner_id
+        or SurveyCollaborator.objects.filter(survey=submission.survey, user=user).exists()
         or (submission.respondent_id and submission.respondent_id != user.id)
     ):
         return None, False

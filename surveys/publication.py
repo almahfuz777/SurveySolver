@@ -3,6 +3,8 @@ from copy import deepcopy
 from django.db import transaction
 from django.utils import timezone
 
+from sharing.permissions import EDIT_ROLES, accessible_surveys
+
 from .models import BranchRule, EligibilityCriteria, MatrixRow, Question, QuestionChoice, Quota, Section, Survey, SurveyVersion
 
 
@@ -122,7 +124,7 @@ def _clone_version(source, created_by):
 
 @transaction.atomic
 def publish_survey(survey_id, user, expected_revision):
-    survey = Survey.objects.select_for_update().get(id=survey_id, owner=user)
+    survey = accessible_surveys(user, EDIT_ROLES).select_for_update().get(id=survey_id)
     if survey.status == Survey.Status.ARCHIVED:
         raise PublicationError(['Archived surveys cannot be published.'])
     version = SurveyVersion.objects.select_for_update().get(

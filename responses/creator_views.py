@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from surveys.models import Survey
+from sharing.permissions import EDIT_ROLES, OWNER_ROLES, VIEW_ROLES, get_accessible_survey
 
 from .dashboard import creator_identity, filter_submissions, format_answer, format_duration, response_metrics
 from .forms import ResponseFilterForm
@@ -13,13 +13,9 @@ from .management import permanently_delete_submission, set_analytics_exclusion
 from .models import Submission
 
 
-def _owned_survey(user, survey_id):
-    return get_object_or_404(Survey, id=survey_id, owner=user)
-
-
 @login_required
 def response_list(request, survey_id):
-    survey = _owned_survey(request.user, survey_id)
+    survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
     queryset = survey.submissions.select_related('version').order_by('-started_at')
     filter_form = ResponseFilterForm(request.GET or None, survey=survey)
     if filter_form.is_valid():
@@ -53,7 +49,7 @@ def response_list(request, survey_id):
 
 @login_required
 def response_detail(request, survey_id, submission_id):
-    survey = _owned_survey(request.user, survey_id)
+    survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
     submission = get_object_or_404(
         Submission.objects.select_related('version', 'survey').prefetch_related(
             'answers__question__section',
@@ -88,7 +84,7 @@ def response_detail(request, survey_id, submission_id):
 @require_POST
 @login_required
 def response_exclusion(request, survey_id, submission_id):
-    _owned_survey(request.user, survey_id)
+    get_accessible_survey(request.user, survey_id, EDIT_ROLES)
     get_object_or_404(Submission, id=submission_id, survey_id=survey_id)
     action = request.POST.get('action')
     if action not in {'exclude', 'include'}:
@@ -114,7 +110,7 @@ def response_exclusion(request, survey_id, submission_id):
 
 @login_required
 def response_delete(request, survey_id, submission_id):
-    survey = _owned_survey(request.user, survey_id)
+    survey = get_accessible_survey(request.user, survey_id, OWNER_ROLES)
     submission = get_object_or_404(
         Submission,
         id=submission_id,
