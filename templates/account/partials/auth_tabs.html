@@ -1,0 +1,5 @@
+{% load i18n %}
+<div class="auth-tabs" role="tablist" aria-label="{% translate 'Sign in or create an account' %}">
+    <a class="auth-tab{% if active == 'login' %} is-active{% endif %}" href="{% url 'account_login' %}" role="tab" aria-selected="{% if active == 'login' %}true{% else %}false{% endif %}">Sign in</a>
+    <a class="auth-tab{% if active == 'signup' %} is-active{% endif %}" href="{% url 'account_signup' %}" role="tab" aria-selected="{% if active == 'signup' %}true{% else %}false{% endif %}">Sign up</a>
+</div>

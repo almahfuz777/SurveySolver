@@ -45,7 +45,7 @@
                     <a href="{% url 'survey_list' %}">My surveys</a>
                     <a href="{% url 'profile_detail' %}">Profile</a>
                     <a class="button button-quiet button-small" href="{% url 'account_logout' %}">Sign out</a>
-                {% else %}
+                {% elif request.resolver_match.url_name != 'account_login' and request.resolver_match.url_name != 'account_signup' %}
                     <a href="{% url 'account_login' %}">Sign in</a>
                 {% endif %}
             </nav>

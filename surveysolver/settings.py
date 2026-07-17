@@ -169,7 +169,10 @@ ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_EMAIL_SUBJECT_PREFIX = '[SurveySolver] '
-ACCOUNT_FORMS = {'signup': 'accounts.forms.AccountSignupForm'}
+ACCOUNT_FORMS = {
+    'signup': 'accounts.forms.AccountSignupForm',
+    'login': 'accounts.forms.AccountLoginForm',
+}
 
 SOCIALACCOUNT_LOGIN_ON_GET = False
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True

@@ -10,10 +10,10 @@
     <div class="shell auth-shell">
         {% include 'account/partials/auth_context.html' %}
         <div class="auth-card">
+            {% include 'account/partials/auth_tabs.html' with active='login' %}
+
             <header class="auth-heading">
-                <span class="auth-kicker">SurveySolver account</span>
                 <h1 id="sign-in-heading">Welcome back</h1>
-                <p>Sign in to continue to SurveySolver.</p>
             </header>
 
             <form class="auth-form" method="post" action="{% url 'account_login' %}">
@@ -33,7 +33,7 @@
                     </div>
                     <div class="auth-password-control">
                         {{ form.password }}
-                        <button type="button" aria-controls="{{ form.password.id_for_label }}" aria-pressed="false" data-password-toggle>Show</button>
+                        {% include 'account/partials/password_toggle.html' with target=form.password.id_for_label %}
                     </div>
                     {% for error in form.password.errors %}<p class="auth-error" id="{{ form.password.id_for_label }}-error">{{ error }}</p>{% endfor %}
                 </div>
@@ -44,8 +44,6 @@
 
             <div class="auth-divider" role="separator"><span>or</span></div>
             {% include 'account/partials/google_button.html' %}
-
-            <p class="auth-switch">Don’t have an account? <a href="{% url 'account_signup' %}">Create an account</a></p>
         </div>
     </div>
 </section>

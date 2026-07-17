@@ -1,17 +1,30 @@
-from allauth.account.forms import SignupForm
+from allauth.account.forms import LoginForm, SignupForm
 from django import forms
 from django.contrib.auth import get_user_model
 
 from .models import Profile
 
 
+class AccountLoginForm(LoginForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['login'].widget.attrs['placeholder'] = 'e.g. john@example.com'
+        self.fields['password'].widget.attrs['placeholder'] = 'Enter your password'
+
+
 class AccountSignupForm(SignupForm):
     full_name = forms.CharField(
         label='Full name',
         max_length=301,
-        widget=forms.TextInput(attrs={'autocomplete': 'name'}),
+        widget=forms.TextInput(attrs={'autocomplete': 'name', 'placeholder': 'e.g. John Doe'}),
     )
     field_order = ('full_name', 'email', 'password1', 'password2')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].widget.attrs['placeholder'] = 'e.g. john@example.com'
+        self.fields['password1'].widget.attrs['placeholder'] = 'At least 8 characters'
+        self.fields['password2'].widget.attrs['placeholder'] = 'Re-enter your password'
 
     def clean_full_name(self):
         full_name = ' '.join(self.cleaned_data['full_name'].split())
