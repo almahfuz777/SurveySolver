@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block title %}Build {{ survey.title }} | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/builder.css' %}">{% endblock %}
 {% block extra_head %}<script src="{% static 'js/builder.js' %}" defer></script>{% endblock %}
 
 {% block content %}

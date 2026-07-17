@@ -6,9 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#312e81">
     <meta name="description" content="SurveySolver helps researchers create targeted surveys and reach engaged respondents.">
+
     <title>{% block title %}SurveySolver{% endblock %}</title>
+    
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    {% block extra_css %}{% endblock %}
+    
     <script src="{% static 'js/app.js' %}" defer></script>
+    {% block extra_scripts %}{% endblock %}
+
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -33,7 +39,7 @@
             </button>
 
             <nav id="primary-navigation" class="primary-nav" aria-label="Primary navigation">
-                <a href="{% url 'home' %}">Discover</a>
+                <a href="{% url 'discover' %}">Discover</a>
                 {% if user.is_authenticated %}
                     <a href="{% url 'dashboard' %}">Dashboard</a>
                     <a href="{% url 'survey_list' %}">My surveys</a>
@@ -41,7 +47,6 @@
                     <a class="button button-quiet button-small" href="{% url 'account_logout' %}">Sign out</a>
                 {% else %}
                     <a href="{% url 'account_login' %}">Sign in</a>
-                    <a class="button button-primary button-small" href="{% url 'account_signup' %}">Join SurveySolver</a>
                 {% endif %}
             </nav>
         </div>
@@ -63,11 +68,19 @@
 
     <footer class="site-footer">
         <div class="shell footer-inner">
-            <div>
+            <div class="footer-brand">
                 <a class="brand brand-footer" href="{% url 'home' %}">SurveySolver</a>
                 <p>Better research starts with better responses.</p>
             </div>
-            <p class="footer-meta">Built for students, educators, and researchers.</p>
+            <nav class="footer-nav" aria-label="Footer navigation">
+                <div><strong>Platform</strong><a href="{% url 'discover' %}">Discover surveys</a>{% if user.is_authenticated %}<a href="{% url 'dashboard' %}">Dashboard</a><a href="{% url 'survey_list' %}">My surveys</a>{% else %}<a href="{% url 'account_login' %}">Sign in</a><a href="{% url 'account_signup' %}">Create an account</a>{% endif %}</div>
+                <div><strong>Company</strong><a href="#">About</a><a href="#">Contact</a></div>
+                <div><strong>Legal</strong><a href="#">Privacy policy</a><a href="#">Terms of use</a></div>
+            </nav>
+        </div>
+        <div class="shell footer-bottom">
+            <p>&copy; {% now "Y" %} SurveySolver. All rights reserved.</p>
+            {% comment %} <p>Created by Mahfuz · Built for better research.</p> {% endcomment %}
         </div>
     </footer>
 </body>

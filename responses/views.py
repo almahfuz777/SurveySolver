@@ -1,3 +1,4 @@
+from django.contrib.auth.views import redirect_to_login
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -47,6 +48,11 @@ def _public_survey(slug, invitation_access=False):
 @require_http_methods(['GET', 'POST'])
 def survey_landing(request, slug):
     survey = get_object_or_404(Survey.objects.prefetch_related('topics'), slug=slug)
+    if (
+        survey.identity_mode == Survey.IdentityMode.IDENTIFIED
+        and not request.user.is_authenticated
+    ):
+        return redirect_to_login(request.get_full_path())
     invitation = invitation_from_session(
         request.session,
         survey,

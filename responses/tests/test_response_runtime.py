@@ -192,6 +192,8 @@ class ResponseRuntimeTests(TestCase):
     def test_identified_response_requires_disclosed_identity_and_consent(self):
         self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
         self.survey.save(update_fields=('identity_mode', 'updated_at'))
+        respondent = get_user_model().objects.create_user(email='identified@example.com')
+        self.client.force_login(respondent)
         url = reverse('respond_survey', args=[self.survey.slug])
 
         invalid = self.client.post(
@@ -219,6 +221,15 @@ class ResponseRuntimeTests(TestCase):
             {'name': 'Samira Khan', 'email': 'samira@example.com'},
         )
         self.assertIsNotNone(submission.identity_consent_at)
+
+    def test_identified_survey_requires_authentication(self):
+        self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
+        self.survey.save(update_fields=('identity_mode', 'updated_at'))
+        url = reverse('respond_survey', args=[self.survey.slug])
+
+        response = self.client.get(url)
+
+        self.assertRedirects(response, f"{reverse('account_login')}?next={url}")
 
     def test_completed_guest_is_returned_to_existing_response(self):
         self.start()

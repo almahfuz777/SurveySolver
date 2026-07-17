@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Delete response · {{ survey.title }} | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/responses/creator-responses.css' %}">{% endblock %}
 
 {% block content %}
 <section class="completion-page">

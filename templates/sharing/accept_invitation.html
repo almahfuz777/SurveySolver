@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Accept collaboration invitation | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/sharing/sharing.css' %}">{% endblock %}
 
 {% block content %}
 <section class="completion-page"><div class="shell completion-shell"><div class="panel collaboration-invite"><span class="eyebrow">Email collaboration invitation</span><h1>{{ invitation.survey.title }}</h1>{% if email_matches %}<p>You are signed in as <strong>{{ user.email }}</strong>. This invitation grants <strong>{{ invitation.get_role_display|lower }}</strong> access.</p><form method="post">{% csrf_token %}<button class="button button-primary button-block" type="submit">Accept invitation</button></form>{% else %}<div class="message message-error" role="alert">This invitation was sent to <strong>{{ invitation.email }}</strong>. Sign out and use that account to accept it.</div><a class="button button-secondary button-block" href="{% url 'account_logout' %}">Sign out</a>{% endif %}<a class="button button-quiet button-block" href="{% url 'home' %}">Decline</a></div></div></section>

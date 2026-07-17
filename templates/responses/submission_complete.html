@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Response submitted | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/responses/submission-complete.css' %}">{% endblock %}
 
 {% block content %}
 <section class="completion-page">

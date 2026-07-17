@@ -21,10 +21,29 @@ class AuthenticationFlowTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, 'SurveySolver')
 
+    def test_login_page_has_one_recovery_link_and_accessible_password_control(self):
+        response = self.client.get(reverse('account_login'))
+
+        self.assertContains(response, 'Welcome back')
+        self.assertEqual(response.content.decode().count('Forgot password?'), 1)
+        self.assertContains(response, 'data-password-toggle')
+        self.assertContains(response, 'Continue with Google')
+        self.assertContains(response, 'images/google-g.svg')
+
+    def test_signup_page_has_required_fields_and_password_controls(self):
+        response = self.client.get(reverse('account_signup'))
+
+        self.assertContains(response, 'name="full_name"')
+        self.assertContains(response, 'name="email"')
+        self.assertContains(response, 'name="password1"')
+        self.assertContains(response, 'name="password2"')
+        self.assertContains(response, 'data-password-toggle', count=2)
+
     def test_signup_creates_email_only_user_and_requests_verification(self):
         response = self.client.post(
             reverse('account_signup'),
             {
+                'full_name': 'Nadia Rahman',
                 'email': 'new.researcher@example.com',
                 'password1': self.password,
                 'password2': self.password,
@@ -33,6 +52,7 @@ class AuthenticationFlowTests(TestCase):
 
         self.assertRedirects(response, reverse('account_email_verification_sent'))
         user = get_user_model().objects.get(email='new.researcher@example.com')
+        self.assertEqual(user.get_full_name(), 'Nadia Rahman')
         self.assertFalse(EmailAddress.objects.get(user=user).verified)
         self.assertEqual(len(mail.outbox), 1)
 
@@ -71,6 +91,7 @@ class AuthenticationFlowTests(TestCase):
         response = self.client.post(
             reverse('account_signup'),
             {
+                'full_name': 'Existing Member',
                 'email': 'MEMBER@example.com',
                 'password1': self.password,
                 'password2': self.password,

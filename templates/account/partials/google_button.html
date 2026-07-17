@@ -1,0 +1,9 @@
+{% load socialaccount static %}
+<form class="auth-social-form" method="post" action="{% provider_login_url 'google' %}">
+    {% csrf_token %}
+    {% if redirect_field_value %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">{% endif %}
+    <button class="google-button" type="submit">
+        <img src="{% static 'images/google-g.svg' %}" width="20" height="20" alt="">
+        <span>Continue with Google</span>
+    </button>
+</form>

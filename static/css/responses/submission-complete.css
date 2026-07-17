@@ -1,0 +1,6 @@
+/* Survey completion and reward claim */
+
+.reward-claim-box { background: var(--teal-50); border: 1px solid var(--teal-200); border-radius: var(--radius-lg); display: grid; gap: 0.75rem; margin-top: 1.5rem; padding: 1.35rem; text-align: left; }
+.reward-claim-box > strong { color: var(--teal-700); font-size: 2rem; }
+.reward-claim-box > p { margin: 0; }
+.reward-claim-box form { margin: 0; }

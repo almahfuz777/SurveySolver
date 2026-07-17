@@ -10,7 +10,7 @@ from .forms import ResearchProfileForm, UserNameForm
 
 @login_required
 def profile_detail(request):
-    return render(request, 'accounts/profile_detail.html')
+    return render(request, 'account/profile/profile_detail.html')
 
 
 @login_required
@@ -36,6 +36,6 @@ def profile_edit(request):
 
     return render(
         request,
-        'accounts/profile_edit.html',
+        'account/profile/profile_edit.html',
         {'user_form': user_form, 'profile_form': profile_form},
     )

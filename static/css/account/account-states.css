@@ -1,0 +1,15 @@
+/* Account verification, reset, confirmation, and sign-out states */
+
+main > section[aria-labelledby="reset-heading"],
+main > section[aria-labelledby="verification-heading"],
+main > section[aria-labelledby="confirm-heading"],
+main > section[aria-labelledby="sign-out-heading"] {
+    width: min(calc(100% - 2rem), 30rem);
+    min-height: 36rem;
+    margin: 4rem auto;
+    padding: 2rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}

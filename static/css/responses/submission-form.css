@@ -1,0 +1,54 @@
+/* Survey response form */
+
+.response-heading .page-heading-inner { align-items: end; }
+.response-time { background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 999px; color: white; padding: 0.55rem 0.9rem; white-space: nowrap; }
+.response-form { display: grid; gap: 1.25rem; max-width: 56rem; }
+.response-section { overflow: hidden; padding: 0; }
+.response-section-heading { background: var(--surface-warm); border-bottom: 1px solid var(--border); padding: 1.5rem clamp(1rem, 4vw, 2rem); }
+.response-section-heading h2 { margin: 0.25rem 0; }
+.response-section-heading p { color: var(--text-muted); margin: 0; }
+
+.response-question { border: 0; border-bottom: 1px solid var(--border); margin: 0; padding: 1.75rem clamp(1rem, 4vw, 2rem); }
+.response-question:last-child { border-bottom: 0; }
+.response-question.has-error { background: #fff7f7; box-shadow: inset 3px 0 #dc2626; }
+.response-question legend { color: var(--text); font-size: 1.02rem; font-weight: 700; padding: 0; width: 100%; }
+.question-number { align-items: center; background: var(--indigo-50); border-radius: 50%; color: var(--indigo-700); display: inline-flex; font-size: 0.76rem; height: 1.65rem; justify-content: center; margin-right: 0.4rem; width: 1.65rem; }
+
+.response-question > input:not([type='radio']):not([type='checkbox']), .response-question > select, .response-question > textarea { margin-top: 1rem; max-width: 36rem; width: 100%; }
+.response-options { display: grid; gap: 0.65rem; margin-top: 1rem; }
+.response-option { align-items: center; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; display: flex; gap: 0.7rem; max-width: 36rem; padding: 0.8rem 1rem; }
+.response-option:hover { border-color: var(--indigo-300); background: var(--indigo-50); }
+.response-option input { accent-color: var(--indigo-600); }
+.ranking-inputs { display: grid; gap: 0.65rem; margin-top: 1rem; max-width: 36rem; }
+.ranking-inputs label { align-items: center; display: grid; gap: 0.7rem; grid-template-columns: 2rem 1fr; }
+.ranking-inputs label > span { align-items: center; background: var(--indigo-50); border-radius: 50%; color: var(--indigo-700); display: flex; font-weight: 800; height: 2rem; justify-content: center; }
+.scale-options { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+.scale-options label input { position: absolute; opacity: 0; }
+.scale-options label span { align-items: center; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; display: flex; height: 2.8rem; justify-content: center; min-width: 2.8rem; }
+.scale-options input:checked + span { background: var(--indigo-700); border-color: var(--indigo-700); color: white; }
+.scale-options input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.scale-labels { color: var(--text-muted); display: flex; font-size: 0.8rem; justify-content: space-between; max-width: 30rem; }
+.matrix-scroll { margin-top: 1rem; overflow-x: auto; }
+.response-matrix { border-collapse: collapse; min-width: 36rem; width: 100%; }
+.response-matrix th, .response-matrix td { border-bottom: 1px solid var(--border); padding: 0.75rem; text-align: center; }
+.response-matrix th:first-child { text-align: left; }
+.response-matrix tbody th { font-weight: 500; }
+.response-matrix input { accent-color: var(--indigo-600); }
+.response-submit { align-items: center; display: flex; gap: 1rem; justify-content: space-between; padding: 1.4rem 1.7rem; }
+.response-submit p { color: var(--text-muted); margin: 0.2rem 0 0; }
+.response-submit-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: flex-end; }
+
+@media (max-width: 760px) {
+    .response-submit {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .response-submit .button {
+        width: 100%;
+    }
+
+    .response-submit-actions {
+        width: 100%;
+    }
+}

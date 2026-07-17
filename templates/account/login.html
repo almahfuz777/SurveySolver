@@ -1,26 +1,52 @@
 {% extends 'base.html' %}
-{% load socialaccount %}
+{% load static %}
 
 {% block title %}Sign in | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/account/auth.css' %}">{% endblock %}
+{% block extra_scripts %}<script src="{% static 'js/pages/auth.js' %}" defer></script>{% endblock %}
 
 {% block content %}
-<section aria-labelledby="sign-in-heading">
-    <h1 id="sign-in-heading">Sign in</h1>
-    <p>Access your surveys, responses, and rewards.</p>
-    <form method="post" action="{% provider_login_url 'google' %}">
-        {% csrf_token %}
-        <button type="submit">Continue with Google</button>
-    </form>
-    <p>Or sign in with your email address.</p>
-    <form method="post" action="{% url 'account_login' %}">
-        {% csrf_token %}
-        {{ form.as_p }}
-        {% if redirect_field_value %}
-            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
-        {% endif %}
-        <button type="submit">Sign in</button>
-    </form>
-    <p><a href="{% url 'account_reset_password' %}">Forgot your password?</a></p>
-    <p>New to SurveySolver? <a href="{% url 'account_signup' %}">Create an account</a>.</p>
+<section class="auth-page" aria-labelledby="sign-in-heading">
+    <div class="shell auth-shell">
+        {% include 'account/partials/auth_context.html' %}
+        <div class="auth-card">
+            <header class="auth-heading">
+                <span class="auth-kicker">SurveySolver account</span>
+                <h1 id="sign-in-heading">Welcome back</h1>
+                <p>Sign in to continue to SurveySolver.</p>
+            </header>
+
+            <form class="auth-form" method="post" action="{% url 'account_login' %}">
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="auth-form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+
+                <div class="auth-field{% if form.login.errors %} auth-field-error{% endif %}">
+                    <label for="{{ form.login.id_for_label }}">Email address</label>
+                    {{ form.login }}
+                    {% for error in form.login.errors %}<p class="auth-error" id="{{ form.login.id_for_label }}-error">{{ error }}</p>{% endfor %}
+                </div>
+
+                <div class="auth-field{% if form.password.errors %} auth-field-error{% endif %}">
+                    <div class="auth-label-row">
+                        <label for="{{ form.password.id_for_label }}">Password</label>
+                        <a href="{% url 'account_reset_password' %}">Forgot password?</a>
+                    </div>
+                    <div class="auth-password-control">
+                        {{ form.password }}
+                        <button type="button" aria-controls="{{ form.password.id_for_label }}" aria-pressed="false" data-password-toggle>Show</button>
+                    </div>
+                    {% for error in form.password.errors %}<p class="auth-error" id="{{ form.password.id_for_label }}-error">{{ error }}</p>{% endfor %}
+                </div>
+
+                {% if redirect_field_value %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">{% endif %}
+                <button class="button button-primary auth-primary" type="submit">Sign in</button>
+            </form>
+
+            <div class="auth-divider" role="separator"><span>or</span></div>
+            {% include 'account/partials/google_button.html' %}
+
+            <p class="auth-switch">Don’t have an account? <a href="{% url 'account_signup' %}">Create an account</a></p>
+        </div>
+    </div>
 </section>
 {% endblock %}

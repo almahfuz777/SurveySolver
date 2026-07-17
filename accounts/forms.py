@@ -1,7 +1,32 @@
+from allauth.account.forms import SignupForm
 from django import forms
 from django.contrib.auth import get_user_model
 
 from .models import Profile
+
+
+class AccountSignupForm(SignupForm):
+    full_name = forms.CharField(
+        label='Full name',
+        max_length=301,
+        widget=forms.TextInput(attrs={'autocomplete': 'name'}),
+    )
+    field_order = ('full_name', 'email', 'password1', 'password2')
+
+    def clean_full_name(self):
+        full_name = ' '.join(self.cleaned_data['full_name'].split())
+        first_name, _, last_name = full_name.partition(' ')
+        if len(first_name) > 150 or len(last_name) > 150:
+            raise forms.ValidationError('Enter a name with no more than 150 characters per part.')
+        return full_name
+
+    def save(self, request):
+        user = super().save(request)
+        first_name, _, last_name = self.cleaned_data['full_name'].partition(' ')
+        user.first_name = first_name
+        user.last_name = last_name
+        user.save(update_fields=('first_name', 'last_name'))
+        return user
 
 
 class UserNameForm(forms.ModelForm):

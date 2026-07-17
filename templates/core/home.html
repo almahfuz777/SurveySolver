@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}SurveySolver | Research surveys that reach the right people{% endblock %}
+{% block title %}Home | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/core/home.css' %}">{% endblock %}
 
 {% block content %}
 <section class="hero">
@@ -9,15 +11,13 @@
             <span class="eyebrow">Research surveys, reimagined</span>
             <h1>Research deserves <span>better responses.</span></h1>
             <p class="hero-lead">
-                Create rigorous, targeted surveys and connect with respondents who
-                are genuinely motivated to contribute.
+                Create research-grade studies, connect with relevant participants and turn thoughtful contributions into rewards.
             </p>
             <div class="hero-actions">
                 {% if user.is_authenticated %}
                     <a class="button button-primary" href="{% url 'dashboard' %}">Open your dashboard</a>
                 {% else %}
-                    <a class="button button-primary" href="{% url 'account_signup' %}">Start researching</a>
-                    <a class="button button-secondary" href="{% url 'account_login' %}">I want to respond</a>
+                    <a class="button button-primary" href="{% url 'account_signup' %}">Join SurveySolver</a>
                 {% endif %}
             </div>
             <div class="trust-row" aria-label="Platform benefits">
@@ -54,67 +54,68 @@
     </div>
 </section>
 
-<section class="section discovery-section" aria-labelledby="discover-heading">
+<section class="section section-muted audience-section" aria-labelledby="creator-heading">
     <div class="shell">
-        <div class="section-heading discovery-heading">
-            <div>
-                <span class="eyebrow">Open research studies</span>
-                <h2 id="discover-heading">{% if user.is_authenticated %}Matched to your profile{% else %}Contribute to active research{% endif %}</h2>
-                <p>{% if user.is_authenticated %}Targeted studies appear only when your profile confirms you are eligible.{% else %}Browse public studies. Targeted surveys will check eligibility before they begin.{% endif %}</p>
-            </div>
-            <form class="discovery-filters" method="get" aria-label="Filter surveys">
-                <label>Topic<select name="topic"><option value="">All topics</option>{% for topic in topics %}<option value="{{ topic.slug }}"{% if selected_topic == topic.slug %} selected{% endif %}>{{ topic.name }}</option>{% endfor %}</select></label>
-                <label>Duration<select name="duration"><option value="">Any length</option><option value="5"{% if selected_duration == 5 %} selected{% endif %}>Up to 5 min</option><option value="10"{% if selected_duration == 10 %} selected{% endif %}>Up to 10 min</option><option value="20"{% if selected_duration == 20 %} selected{% endif %}>Up to 20 min</option></select></label>
-                <button class="button button-secondary" type="submit">Apply filters</button>
-            </form>
+        <div class="section-heading">
+            <span class="eyebrow">For researchers and educators</span>
+            <h2 id="creator-heading">Research-grade surveys from first question to final dataset.</h2>
+            <p>Design rigorous studies, reach the right participants, and understand every response without stitching together disconnected tools.</p>
         </div>
-        {% if discovery_surveys %}
-            <div class="discovery-grid">
-                {% for survey in discovery_surveys %}
-                    <article class="discovery-card">
-                        <div class="discovery-card-media"{% if survey.thumbnail %} style="background-image: linear-gradient(180deg, transparent, rgba(23, 22, 43, .58)), url('{{ survey.thumbnail.url }}')"{% elif survey.banner %} style="background-image: linear-gradient(180deg, transparent, rgba(23, 22, 43, .58)), url('{{ survey.banner.url }}')"{% endif %}>
-                            <span class="reward-pill">+{{ base_completion_points }} points</span>
-                            <span class="match-pill">{% if survey.requires_screener %}Eligibility screener{% elif user.is_authenticated %}Profile matched{% else %}Open to everyone{% endif %}</span>
-                        </div>
-                        <div class="discovery-card-body">
-                            <div class="tag-row">{% for topic in survey.topics.all %}<span class="tag">{{ topic.name }}</span>{% endfor %}</div>
-                            <h3>{{ survey.title }}</h3>
-                            <p>{{ survey.summary }}</p>
-                            <div class="discovery-card-meta"><span>{{ survey.estimated_minutes }} min</span><span>{{ survey.get_identity_mode_display }}</span></div>
-                            <a class="button button-primary button-block" href="{% url 'respond_survey' survey.slug %}">View survey</a>
-                        </div>
-                    </article>
-                {% endfor %}
+        <div class="researcher-showcase">
+            <div class="feature-grid researcher-features">
+                <article class="feature-card"><span class="feature-number">01</span><h3>Build complex studies clearly</h3><p>Branching, validation, randomization, quotas, and clear consent.</p></article>
+                <article class="feature-card feature-card-accent"><span class="feature-number">02</span><h3>Reach qualified respondents</h3><p>Profile-aware discovery and eligibility screening for relevant audiences.</p></article>
+                <article class="feature-card"><span class="feature-number">03</span><h3>Turn responses into evidence</h3><p>Version-aware analytics and clean CSV, JSON, or Excel exports.</p></article>
             </div>
-        {% else %}
-            <div class="panel discovery-empty"><span aria-hidden="true">⌁</span><h3>No matching surveys right now</h3><p>{% if user.is_authenticated and user.profile.completion_percentage < 100 %}Complete your profile to unlock more targeted studies.{% else %}Try another filter or check back as researchers publish new studies.{% endif %}</p>{% if user.is_authenticated and user.profile.completion_percentage < 100 %}<a class="button button-secondary" href="{% url 'profile_edit' %}">Complete profile</a>{% endif %}</div>
-        {% endif %}
+            <figure class="analytics-preview" aria-labelledby="analytics-preview-title">
+                <div class="analytics-preview-header"><div><span>Live study analytics</span><strong id="analytics-preview-title">Student wellbeing study</strong></div><span class="status-label status-published">Collecting</span></div>
+                <div class="analytics-preview-metrics"><div><span>Responses</span><strong>248</strong><small>+18 this week</small></div><div><span>Completion</span><strong>84%</strong><small>Above average</small></div><div><span>Median time</span><strong>6m 12s</strong><small>8 min estimated</small></div></div>
+                <div class="analytics-visual-grid">
+                    <div class="completion-chart">
+                        <div class="chart-title"><strong>Response status</strong><span>248 starts</span></div>
+                        <div class="donut-wrap">
+                            <svg class="donut-chart" viewBox="0 0 42 42" role="img" aria-label="84 percent complete, 10 percent abandoned, and 6 percent in progress">
+                                <circle class="donut-track" cx="21" cy="21" r="15.9155" pathLength="100"/>
+                                <circle class="donut-segment donut-complete" cx="21" cy="21" r="15.9155" pathLength="100" tabindex="0"><title>Completed: 84%</title></circle>
+                                <circle class="donut-segment donut-abandoned" cx="21" cy="21" r="15.9155" pathLength="100" tabindex="0"><title>Abandoned: 10%</title></circle>
+                                <circle class="donut-segment donut-progress" cx="21" cy="21" r="15.9155" pathLength="100" tabindex="0"><title>In progress: 6%</title></circle>
+                            </svg>
+                            <div><strong>84%</strong><span>complete</span></div>
+                        </div>
+                        <ul class="donut-legend"><li><span class="legend-complete"></span>Completed <strong>208</strong></li><li><span class="legend-abandoned"></span>Abandoned <strong>25</strong></li><li><span class="legend-progress"></span>In progress <strong>15</strong></li></ul>
+                    </div>
+                    <div class="source-chart">
+                        <div class="chart-title"><strong>Response sources</strong><span>Qualified starts</span></div>
+                        <div class="source-bars"><div><p><span>Profile matched</span><strong>58%</strong></p><span class="source-bar"><i style="--bar-width: 58%"></i></span></div><div><p><span>Direct link</span><strong>30%</strong></p><span class="source-bar"><i style="--bar-width: 30%"></i></span></div><div><p><span>Email invitation</span><strong>12%</strong></p><span class="source-bar"><i style="--bar-width: 12%"></i></span></div></div>
+                        <p class="chart-insight"><strong>76%</strong> of reached respondents matched the study criteria.</p>
+                    </div>
+                </div>
+            </figure>
+        </div>
     </div>
 </section>
 
-<section class="section section-muted" aria-labelledby="why-heading">
+<section class="section respondent-section" aria-labelledby="respondent-heading">
     <div class="shell">
         <div class="section-heading">
-            <span class="eyebrow">One platform, two communities</span>
-            <h2 id="why-heading">Designed around the hardest part of survey research</h2>
-            <p>SurveySolver helps researchers find relevant participants while making every contribution feel worthwhile.</p>
+            <span class="eyebrow">For respondents</span>
+            <h2 id="respondent-heading">Your perspective can move meaningful research forward.</h2>
+            <p>Discover studies that fit your profile, contribute on your own terms, and receive recognition for the time and insight you share.</p>
         </div>
-        <div class="feature-grid">
-            <article class="feature-card">
-                <span class="feature-number">01</span>
-                <h3>Build with research-grade controls</h3>
-                <p>Structure complex studies with branching, validation, targeting, quotas, and clear consent.</p>
-            </article>
-            <article class="feature-card feature-card-accent">
-                <span class="feature-number">02</span>
-                <h3>Reach people who actually qualify</h3>
-                <p>Profile-aware discovery brings relevant surveys to eligible respondents instead of broadcasting blindly.</p>
-            </article>
-            <article class="feature-card">
-                <span class="feature-number">03</span>
-                <h3>Reward meaningful participation</h3>
-                <p>Points, progress, and badges create a healthier exchange between researchers and their communities.</p>
-            </article>
+        <div class="respondent-grid">
+            <article class="respondent-benefit"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19.5V7.8c0-.7.6-1.3 1.3-1.3h13.4c.7 0 1.3.6 1.3 1.3v8.4c0 .7-.6 1.3-1.3 1.3H9l-5 3v-1Z"/><path d="m8 12 2.2 2.2L16 9"/></svg></span><div><h3>Contribute to work that matters</h3><p>Support student projects, academic studies, and evidence-led questions across disciplines.</p></div></article>
+            <article class="respondent-benefit"><span aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M6.5 19c.8-3.3 2.6-5 5.5-5s4.7 1.7 5.5 5M18 5l1 1 2-2"/></svg></span><div><h3>Find studies relevant to you</h3><p>A complete research profile unlocks targeted surveys while keeping eligibility clear and respectful.</p></div></article>
+            <article class="respondent-benefit"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 15 7l5 .7-3.6 3.5.8 4.9L12 14l-4.4 2.1.8-4.9L4.8 7.7 9 7l3-4Z"/><path d="M9 19h6M10 22h4"/></svg></span><div><h3>Earn points and badges</h3><p>Receive points for valid first completions, build participation milestones, and prepare for future partner perks.</p></div></article>
+            <aside class="respondent-callout">
+                <span class="panel-kicker">Ready to contribute?</span>
+                <div class="reward-visual" aria-label="Example points and participation badges">
+                    <div class="points-coin"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9h4.5a2 2 0 0 1 0 4H10.5a2 2 0 0 0 0 4H15"/></svg><strong>+10</strong><span>points</span></div>
+                    <div class="badge-stack"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 15 7l5 .7-3.6 3.5.8 4.9L12 14l-4.4 2.1.8-4.9L4.8 7.7 9 7l3-4Z"/></svg>First response</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 19 6v6c0 4.5-2.8 7.5-7 10-4.2-2.5-7-5.5-7-10V6l7-4Z"/><path d="m9 12 2 2 4-5"/></svg>Research regular</span></div>
+                </div>
+                <h3>Find a study that fits.</h3>
+                <p>Browse open surveys by topic and time commitment.</p>
+                <a class="button button-primary" href="{% url 'discover' %}">Discover surveys</a>
+            </aside>
         </div>
     </div>
 </section>
@@ -122,14 +123,14 @@
 <section class="section">
     <div class="shell split-callout">
         <div>
-            <span class="eyebrow">Built for credible work</span>
-            <h2>From first question to defensible dataset.</h2>
+            <span class="eyebrow">A healthier research exchange</span>
+            <h2>Better participation creates better evidence.</h2>
         </div>
         <ul class="check-list">
-            <li>Anonymous or identified collection</li>
-            <li>Version-aware response history</li>
-            <li>Transparent eligibility rules</li>
-            <li>Dashboard analytics and clean exports</li>
+            <li>Clear privacy and identity choices</li>
+            <li>Transparent eligibility requirements</li>
+            <li>Recognition for respondent effort</li>
+            <li>Reliable data for research teams</li>
         </ul>
     </div>
 </section>

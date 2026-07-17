@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Join {{ link.survey.title }} | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/sharing/sharing.css' %}">{% endblock %}
 
 {% block content %}
 <section class="completion-page"><div class="shell completion-shell"><div class="panel collaboration-invite"><span class="eyebrow">Collaboration invitation</span><h1>{{ link.survey.title }}</h1><p>You are signed in as <strong>{{ user.email }}</strong>. Accepting gives you <strong>{{ link.get_role_display|lower }}</strong> access.</p><ul>{% if link.role == 'editor' %}<li>Edit survey details and questions</li><li>Publish new versions</li><li>Inspect responses and analytics</li>{% else %}<li>View survey configuration</li><li>Inspect responses and analytics</li><li>No editing or publishing access</li>{% endif %}</ul><form method="post">{% csrf_token %}<button class="button button-primary button-block" type="submit">Accept {{ link.get_role_display|lower }} access</button></form><a class="button button-quiet button-block" href="{% url 'home' %}">Decline</a></div></div></section>

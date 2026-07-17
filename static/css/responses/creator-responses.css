@@ -1,0 +1,73 @@
+/* Creator response list, detail, filtering, and deletion */
+
+.creator-responses { display: grid; gap: 1.25rem; }
+.response-table-panel { overflow: hidden; padding: 0; }
+.response-table-panel .panel-heading { padding: 1.25rem 1.5rem; }
+.table-count { color: var(--text-muted); font-size: 0.85rem; }
+
+.response-table { border-collapse: collapse; min-width: 62rem; width: 100%; }
+.response-table th, .response-table td { border-top: 1px solid var(--border); padding: 0.8rem 1rem; text-align: left; vertical-align: middle; }
+.response-table th { background: var(--surface-warm); color: var(--text-muted); font-size: 0.74rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.response-table td { font-size: 0.88rem; }
+.response-table td small { color: var(--text-muted); display: block; }
+.pagination { align-items: center; border-top: 1px solid var(--border); display: flex; gap: 1rem; justify-content: flex-end; padding: 1rem 1.5rem; }
+.pagination span { color: var(--text-muted); font-size: 0.85rem; }
+.response-detail-layout { align-items: start; display: grid; gap: 1.25rem; grid-template-columns: minmax(14rem, .55fr) minmax(0, 1.45fr); }
+.response-identity-card { position: sticky; top: 6rem; }
+.response-identity-card h2 { margin: 0.6rem 0 0.2rem; }
+.response-identity-card p, .response-identity-card small { color: var(--text-muted); }
+.response-answer-list { display: grid; gap: 1rem; }
+.response-answer-section { padding: 1.5rem; }
+.response-answer-section > h2 { margin: 0.35rem 0 1.25rem; }
+.response-answer { border-top: 1px solid var(--border); padding: 1rem 0; }
+.response-answer h3 { font-size: 0.95rem; margin: 0 0 0.5rem; }
+.response-answer p, .response-answer ol { color: var(--text-muted); margin: 0; }
+.response-answer dl { display: grid; gap: 0.45rem; margin: 0; }
+.response-answer dl div { display: flex; gap: 1rem; justify-content: space-between; }
+.response-answer dt { color: var(--text-muted); }
+.response-answer dd { font-weight: 700; margin: 0; }
+.response-filters { padding: 1.25rem 1.5rem; }
+.response-filters summary { cursor: pointer; font-size: 1rem; font-weight: 800; }
+.response-filters form { margin-top: 1.25rem; }
+.response-filter-grid { display: grid; gap: 0.8rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.response-filter-grid label { color: var(--text-muted); display: grid; font-size: 0.78rem; font-weight: 700; gap: 0.3rem; }
+.column-selector { border: 0; margin: 1rem 0; padding: 0; }
+.column-selector legend { font-size: 0.8rem; font-weight: 800; margin-bottom: 0.5rem; }
+.column-selector > div { display: flex; flex-wrap: wrap; gap: 0.45rem 1rem; }
+.column-selector label { align-items: center; display: flex; font-size: 0.8rem; gap: 0.35rem; }
+.column-selector input { accent-color: var(--indigo-600); }
+.filter-actions { display: flex; gap: 0.65rem; }
+.export-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .55rem; justify-content: flex-end; }
+.export-actions span { color: var(--text-muted); font-size: .82rem; margin-right: .25rem; }
+.response-row-excluded { background: #fff7ed; opacity: 0.82; }
+.response-management { border-top: 1px solid var(--border); display: grid; gap: 0.7rem; margin-top: 1.2rem; padding-top: 1rem; }
+.response-management h3 { font-size: 0.9rem; margin: 0; }
+.response-management form { display: grid; gap: 0.55rem; }
+.response-management label { color: var(--text-muted); font-size: 0.78rem; font-weight: 700; }
+
+.destructive-confirmation { max-width: 42rem; padding: clamp(1.5rem, 5vw, 3rem); }
+.destructive-confirmation > p { color: var(--text-muted); }
+.destructive-confirmation dl { border-block: 1px solid var(--border); margin: 1.25rem 0; padding: 1rem 0; }
+.destructive-confirmation dl div { display: flex; gap: 1rem; justify-content: space-between; }
+.destructive-confirmation dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
+.destructive-confirmation form { display: grid; gap: 0.65rem; }
+
+@media (max-width: 860px) {
+    .response-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .response-detail-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .response-identity-card {
+        position: static;
+    }
+
+    .response-filter-grid {
+        grid-template-columns: 1fr;
+    }
+}

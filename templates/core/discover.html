@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Discover | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/core/discover.css' %}">{% endblock %}
+{% block extra_scripts %}<script src="{% static 'js/pages/discover.js' %}" defer></script>{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div class="shell page-heading-inner">
+        <div>
+            <span class="eyebrow">Open research studies</span>
+            <h1>{% if user.is_authenticated %}Surveys matched to you{% else %}Find research worth contributing to{% endif %}</h1>
+            <p>{% if user.is_authenticated %}Your profile helps surface studies for which you are eligible.{% else %}Browse public studies and complete a short eligibility check where required.{% endif %}</p>
+        </div>
+    </div>
+</section>
+
+<section class="section discovery-section" aria-labelledby="discover-heading">
+    <div class="shell">
+        <div class="section-heading discovery-heading">
+            <span class="eyebrow">Survey directory</span>
+            <h2 id="discover-heading">Available studies</h2>
+            <p>Filter by subject, time commitment, reward, or response privacy.</p>
+        </div>
+        <form class="discovery-filters" method="get" action="{% url 'discover' %}" aria-label="Filter surveys" data-live-filters>
+            <label>Topic<select name="topic"><option value="">All topics</option>{% for topic in topics %}<option value="{{ topic.slug }}"{% if selected_topic == topic.slug %} selected{% endif %}>{{ topic.name }}</option>{% endfor %}</select></label>
+            <label>Duration<select name="duration"><option value="">Any length</option><option value="5"{% if selected_duration == 5 %} selected{% endif %}>Up to 5 min</option><option value="10"{% if selected_duration == 10 %} selected{% endif %}>Up to 10 min</option><option value="20"{% if selected_duration == 20 %} selected{% endif %}>Up to 20 min</option></select></label>
+            <label>Points<select name="points"><option value="">Any reward</option><option value="10"{% if selected_points == 10 %} selected{% endif %}>10+ points</option></select></label>
+            <label>Response privacy<select name="privacy">{% if user.is_authenticated %}<option value="">Any privacy</option>{% endif %}<option value="anonymous"{% if selected_privacy == 'anonymous' %} selected{% endif %}>Anonymous</option><option value="identified"{% if selected_privacy == 'identified' %} selected{% endif %}{% if not user.is_authenticated %} disabled{% endif %}>Identified</option></select></label>
+            <noscript><button class="button button-primary" type="submit">Apply filters</button></noscript>
+        </form>
+        <p class="filter-status sr-only" role="status" aria-live="polite" data-filter-status></p>
+        <div id="discovery-results" aria-live="polite" data-discovery-results>
+            {% include 'core/partials/discovery_results.html' %}
+        </div>
+    </div>
+</section>
+{% endblock %}

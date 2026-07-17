@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Share {{ survey.title }} | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/sharing/sharing.css' %}">{% endblock %}
 
 {% block content %}
 <section class="page-heading"><div class="shell page-heading-inner"><div><span class="eyebrow">Owner access controls</span><h1>Share survey access</h1><p>Invite signed-in collaborators without exposing the respondent link or transferring ownership.</p></div><a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a></div></section>

@@ -27,6 +27,7 @@ class SurveyDiscoveryTests(TestCase):
         visibility=Survey.Visibility.DISCOVERABLE,
         minutes=5,
         criteria=None,
+        identity_mode=Survey.IdentityMode.ANONYMOUS,
     ):
         survey = Survey.objects.create(
             owner=self.owner,
@@ -34,6 +35,7 @@ class SurveyDiscoveryTests(TestCase):
             summary=f'{title} summary',
             visibility=visibility,
             estimated_minutes=minutes,
+            identity_mode=identity_mode,
         )
         survey.topics.add(self.topic)
         draft = survey.draft_version
@@ -70,14 +72,57 @@ class SurveyDiscoveryTests(TestCase):
             visibility=Survey.Visibility.UNLISTED,
         )
 
-        response = self.client.get(reverse('home'))
+        response = self.client.get(reverse('discover'))
 
         self.assertContains(response, open_survey.title)
         self.assertContains(response, targeted.title)
         self.assertEqual(len(response.context['discovery_surveys']), 2)
         self.assertContains(response, '+10 points')
         self.assertContains(response, 'Eligibility screener')
+        self.assertContains(response, self.topic.name)
+        self.assertContains(response, 'name="points"')
+        self.assertContains(response, 'name="privacy"')
         self.assertNotContains(response, hidden.title)
+
+    def test_guest_discovery_only_lists_anonymous_studies(self):
+        anonymous, _ = self.publish_survey('Anonymous study')
+        identified, _ = self.publish_survey(
+            'Identified study',
+            identity_mode=Survey.IdentityMode.IDENTIFIED,
+        )
+
+        response = self.client.get(reverse('discover'))
+
+        self.assertContains(response, anonymous.title)
+        self.assertNotContains(response, identified.title)
+        self.assertContains(
+            response,
+            '<option value="anonymous" selected>Anonymous</option>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<option value="identified" disabled>Identified</option>',
+            html=True,
+        )
+        self.assertNotContains(response, 'Sign in to access identified studies.')
+
+    def test_authenticated_user_can_filter_identified_studies(self):
+        anonymous, _ = self.publish_survey('Anonymous study')
+        identified, _ = self.publish_survey(
+            'Identified study',
+            identity_mode=Survey.IdentityMode.IDENTIFIED,
+        )
+        respondent = get_user_model().objects.create_user(email='privacy-filter@example.com')
+        self.client.force_login(respondent)
+
+        response = self.client.get(
+            reverse('discover'),
+            {'privacy': Survey.IdentityMode.IDENTIFIED},
+        )
+
+        self.assertContains(response, identified.title)
+        self.assertNotContains(response, anonymous.title)
 
     def test_authenticated_discovery_uses_completed_profile_fields(self):
         eligible, _ = self.publish_survey('Bangladesh student study', criteria=self.criteria())
@@ -91,7 +136,7 @@ class SurveyDiscoveryTests(TestCase):
         profile.save()
         self.client.force_login(respondent)
 
-        response = self.client.get(reverse('home'))
+        response = self.client.get(reverse('discover'))
 
         self.assertContains(response, eligible.title)
         self.assertNotContains(response, ineligible.title)
@@ -103,7 +148,7 @@ class SurveyDiscoveryTests(TestCase):
         respondent = get_user_model().objects.create_user(email='incomplete-match@example.com')
         self.client.force_login(respondent)
 
-        response = self.client.get(reverse('home'))
+        response = self.client.get(reverse('discover'))
 
         self.assertContains(response, unrestricted.title)
         self.assertNotContains(response, targeted.title)
@@ -127,7 +172,7 @@ class SurveyDiscoveryTests(TestCase):
         owned.save(update_fields=('owner', 'updated_at'))
         self.client.force_login(respondent)
 
-        response = self.client.get(reverse('home'))
+        response = self.client.get(reverse('discover'))
 
         self.assertNotContains(response, completed_survey.title)
         self.assertNotContains(response, owned.title)
@@ -137,12 +182,35 @@ class SurveyDiscoveryTests(TestCase):
         long, _ = self.publish_survey('Long learning study', minutes=20)
 
         response = self.client.get(
-            reverse('home'),
+            reverse('discover'),
             {'topic': self.topic.slug, 'duration': '5'},
         )
 
         self.assertContains(response, short.title)
         self.assertNotContains(response, long.title)
+
+    def test_discovery_filters_are_live_and_page_assets_are_modular(self):
+        response = self.client.get(reverse('discover'))
+
+        self.assertContains(response, 'data-live-filters')
+        self.assertContains(response, 'data-discovery-results')
+        self.assertContains(response, 'css/core/discover.css')
+        self.assertContains(response, 'js/pages/discover.js')
+
+    def test_live_filter_request_returns_only_updated_results(self):
+        matching, _ = self.publish_survey('Matching study', minutes=5)
+        excluded, _ = self.publish_survey('Excluded study', minutes=20)
+
+        response = self.client.get(
+            reverse('discover'),
+            {'duration': '5'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertTemplateUsed(response, 'core/partials/discovery_results.html')
+        self.assertContains(response, matching.title)
+        self.assertNotContains(response, excluded.title)
+        self.assertNotContains(response, 'data-live-filters')
 
 
 class DashboardMetricTests(TestCase):

@@ -1,0 +1,24 @@
+/* Survey management list */
+
+.survey-grid { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.survey-management-card { overflow: hidden; background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.survey-card-visual { min-height: 8rem; padding: 1rem; background: linear-gradient(135deg, var(--indigo-900), var(--teal-700)); background-position: center; background-size: cover; }
+.survey-card-body { padding: 1.25rem; }
+.survey-card-body h2 { margin: 0.85rem 0 0.45rem; font-size: 1.3rem; line-height: 1.2; }
+.survey-card-body h2 a { color: var(--ink-950); text-decoration: none; }
+.survey-card-body p { color: var(--ink-600); }
+.survey-card-footer { display: flex; justify-content: space-between; gap: 1rem; padding-top: 1rem; color: var(--ink-600); border-top: 1px solid var(--border); font-size: 0.82rem; }
+.page-empty-state { min-height: 25rem; }
+.page-empty-state .button { margin-top: 1rem; }
+
+@media (max-width: 860px) {
+    .survey-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .survey-grid {
+        grid-template-columns: 1fr;
+    }
+}

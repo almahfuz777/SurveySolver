@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ survey.title }} | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/responses/survey-landing.css' %}">{% endblock %}
 
 {% block content %}
 <section class="response-hero">

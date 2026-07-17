@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}My surveys | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/survey-list.css' %}">{% endblock %}
 
 {% block content %}
 <section class="page-heading">

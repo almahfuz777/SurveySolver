@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Logic and quotas | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/logic.css' %}">{% endblock %}
 
 {% block content %}
 <section class="page-heading"><div class="shell page-heading-inner"><div><span class="eyebrow">Advanced questionnaire controls</span><h1>Logic and quotas</h1><p>Route respondents based on answers and cap collection segments.</p></div><a class="button button-secondary" href="{% url 'survey_builder' survey.id %}">Back to builder</a></div></section>

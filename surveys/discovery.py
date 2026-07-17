@@ -31,7 +31,7 @@ def profile_matches(criteria, profile):
     return all(not allowed or value in allowed for allowed, value in values)
 
 
-def discover_surveys(user=None, topic=None, duration=None):
+def discover_surveys(user=None, topic=None, duration=None, identity_mode=None):
     published_versions = SurveyVersion.objects.filter(
         status=SurveyVersion.Status.PUBLISHED,
     ).select_related('eligibility_criteria')
@@ -44,6 +44,8 @@ def discover_surveys(user=None, topic=None, duration=None):
         queryset = queryset.filter(topics__slug=topic)
     if duration:
         queryset = queryset.filter(estimated_minutes__lte=duration)
+    if identity_mode:
+        queryset = queryset.filter(identity_mode=identity_mode)
     if user and user.is_authenticated:
         queryset = queryset.exclude(
             Q(owner=user)

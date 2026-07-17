@@ -1,0 +1,48 @@
+/* Respondent survey landing and eligibility */
+
+.response-hero {
+    background: linear-gradient(145deg, #eef2ff 0%, var(--surface-warm) 60%, #ecfdf5 100%);
+    min-height: calc(100vh - 8rem);
+    padding: clamp(3rem, 8vw, 7rem) 0;
+}
+
+.response-hero-inner {
+    align-items: center;
+    display: grid;
+    gap: clamp(2rem, 6vw, 6rem);
+    grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.7fr);
+}
+
+.response-intro h1 {
+    font-size: clamp(2.4rem, 6vw, 4.5rem);
+    letter-spacing: -0.04em;
+    line-height: 1.02;
+    margin: 0.6rem 0 1rem;
+    max-width: 16ch;
+}
+
+.response-summary { color: var(--text-muted); font-size: 1.2rem; max-width: 52rem; }
+.response-description { max-width: 52rem; }
+.survey-meta { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.5rem 0 1rem; }
+.survey-meta span { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); font-size: 0.88rem; padding: 0.45rem 0.8rem; }
+.topic-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+
+.identity-consent { background: rgba(255, 255, 255, 0.72); border: 1px solid var(--border); border-radius: var(--radius-lg); display: grid; gap: 0.55rem; margin: 1.5rem 0; max-width: 38rem; padding: 1.2rem; }
+.identity-consent legend { color: var(--text); font-weight: 800; padding: 0 0.35rem; }
+.identity-consent p { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 0.5rem; }
+.identity-consent > label:not(.consent-check) { font-size: 0.85rem; font-weight: 700; }
+.consent-check { align-items: flex-start; display: flex; gap: 0.65rem; margin-top: 0.65rem; }
+.consent-check input { accent-color: var(--indigo-600); margin-top: 0.25rem; }
+.response-sidecard { padding: 2rem; }
+.response-sidecard h2 { margin: 1rem 0; }
+.response-sidecard ul { color: var(--text-muted); display: grid; gap: 0.8rem; margin: 0; padding-left: 1.25rem; }
+
+@media (max-width: 760px) {
+    .response-hero-inner {
+        grid-template-columns: 1fr;
+    }
+
+    .response-sidecard {
+        order: -1;
+    }
+}
