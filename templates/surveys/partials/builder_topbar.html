@@ -1,0 +1,42 @@
+<header class="builder-topbar">
+    <div class="builder-topbar-lead">
+        <a class="builder-back" href="{% url 'survey_list' %}" aria-label="Back to my surveys">{% include 'partials/icon.html' with name='arrow-left' %}</a>
+        <div class="builder-title">
+            {% if active == 'questions' %}
+                <form class="autosave-form builder-title-form" method="post" action="{% url 'survey_rename' survey.id %}">
+                    {% csrf_token %}
+                    <label class="sr-only" for="builder-title-input">Survey title</label>
+                    <input id="builder-title-input" name="title" value="{{ survey.title }}" maxlength="160" placeholder="Untitled survey">
+                    <div class="field-errors" data-errors-for="title"></div>
+                </form>
+            {% else %}
+                <h1 class="builder-title-static">{{ survey.title }}</h1>
+            {% endif %}
+            <span class="builder-save-status" data-save-status aria-live="polite"><span class="save-dot" aria-hidden="true"></span><span data-save-text>All changes saved</span></span>
+        </div>
+    </div>
+    {% if survey.access_role == 'owner' or survey.access_role == 'editor' %}
+        <nav class="builder-tabs" aria-label="Builder sections">
+            <a {% if active == 'questions' %}class="is-active" aria-current="page"{% endif %} href="{% url 'survey_builder' survey.id %}">{% include 'partials/icon.html' with name='edit' size='16' %} Questions</a>
+            <a {% if active == 'settings' %}class="is-active" aria-current="page"{% endif %} href="{% url 'survey_edit' survey.id %}">{% include 'partials/icon.html' with name='settings' size='16' %} Settings</a>
+            <a {% if active == 'preview' %}class="is-active" aria-current="page"{% endif %} href="{% url 'survey_preview' survey.id %}">{% include 'partials/icon.html' with name='preview' size='16' %} Preview</a>
+        </nav>
+        <div class="builder-topbar-actions">
+            {% if question_total %}<span class="builder-meta">{{ question_total }} question{{ question_total|pluralize }} · ~{{ survey.estimated_minutes }} min</span>{% endif %}
+            {% if version %}
+                {% if readiness_errors %}
+                    <details class="builder-readiness">
+                        <summary>{% include 'partials/icon.html' with name='alert' size='16' %} {{ readiness_errors|length }} issue{{ readiness_errors|length|pluralize }} before publishing</summary>
+                        <ul>{% for error in readiness_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                    </details>
+                {% else %}
+                    <form method="post" action="{% url 'survey_publish' survey.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="revision" value="{{ version.revision }}">
+                        <button class="button button-primary button-small" type="submit">{% include 'partials/icon.html' with name='publish' size='15' %} {% if survey.status == 'published' %}Publish changes{% else %}Publish{% endif %}</button>
+                    </form>
+                {% endif %}
+            {% endif %}
+        </div>
+    {% endif %}
+</header>

@@ -630,6 +630,15 @@ form textarea:focus {
     outline: none;
 }
 
+/* Keyboard focus must stay visible: the pointer-focus ring above is subtle,
+   so restore a high-contrast outline for :focus-visible only. */
+form input:focus-visible,
+form select:focus-visible,
+form textarea:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 1px;
+}
+
 form button[type="submit"] {
     min-height: 2.9rem;
     padding: 0.7rem 1.15rem;

@@ -60,7 +60,7 @@ class CollaborationLinkTests(TestCase):
 
         accepted = self.client.post(accept_url)
 
-        self.assertRedirects(accepted, reverse('survey_detail', args=[self.survey.id]))
+        self.assertRedirects(accepted, reverse('survey_detail', args=[self.survey.id]), target_status_code=302)
         membership = SurveyCollaborator.objects.get(user=self.member)
         self.assertEqual(membership.role, SurveyCollaborator.Role.VIEWER)
         link.refresh_from_db()

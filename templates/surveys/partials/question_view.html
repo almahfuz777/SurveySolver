@@ -1,0 +1,63 @@
+{% comment %}
+Read-only respondent facsimile of one question, shared by the builder canvas
+and the Preview tab. Context: question, annotated by the view with .number
+and (for scale) .scale_points. Interactive-looking controls are inert spans
+so the whole block can safely sit inside a selection link.
+{% endcomment %}
+<div class="rv-prompt">
+    <span class="rv-num">{{ question.number }}.</span>
+    <span class="rv-prompt-text" data-mirror="prompt"{% if editable %} contenteditable="true" role="textbox" aria-label="Question prompt"{% endif %}>{{ question.prompt }}</span>
+    <span class="rv-req" data-mirror="required"{% if not question.required %} hidden{% endif %} title="Required">*</span>
+</div>
+<p class="rv-help" data-mirror="help"{% if editable %} contenteditable="true" role="textbox" aria-label="Help text"{% endif %}{% if not question.help_text %} hidden{% endif %}>{{ question.help_text }}</p>
+<div class="rv-body" data-mirror="body">
+    {% if question.type == 'single_choice' or question.type == 'multiple_choice' %}
+        <div class="rv-options">
+            {% for choice in question.choices.all %}
+                <span class="rv-opt"><span class="rv-glyph {% if question.type == 'multiple_choice' %}rv-glyph-check{% else %}rv-glyph-radio{% endif %}"></span><span class="rv-opt-label"{% if editable %} contenteditable="true" data-opt-index="{{ forloop.counter0 }}" role="textbox" aria-label="Option {{ forloop.counter }}"{% endif %}>{{ choice.label }}</span></span>
+            {% empty %}
+                <span class="rv-opt rv-opt-placeholder"><span class="rv-glyph {% if question.type == 'multiple_choice' %}rv-glyph-check{% else %}rv-glyph-radio{% endif %}"></span>Add options in the editor</span>
+            {% endfor %}
+        </div>
+    {% elif question.type == 'dropdown' %}
+        <span class="rv-field rv-field-select"><span class="rv-placeholder">Select an option…</span>{% include 'partials/icon.html' with name='chevron-down' size='16' %}</span>
+    {% elif question.type == 'ranking' %}
+        <p class="rv-note">Drag to reorder — most important at the top</p>
+        <div class="rv-options">
+            {% for choice in question.choices.all %}
+                <span class="rv-opt rv-opt-rank"><span class="rv-ranknum">{{ forloop.counter }}</span><span class="rv-opt-label"{% if editable %} contenteditable="true" data-opt-index="{{ forloop.counter0 }}" role="textbox" aria-label="Option {{ forloop.counter }}"{% endif %}>{{ choice.label }}</span><span class="rv-spacer"></span>{% include 'partials/icon.html' with name='grip' size='15' %}</span>
+            {% empty %}
+                <span class="rv-opt rv-opt-placeholder"><span class="rv-ranknum">1</span>Add items in the editor</span>
+            {% endfor %}
+        </div>
+    {% elif question.type == 'likert_matrix' %}
+        <div class="rv-matrix-scroll">
+            <div class="rv-matrix" style="--matrix-cols: {{ question.choices.all|length }}">
+                <span class="rv-matrix-corner"></span>
+                {% for choice in question.choices.all %}<span class="rv-matrix-col">{{ choice.label }}</span>{% endfor %}
+                {% for row in question.matrix_rows.all %}
+                    <span class="rv-matrix-row">{{ row.label }}</span>
+                    {% for choice in question.choices.all %}<span class="rv-matrix-cell"><span class="rv-glyph rv-glyph-radio"></span></span>{% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+    {% elif question.type == 'scale' %}
+        <div class="rv-scale">
+            <div class="rv-scale-points">
+                {% for point in question.scale_points %}<span class="rv-scale-pt">{{ point }}</span>{% endfor %}
+            </div>
+            {% if question.config.scale_min_label or question.config.scale_max_label %}
+                <div class="rv-scale-labels"><span>{{ question.config.scale_min_label }}</span><span>{{ question.config.scale_max_label }}</span></div>
+            {% endif %}
+        </div>
+    {% elif question.type == 'long_text' %}
+        <span class="rv-field rv-field-area"><span class="rv-placeholder">Share as much detail as you like…</span></span>
+        {% if question.config.max_length %}<div class="rv-count">0 / {{ question.config.max_length }}</div>{% endif %}
+    {% elif question.type == 'number' %}
+        <span class="rv-stepper"><span class="rv-step" aria-hidden="true">−</span><span class="rv-stepval">0</span><span class="rv-step" aria-hidden="true">+</span></span>
+    {% elif question.type == 'date' %}
+        <span class="rv-field rv-field-date"><span class="rv-placeholder">Select a date</span>{% include 'partials/icon.html' with name='calendar' size='16' %}</span>
+    {% else %}
+        <span class="rv-field"><span class="rv-placeholder">Type your answer…</span></span>
+    {% endif %}
+</div>

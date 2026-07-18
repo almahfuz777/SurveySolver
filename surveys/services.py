@@ -154,6 +154,22 @@ def add_quota(version_id, expected_revision, cleaned_data):
 
 
 @transaction.atomic
+def delete_branch_rule(rule_id, expected_revision):
+    rule = BranchRule.objects.select_related('version').get(pk=rule_id)
+    version = _lock_version(rule.version_id, expected_revision)
+    rule.delete()
+    return _bump_revision(version)
+
+
+@transaction.atomic
+def delete_quota(quota_id, expected_revision):
+    quota = Quota.objects.select_related('version').get(pk=quota_id)
+    version = _lock_version(quota.version_id, expected_revision)
+    quota.delete()
+    return _bump_revision(version)
+
+
+@transaction.atomic
 def update_eligibility(version_id, expected_revision, cleaned_data):
     version = _lock_version(version_id, expected_revision)
     criteria, _ = EligibilityCriteria.objects.update_or_create(

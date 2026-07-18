@@ -1,14 +1,17 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ page_title }} | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/builder.css' %}"><link rel="stylesheet" href="{% static 'css/surveys/survey-form.css' %}">{% endblock %}
 
 {% block content %}
+{% include 'surveys/partials/builder_topbar.html' with active='settings' %}
 <section class="page-heading">
     <div class="shell page-heading-inner">
         <div>
-            <span class="eyebrow">Survey overview</span>
+            <span class="eyebrow">{{ survey.title }}</span>
             <h1>{{ page_title }}</h1>
-            <p>Describe the study clearly so eligible respondents can make an informed choice.</p>
+            <p>Audience, privacy, and discovery details for this survey.</p>
         </div>
     </div>
 </section>
@@ -29,10 +32,72 @@
                 {% endfor %}
             </div>
             <div class="form-actions">
-                <a class="button button-quiet" href="{% if survey %}{% url 'survey_detail' survey.id %}{% else %}{% url 'survey_list' %}{% endif %}">Cancel</a>
-                <button class="button button-primary" type="submit">Save survey</button>
+                <a class="button button-quiet" href="{% url 'survey_builder' survey.id %}">Cancel</a>
+                <button class="button button-primary" type="submit" name="action" value="metadata">Save settings</button>
             </div>
         </form>
+
+        {% if version %}
+            <section class="panel settings-panel" aria-labelledby="eligibility-heading">
+                <h2 id="eligibility-heading">Respondent eligibility</h2>
+                <p class="settings-panel-hint">Leave every field empty for an unrestricted survey. Signed-in respondents are matched from their research profile; guests receive a screener.</p>
+                <form method="post" class="settings-subform">
+                    {% csrf_token %}
+                    <input type="hidden" name="revision" value="{{ version.revision }}">
+                    <input type="hidden" name="action" value="update_eligibility">
+                    <div class="form-grid">
+                        <div class="field-group"><label for="{{ eligibility_form.min_age.id_for_label }}">Minimum age</label>{{ eligibility_form.min_age }}{{ eligibility_form.min_age.errors }}</div>
+                        <div class="field-group"><label for="{{ eligibility_form.max_age.id_for_label }}">Maximum age</label>{{ eligibility_form.max_age }}{{ eligibility_form.max_age.errors }}</div>
+                        <div class="field-group"><label for="{{ eligibility_form.genders.id_for_label }}">Genders</label>{{ eligibility_form.genders }}{{ eligibility_form.genders.errors }}</div>
+                        <div class="field-group"><label for="{{ eligibility_form.education_levels.id_for_label }}">Education levels</label>{{ eligibility_form.education_levels }}{{ eligibility_form.education_levels.errors }}</div>
+                        <div class="field-group"><label for="{{ eligibility_form.employment_statuses.id_for_label }}">Employment statuses</label>{{ eligibility_form.employment_statuses }}{{ eligibility_form.employment_statuses.errors }}</div>
+                        <div class="field-group"><label for="{{ eligibility_form.countries.id_for_label }}">Countries</label>{{ eligibility_form.countries }}{{ eligibility_form.countries.errors }}</div>
+                    </div>
+                    <div class="form-actions"><button class="button button-primary" type="submit">Save eligibility</button></div>
+                </form>
+            </section>
+
+            <section class="panel settings-panel" aria-labelledby="quotas-heading">
+                <h2 id="quotas-heading">Response quotas</h2>
+                <p class="settings-panel-hint">Cap how many completed responses a segment can collect.</p>
+                {% for quota in version.quotas.all %}
+                    <div class="quota-row">
+                        <span><strong>{{ quota.name }}</strong> · limit {{ quota.limit }}{% if not quota.is_active %} · inactive{% endif %}</span>
+                        <form method="post" onsubmit="return confirm('Remove quota “{{ quota.name|escapejs }}”?')">
+                            {% csrf_token %}
+                            <input type="hidden" name="revision" value="{{ version.revision }}">
+                            <input type="hidden" name="action" value="delete_quota">
+                            <input type="hidden" name="quota_id" value="{{ quota.id }}">
+                            <button class="quota-remove" type="submit" title="Remove quota" aria-label="Remove {{ quota.name }}">{% include 'partials/icon.html' with name='trash' size='15' %}</button>
+                        </form>
+                    </div>
+                {% empty %}
+                    <p class="settings-panel-hint">No quotas configured.</p>
+                {% endfor %}
+                <form method="post" class="settings-subform quota-add-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="revision" value="{{ version.revision }}">
+                    <input type="hidden" name="action" value="add_quota">
+                    <div class="form-grid">
+                        <div class="field-group"><label for="{{ quota_form.name.id_for_label }}">Name</label>{{ quota_form.name }}{{ quota_form.name.errors }}</div>
+                        <div class="field-group"><label for="{{ quota_form.limit.id_for_label }}">Limit</label>{{ quota_form.limit }}{{ quota_form.limit.errors }}</div>
+                        <div class="field-group quota-active-field"><label>{{ quota_form.is_active }} Active</label></div>
+                    </div>
+                    <div class="form-actions"><button class="button button-secondary" type="submit">Add quota</button></div>
+                </form>
+            </section>
+        {% endif %}
+
+        {% if survey.access_role == 'owner' and survey.status != 'archived' %}
+            <form class="panel archive-panel" method="post" action="{% url 'survey_archive' survey.id %}">
+                {% csrf_token %}
+                <div>
+                    <h2>Archive survey</h2>
+                    <p>Stops collection and hides the survey from respondents. Collected data is kept.</p>
+                </div>
+                <button class="button button-quiet" type="submit">{% include 'partials/icon.html' with name='archive' size='16' %} Archive</button>
+            </form>
+        {% endif %}
     </div>
 </section>
 {% endblock %}

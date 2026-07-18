@@ -2,13 +2,35 @@
 {% load static %}
 
 {% block title %}Preview {{ survey.title }} | SurveySolver{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/preview.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/builder.css' %}">{% endblock %}
 
 {% block content %}
-<section class="page-heading"><div class="shell page-heading-inner"><div><span class="eyebrow">Draft preview · version {{ version.number }}</span><h1>{{ survey.title }}</h1><p>{{ survey.summary }}</p></div><a class="button button-secondary" href="{% url 'survey_builder' survey.id %}">Back to builder</a></div></section>
-<section class="page-content"><div class="shell preview-shell">
-{% for section in version.sections.all %}<section class="panel preview-section"><h2>{{ section.title }}</h2>{% if section.description %}<p>{{ section.description }}</p>{% endif %}
-{% for question in section.questions.all %}<div class="preview-question"><label>{{ question.prompt }}{% if question.required %}<span aria-hidden="true"> *</span>{% endif %}</label>{% if question.help_text %}<small>{{ question.help_text }}</small>{% endif %}
-{% if question.type == 'likert_matrix' %}<table class="matrix-preview"><thead><tr><th>Statement</th>{% for choice in question.choices.all %}<th>{{ choice.label }}</th>{% endfor %}</tr></thead><tbody>{% for row in question.matrix_rows.all %}<tr><th>{{ row.label }}</th>{% for choice in question.choices.all %}<td><input disabled type="radio"></td>{% endfor %}</tr>{% endfor %}</tbody></table>{% elif question.accepts_choices %}{% for choice in question.choices.all %}<label class="preview-option"><input disabled type="{% if question.type == 'multiple_choice' %}checkbox{% else %}radio{% endif %}"> {{ choice.label }}</label>{% endfor %}{% elif question.type == 'long_text' %}<textarea disabled rows="4"></textarea>{% elif question.type == 'number' %}<input disabled type="number">{% elif question.type == 'date' %}<input disabled type="date">{% elif question.type == 'scale' %}<div class="scale-preview"><span>{{ question.config.scale_min|default:1 }}</span><input disabled type="range"><span>{{ question.config.scale_max|default:5 }}</span></div>{% else %}<input disabled type="text">{% endif %}</div>{% empty %}<p>No questions in this section.</p>{% endfor %}</section>{% endfor %}
-</div></section>
+{% include 'surveys/partials/builder_topbar.html' with active='preview' %}
+
+<div class="studio studio-preview">
+    <main class="studio-canvas" aria-label="Survey preview">
+        <div class="canvas-inner">
+            <div class="rv-head">
+                <span class="rv-eyebrow">{% include 'partials/icon.html' with name='preview' size='13' %} Respondents will see this</span>
+            </div>
+            <div class="rv-card">
+                {% if survey.summary %}<p class="rv-summary">{{ survey.summary }}</p>{% endif %}
+                {% for section in sections %}
+                    <div class="rv-section">
+                        <span class="rv-section-label">Section {{ forloop.counter }} of {{ sections|length }}</span>
+                        <h2 class="rv-section-name">{{ section.title }}</h2>
+                        {% if section.description %}<p class="rv-section-note">{{ section.description }}</p>{% endif %}
+                        {% for question in section.questions.all %}
+                            <div class="rv-q rv-q-static">
+                                {% include 'surveys/partials/question_view.html' %}
+                            </div>
+                        {% empty %}
+                            <p class="rv-empty">No questions in this section.</p>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+</div>
 {% endblock %}

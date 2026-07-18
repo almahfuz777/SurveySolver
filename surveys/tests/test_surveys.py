@@ -20,13 +20,20 @@ class SurveyManagementTests(TestCase):
 
     def test_creator_can_create_survey_draft(self):
         self.client.force_login(self.user)
-        response = self.client.post(reverse('survey_create'), {'title': 'Digital wellbeing study', 'summary': 'A study about technology use and academic focus.', 'description': 'This research explores daily screen habits.', 'topics': [str(self.topic.id)], 'visibility': Survey.Visibility.DISCOVERABLE, 'identity_mode': Survey.IdentityMode.ANONYMOUS, 'estimated_minutes': 8})
+        response = self.client.post(reverse('survey_create'))
         survey = Survey.objects.get()
-        self.assertRedirects(response, reverse('survey_detail', args=[survey.id]))
+        self.assertRedirects(response, reverse('survey_builder', args=[survey.id]))
         self.assertEqual(survey.owner, self.user)
         self.assertEqual(survey.status, Survey.Status.DRAFT)
-        self.assertTrue(survey.slug.startswith('digital-wellbeing-study-'))
-        self.assertEqual(list(survey.topics.all()), [self.topic])
+        self.assertEqual(survey.title, 'Untitled survey')
+        self.assertTrue(survey.slug.startswith('untitled-survey-'))
+        self.assertIsNotNone(survey.draft_version)
+
+    def test_survey_detail_redirects_editors_to_builder(self):
+        survey = Survey.objects.create(owner=self.user, title='Redirect study', summary='Detail page routes to the builder.')
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('survey_detail', args=[survey.id]))
+        self.assertRedirects(response, reverse('survey_builder', args=[survey.id]))
 
     def test_non_owner_cannot_view_or_edit_survey(self):
         survey = Survey.objects.create(owner=self.user, title='Private research', summary='Only the owner can manage this survey.')
@@ -34,6 +41,46 @@ class SurveyManagementTests(TestCase):
         for url_name in ('survey_detail', 'survey_edit'):
             with self.subTest(url_name=url_name):
                 self.assertEqual(self.client.get(reverse(url_name, args=[survey.id])).status_code, 404)
+
+    def test_owner_can_soft_delete_restore_and_purge_survey(self):
+        survey = Survey.objects.create(owner=self.user, title='Disposable study', summary='A survey to delete.')
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse('survey_delete', args=[survey.id]))
+        self.assertRedirects(response, reverse('survey_list'))
+        survey.refresh_from_db()
+        self.assertIsNotNone(survey.deleted_at)
+        self.assertNotContains(self.client.get(reverse('survey_list')), 'survey-management-card')
+
+        response = self.client.post(reverse('survey_restore', args=[survey.id]))
+        survey.refresh_from_db()
+        self.assertIsNone(survey.deleted_at)
+
+        self.client.post(reverse('survey_delete', args=[survey.id]))
+        response = self.client.post(reverse('survey_purge', args=[survey.id]))
+        self.assertRedirects(response, reverse('survey_list'))
+        self.assertFalse(Survey.objects.filter(id=survey.id).exists())
+
+    def test_deleted_survey_is_inaccessible_and_non_owner_cannot_delete(self):
+        survey = Survey.objects.create(owner=self.user, title='Hidden study', summary='Soft deleted.')
+        self.client.force_login(self.user)
+        self.client.post(reverse('survey_delete', args=[survey.id]))
+        self.assertEqual(self.client.get(reverse('survey_builder', args=[survey.id])).status_code, 404)
+
+        restored = Survey.objects.create(owner=self.user, title='Other users study', summary='Not yours.')
+        self.client.force_login(self.other_user)
+        self.assertEqual(self.client.post(reverse('survey_delete', args=[restored.id])).status_code, 404)
+
+    def test_owner_can_rename_survey_inline(self):
+        survey = Survey.objects.create(owner=self.user, title='Old name', summary='Renaming test.')
+        self.client.force_login(self.user)
+        response = self.client.post(reverse('survey_rename', args=[survey.id]), {'title': 'New name'})
+        self.assertEqual(response.status_code, 200)
+        survey.refresh_from_db()
+        self.assertEqual(survey.title, 'New name')
+
+        response = self.client.post(reverse('survey_rename', args=[survey.id]), {'title': '   '})
+        self.assertEqual(response.status_code, 422)
 
     def test_owner_can_archive_survey(self):
         survey = Survey.objects.create(owner=self.user, title='Completed research', summary='A completed study ready for archiving.')

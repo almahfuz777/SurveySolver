@@ -41,10 +41,14 @@ class SurveyQuerySet(models.QuerySet):
     def owned_by(self, user):
         return self.filter(owner=user)
 
+    def active(self):
+        return self.filter(deleted_at__isnull=True)
+
     def discoverable(self):
         return self.filter(
             status=Survey.Status.PUBLISHED,
             visibility=Survey.Visibility.DISCOVERABLE,
+            deleted_at__isnull=True,
         )
 
 
@@ -109,6 +113,7 @@ class Survey(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     published_at = models.DateTimeField(blank=True, null=True)
     closed_at = models.DateTimeField(blank=True, null=True)
+    deleted_at = models.DateTimeField(blank=True, null=True, db_index=True)
 
     objects = SurveyQuerySet.as_manager()
 
@@ -125,6 +130,22 @@ class Survey(models.Model):
         if self.status != self.Status.ARCHIVED:
             self.status = self.Status.ARCHIVED
             self.save(update_fields=('status', 'updated_at'))
+
+    def soft_delete(self):
+        from django.utils import timezone
+
+        if self.deleted_at is None:
+            self.deleted_at = timezone.now()
+            self.save(update_fields=('deleted_at', 'updated_at'))
+
+    def restore(self):
+        if self.deleted_at is not None:
+            self.deleted_at = None
+            self.save(update_fields=('deleted_at', 'updated_at'))
+
+    @property
+    def has_response_history(self):
+        return self.submissions.exists() or self.response_audit_events.exists()
 
     def __str__(self):
         return self.title

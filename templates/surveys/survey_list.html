@@ -9,10 +9,13 @@
     <div class="shell page-heading-inner">
         <div>
             <span class="eyebrow">Research workspace</span>
-            <h1>Survey workspace</h1>
+            <h1>My surveys</h1>
             <p>Manage studies you own and collaborate on.</p>
         </div>
-        <a class="button button-primary" href="{% url 'survey_create' %}">Create survey</a>
+        <form method="post" action="{% url 'survey_create' %}">
+            {% csrf_token %}
+            <button class="button button-primary" type="submit">{% include 'partials/icon.html' with name='plus' size='16' %} Create survey</button>
+        </form>
     </div>
 </section>
 
@@ -22,24 +25,36 @@
             <div class="survey-grid">
                 {% for survey in surveys %}
                     <article class="survey-management-card">
-                        <div
+                        <a
                             class="survey-card-visual"
+                            href="{% url 'survey_detail' survey.id %}"
                             {% if survey.banner %}style="background-image: linear-gradient(135deg, rgba(49,46,129,.78), rgba(20,184,166,.48)), url('{{ survey.banner.url }}')"{% endif %}
+                            aria-label="Open {{ survey.title }}"
                         >
                             <span class="status-label status-{{ survey.status }}">{{ survey.get_status_display }}</span>
-                        </div>
+                        </a>
                         <div class="survey-card-body">
-                            <div class="tag-row">
-                                {% for topic in survey.topics.all %}
-                                    <span class="tag">{{ topic.name }}</span>
-                                {% endfor %}
-                            </div>
                             <h2><a href="{% url 'survey_detail' survey.id %}">{{ survey.title }}</a></h2>
-                            <p>{{ survey.summary }}</p>
-                            <div class="survey-card-footer">
-                                <span>{{ survey.estimated_minutes }} min</span>
+                            {% if survey.summary %}<p class="survey-card-summary">{{ survey.summary }}</p>{% endif %}
+                            <div class="survey-card-meta">
+                                <span>{% include 'partials/icon.html' with name='clock' size='14' %} {{ survey.estimated_minutes }} min</span>
                                 <span>{{ survey.get_visibility_display }}</span>
+                                {% for topic in survey.topics.all|slice:':2' %}<span class="tag">{{ topic.name }}</span>{% endfor %}
                             </div>
+                            <p class="survey-card-dates">Edited {{ survey.updated_at|date:'M j, Y' }} · Created {{ survey.created_at|date:'M j, Y' }}</p>
+                        </div>
+                        <div class="survey-card-actions" aria-label="Survey actions">
+                            <a href="{% url 'survey_builder' survey.id %}" title="Edit questions" aria-label="Edit {{ survey.title }}">{% include 'partials/icon.html' with name='edit' %}</a>
+                            <a href="{% url 'creator_response_list' survey.id %}" title="Responses" aria-label="Responses for {{ survey.title }}">{% include 'partials/icon.html' with name='responses' %}</a>
+                            <a href="{% url 'survey_analytics' survey.id %}" title="Analytics" aria-label="Analytics for {{ survey.title }}">{% include 'partials/icon.html' with name='analytics' %}</a>
+                            <a href="{% url 'sharing_settings' survey.id %}" title="Share access" aria-label="Share {{ survey.title }}">{% include 'partials/icon.html' with name='share' %}</a>
+                            <a href="{% url 'survey_edit' survey.id %}" title="Settings" aria-label="Settings for {{ survey.title }}">{% include 'partials/icon.html' with name='settings' %}</a>
+                            {% if survey.owner_id == request.user.id %}
+                                <form class="card-action-form" method="post" action="{% url 'survey_delete' survey.id %}" onsubmit="return confirm('Move “{{ survey.title|escapejs }}” to recently deleted?')">
+                                    {% csrf_token %}
+                                    <button class="card-action-danger" type="submit" title="Delete" aria-label="Delete {{ survey.title }}">{% include 'partials/icon.html' with name='trash' %}</button>
+                                </form>
+                            {% endif %}
                         </div>
                     </article>
                 {% endfor %}
@@ -48,9 +63,40 @@
             <div class="panel empty-state page-empty-state">
                 <span class="empty-icon" aria-hidden="true">✦</span>
                 <h2>Create your first research survey</h2>
-                <p>Start with a clear overview, audience visibility, and privacy model.</p>
-                <a class="button button-primary" href="{% url 'survey_create' %}">Create survey</a>
+                <p>Start building questions right away — settings and publishing come later.</p>
+                <form method="post" action="{% url 'survey_create' %}">
+                    {% csrf_token %}
+                    <button class="button button-primary" type="submit">{% include 'partials/icon.html' with name='plus' size='16' %} Create survey</button>
+                </form>
             </div>
+        {% endif %}
+
+        {% if deleted_surveys %}
+            <details class="trash-section">
+                <summary>{% include 'partials/icon.html' with name='trash' size='16' %} Recently deleted ({{ deleted_surveys|length }})</summary>
+                <ul class="trash-list">
+                    {% for survey in deleted_surveys %}
+                        <li>
+                            <div class="trash-item-info">
+                                <strong>{{ survey.title }}</strong>
+                                <small>Deleted {{ survey.deleted_at|date:'M j, Y' }}{% if survey.has_response_history %} · has collected responses, cannot be deleted forever{% endif %}</small>
+                            </div>
+                            <div class="trash-item-actions">
+                                <form method="post" action="{% url 'survey_restore' survey.id %}">
+                                    {% csrf_token %}
+                                    <button class="button button-secondary button-small" type="submit">Restore</button>
+                                </form>
+                                {% if not survey.has_response_history %}
+                                    <form method="post" action="{% url 'survey_purge' survey.id %}" onsubmit="return confirm('Delete “{{ survey.title|escapejs }}” forever? This cannot be undone.')">
+                                        {% csrf_token %}
+                                        <button class="button button-quiet button-small trash-purge" type="submit">Delete forever</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </details>
         {% endif %}
     </div>
 </section>

@@ -1,15 +1,40 @@
 /* Survey management list */
 
+.page-heading-inner .button svg { margin-right: 0.35rem; vertical-align: -0.18rem; }
 .survey-grid { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.survey-management-card { overflow: hidden; background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
-.survey-card-visual { min-height: 8rem; padding: 1rem; background: linear-gradient(135deg, var(--indigo-900), var(--teal-700)); background-position: center; background-size: cover; }
-.survey-card-body { padding: 1.25rem; }
-.survey-card-body h2 { margin: 0.85rem 0 0.45rem; font-size: 1.3rem; line-height: 1.2; }
+.survey-management-card { display: flex; flex-direction: column; overflow: hidden; background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.survey-management-card:hover { box-shadow: 0 10px 30px rgba(23, 22, 43, 0.12); transform: translateY(-2px); }
+.survey-card-visual { display: block; min-height: 6.5rem; padding: 1rem; background: linear-gradient(135deg, var(--indigo-900), var(--teal-700)); background-position: center; background-size: cover; }
+.survey-card-body { flex: 1; padding: 1rem 1.25rem 0.75rem; }
+.survey-card-body h2 { margin: 0 0 0.35rem; font-size: 1.15rem; line-height: 1.25; }
 .survey-card-body h2 a { color: var(--ink-950); text-decoration: none; }
-.survey-card-body p { color: var(--ink-600); }
-.survey-card-footer { display: flex; justify-content: space-between; gap: 1rem; padding-top: 1rem; color: var(--ink-600); border-top: 1px solid var(--border); font-size: 0.82rem; }
+.survey-card-body h2 a:hover { color: var(--indigo-700); }
+.survey-card-summary { display: -webkit-box; overflow: hidden; margin: 0 0 0.6rem; color: var(--ink-600); font-size: 0.88rem; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.survey-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; color: var(--ink-600); font-size: 0.78rem; }
+.survey-card-meta svg { vertical-align: -0.15rem; }
+.survey-card-dates { margin: 0.5rem 0 0; color: var(--ink-600); font-size: 0.74rem; }
+.survey-card-actions { display: flex; gap: 0.25rem; padding: 0.6rem 1rem; border-top: 1px solid var(--border); }
+.survey-card-actions a,
+.survey-card-actions .card-action-danger { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; min-height: 0; padding: 0; color: var(--ink-600); background: transparent; border: 0; border-radius: 0.6rem; cursor: pointer; }
+.survey-card-actions a:hover { color: var(--indigo-700); background: var(--surface-muted); }
+.card-action-form { margin: 0 0 0 auto; }
+.survey-card-actions .card-action-danger:hover { color: var(--danger); background: #fef2f2; }
+
+.trash-section { margin-top: 2rem; }
+.trash-section summary { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.5rem 0.9rem; color: var(--ink-600); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: 0.85rem; font-weight: 700; list-style: none; }
+.trash-section summary::-webkit-details-marker { display: none; }
+.trash-section summary:hover { color: var(--ink-800); background: white; }
+.trash-list { display: grid; gap: 0.5rem; margin: 0.85rem 0 0; padding: 0; list-style: none; }
+.trash-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.8rem 1rem; background: white; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.trash-item-info { display: grid; }
+.trash-item-info small { color: var(--ink-600); }
+.trash-item-actions { display: flex; gap: 0.5rem; }
+.trash-item-actions form { margin: 0; }
+.trash-item-actions .trash-purge { color: var(--danger); background: white; border: 1px solid #fecaca; }
+.trash-item-actions .trash-purge:hover { background: #fef2f2; }
 .page-empty-state { min-height: 25rem; }
 .page-empty-state .button { margin-top: 1rem; }
+.page-empty-state .button svg { margin-right: 0.35rem; vertical-align: -0.18rem; }
 
 @media (max-width: 860px) {
     .survey-grid {

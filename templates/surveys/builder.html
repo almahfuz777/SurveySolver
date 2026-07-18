@@ -1,97 +1,226 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Build {{ survey.title }} | SurveySolver{% endblock %}
+{% block title %}Edit {{ survey.title }} | SurveySolver{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/builder.css' %}">{% endblock %}
 {% block extra_head %}<script src="{% static 'js/builder.js' %}" defer></script>{% endblock %}
 
 {% block content %}
-<header class="builder-header">
-    <div>
-        <a href="{% url 'survey_detail' survey.id %}">← Survey overview</a>
-        <h1>{{ survey.title }}</h1>
-    </div>
-    <div class="builder-status" aria-live="polite">
-        <span data-save-status>All changes saved</span>
-        <a class="button button-secondary button-small" href="{% url 'survey_logic' survey.id %}">Logic & quotas</a>
-        <a class="button button-secondary button-small" href="{% url 'survey_preview' survey.id %}">Preview</a>
-    </div>
-</header>
+{% include 'surveys/partials/builder_topbar.html' with active='questions' %}
 
-<div class="builder-layout" data-builder>
-    <aside class="builder-palette" aria-labelledby="palette-heading">
-        <h2 id="palette-heading">Question types</h2>
-        <form method="post" action="{% url 'question_add' survey.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="revision" value="{{ version.revision }}">
-            <label for="target-section">Add to section</label>
-            <select id="target-section" name="section_id">
-                {% for section in version.sections.all %}<option value="{{ section.id }}">{{ section.title }}</option>{% endfor %}
-            </select>
-            <div class="question-type-list">
-                {% for value, label in question_types %}
-                    <button type="submit" name="type" value="{{ value }}">+ {{ label }}</button>
+<div class="studio" data-builder data-survey-id="{{ survey.id }}">
+    <aside class="studio-rail" aria-label="Survey structure" data-rail>
+        <div class="rail-head">
+            <span class="rail-heading">Structure</span>
+            <span class="rail-total">{{ question_total }} Q{{ question_total|pluralize }}</span>
+        </div>
+        {% for section in sections %}
+            <div class="rail-section{% if selected_question.section_id == section.id %} is-current{% endif %}">
+                <a class="rail-section-head" href="#section-{{ section.id }}">
+                    <span class="rail-section-num">{{ forloop.counter|stringformat:'02d' }}</span>
+                    <span class="rail-section-name">{{ section.title }}</span>
+                    <span class="rail-section-count">{{ section.questions.all|length }}</span>
+                </a>
+                {% for question in section.questions.all %}
+                    <div class="rail-q-row{% if selected_question.id == question.id %} is-active{% endif %}">
+                        <a class="rail-q" href="{% url 'survey_builder' survey.id %}?question={{ question.id }}#question-{{ question.id }}" data-select>
+                            <span class="rail-q-icon">{% include 'surveys/partials/type_icon.html' with type=question.type size='13' %}</span>
+                            <span class="rail-q-label">{{ question.prompt|truncatechars:30 }}</span>
+                        </a>
+                        {% if section.questions.all|length > 1 %}
+                            <form class="rail-q-tools" method="post" action="{% url 'question_move' survey.id question.id %}">
+                                {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                                <button class="icon-button" name="direction" value="up" title="Move up" aria-label="Move question {{ forloop.counter }} up">{% include 'partials/icon.html' with name='arrow-up' size='12' %}</button>
+                                <button class="icon-button" name="direction" value="down" title="Move down" aria-label="Move question {{ forloop.counter }} down">{% include 'partials/icon.html' with name='arrow-down' size='12' %}</button>
+                            </form>
+                        {% endif %}
+                    </div>
                 {% endfor %}
             </div>
-        </form>
+        {% endfor %}
         <form method="post" action="{% url 'section_add' survey.id %}">
             {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
-            <button class="button button-secondary button-block" type="submit">Add section</button>
+            <button class="rail-add" type="submit">{% include 'partials/icon.html' with name='plus' size='14' %} Add section</button>
         </form>
     </aside>
 
-    <main class="builder-canvas" aria-label="Survey questionnaire">
-        {% for section in version.sections.all %}
-            <section class="builder-section">
-                <div class="builder-section-heading">
-                    <form class="autosave-form section-autosave" method="post" action="{% url 'section_update' survey.id section.id %}">
-                        {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
-                        <label class="sr-only" for="section-title-{{ section.id }}">Section title</label>
-                        <input id="section-title-{{ section.id }}" name="title" value="{{ section.title }}" maxlength="160">
-                        <label class="sr-only" for="section-description-{{ section.id }}">Section description</label>
-                        <textarea id="section-description-{{ section.id }}" name="description" rows="2" placeholder="Optional section description">{{ section.description }}</textarea>
-                    </form>
-                    <div class="order-actions">
-                        <form method="post" action="{% url 'section_move' survey.id section.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"><button name="direction" value="up" aria-label="Move {{ section.title }} up">↑</button><button name="direction" value="down" aria-label="Move {{ section.title }} down">↓</button></form>
-                        <form method="post" action="{% url 'section_delete' survey.id section.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"><button aria-label="Delete {{ section.title }}">Delete</button></form>
-                    </div>
-                </div>
-                <div class="builder-question-list">
-                    {% for question in section.questions.all %}
-                        <article class="builder-question{% if selected_question.id == question.id %} is-selected{% endif %}">
-                            <a href="{% url 'survey_builder' survey.id %}?question={{ question.id }}">
-                                <span>{{ question.get_type_display }}{% if question.required %} · Required{% endif %}</span>
-                                <strong>{{ question.prompt }}</strong>
-                            </a>
-                            <form method="post" action="{% url 'question_move' survey.id question.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"><button name="direction" value="up" aria-label="Move question up">↑</button><button name="direction" value="down" aria-label="Move question down">↓</button></form>
-                        </article>
-                    {% empty %}
-                        <p class="builder-empty">Add a question from the palette.</p>
-                    {% endfor %}
-                </div>
-            </section>
-        {% endfor %}
-    </main>
+    <main class="studio-canvas" aria-label="Survey questionnaire">
+        <div class="canvas-inner">
+            <div class="rv-head">
+                <span class="rv-eyebrow">{% include 'partials/icon.html' with name='preview' size='13' %} Responder view</span>
+                <span class="rv-hint">Click any question to edit it</span>
+            </div>
 
-    <aside class="builder-settings" aria-labelledby="settings-panel-heading">
-        <h2 id="settings-panel-heading">Question settings</h2>
-        {% if selected_question %}
-            <form class="autosave-form question-autosave" method="post" action="{% url 'question_update' survey.id selected_question.id %}">
-                {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
-                {% for field in editor_form %}
-                    <div class="field-group">
-                        {{ field.label_tag }}{{ field }}
-                        {% if field.help_text %}<small class="helptext">{{ field.help_text }}</small>{% endif %}
-                        <div class="field-errors" data-errors-for="{{ field.name }}">{{ field.errors }}</div>
+            <div class="rv-card">
+                {% for section in sections %}
+                    <div class="rv-section" id="section-{{ section.id }}">
+                        <div class="rv-section-head">
+                            <span class="rv-section-label">Section {{ forloop.counter }} of {{ sections|length }}</span>
+                            <div class="rv-section-tools">
+                                <form method="post" action="{% url 'section_move' survey.id section.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"><button class="icon-button" name="direction" value="up" title="Move section up" aria-label="Move {{ section.title }} up">{% include 'partials/icon.html' with name='arrow-up' size='14' %}</button><button class="icon-button" name="direction" value="down" title="Move section down" aria-label="Move {{ section.title }} down">{% include 'partials/icon.html' with name='arrow-down' size='14' %}</button></form>
+                                {% if sections|length > 1 %}<form method="post" action="{% url 'section_delete' survey.id section.id %}" data-confirm="Delete this section and all its questions?">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"><button class="icon-button icon-button-danger" title="Delete section" aria-label="Delete {{ section.title }}">{% include 'partials/icon.html' with name='trash' size='14' %}</button></form>{% endif %}
+                            </div>
+                        </div>
+                        <form class="autosave-form section-autosave" method="post" action="{% url 'section_update' survey.id section.id %}">
+                            {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                            <label class="sr-only" for="section-title-{{ section.id }}">Section title</label>
+                            <input class="rv-section-title" id="section-title-{{ section.id }}" name="title" value="{{ section.title }}" maxlength="160" placeholder="Section title">
+                            <label class="sr-only" for="section-description-{{ section.id }}">Section description</label>
+                            <textarea class="rv-section-desc" id="section-description-{{ section.id }}" name="description" rows="1" placeholder="Description (optional)">{{ section.description }}</textarea>
+                            <div class="field-errors" data-errors-for="title"></div>
+                        </form>
+
+                        {% for question in section.questions.all %}
+                            {% if selected_question.id == question.id %}
+                                <div class="rv-q is-editing" id="question-{{ question.id }}" data-selected-card>
+                                    <span class="editing-chip">{% include 'partials/icon.html' with name='edit' size='11' %} Editing</span>
+                                    {% include 'surveys/partials/question_view.html' with editable=True %}
+                                </div>
+                            {% else %}
+                                <a class="rv-q" id="question-{{ question.id }}" href="{% url 'survey_builder' survey.id %}?question={{ question.id }}#question-{{ question.id }}" data-select aria-label="Edit question {{ question.number }}: {{ question.prompt }}">
+                                    {% include 'surveys/partials/question_view.html' %}
+                                </a>
+                            {% endif %}
+                        {% empty %}
+                            <p class="rv-empty">No questions in this section yet — add one from the toolbar below.</p>
+                        {% endfor %}
                     </div>
                 {% endfor %}
-            </form>
-            <form method="post" action="{% url 'question_delete' survey.id selected_question.id %}">
+            </div>
+
+            {% if toolbar_section_id %}
+                <div class="add-question-wrap">
+                    <button type="button" class="add-question-cta" data-add-toggle aria-expanded="false" aria-controls="add-question-popover">{% include 'partials/icon.html' with name='plus' size='16' %} Add question</button>
+                    <form class="add-popover" id="add-question-popover" method="post" action="{% url 'question_add' survey.id %}" aria-label="Choose a question type" data-add-popover hidden>
+                        {% csrf_token %}
+                        <input type="hidden" name="revision" value="{{ version.revision }}">
+                        <input type="hidden" name="section_id" value="{{ toolbar_section_id }}">
+                        {% for value, label in question_types %}
+                            <button class="add-chip" type="submit" name="type" value="{{ value }}">{% include 'surveys/partials/type_icon.html' with type=value size='15' %} {{ label }}</button>
+                        {% endfor %}
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <aside class="studio-inspector" aria-label="Question settings" data-inspector>
+        {% if selected_question %}
+            <div class="insp-head">
+                <span class="insp-type-badge">{% include 'surveys/partials/type_icon.html' with type=selected_question.type size='16' %}</span>
+                <div class="insp-headings">
+                    <strong>Question {{ selected_question.number }}</strong>
+                    <small>Section · {{ selected_question.section.title }}</small>
+                </div>
+                <button class="icon-button icon-button-danger" type="submit" form="delete-question-{{ selected_question.id }}" title="Delete question" aria-label="Delete question">{% include 'partials/icon.html' with name='trash' size='16' %}</button>
+            </div>
+
+            <form class="autosave-form question-autosave" method="post" action="{% url 'question_update' survey.id selected_question.id %}">
                 {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
-                <button class="button button-quiet button-block" type="submit">Delete question</button>
+
+                <div class="insp-toprow">
+                    <label class="insp-required insp-required-compact" title="Respondents must answer this question">
+                        <span class="insp-required-text"><strong>Required</strong></span>
+                        <span class="switch">{{ editor_form.required }}<span class="switch-track" aria-hidden="true"></span></span>
+                    </label>
+                    <button type="button" class="insp-logic-shortcut" data-logic-shortcut>{% include 'partials/icon.html' with name='logic' size='14' %} {% if branch_rules %}Branching logic ({{ branch_rules|length }}){% else %}Add branching logic{% endif %}</button>
+                </div>
+
+                <div class="insp-group">
+                    <label class="insp-label" for="{{ editor_form.prompt.id_for_label }}">Question</label>
+                    {{ editor_form.prompt }}
+                    <div class="field-errors" data-errors-for="prompt">{{ editor_form.prompt.errors }}</div>
+                </div>
+
+                <div class="insp-group">
+                    <label class="insp-label" for="{{ editor_form.type.id_for_label }}">Question type</label>
+                    {{ editor_form.type }}
+                </div>
+
+                <div class="insp-group">
+                    <label class="insp-label" for="{{ editor_form.help_text.id_for_label }}">Help text <span class="optional-tag">optional</span></label>
+                    {{ editor_form.help_text }}
+                    <div class="field-errors" data-errors-for="help_text">{{ editor_form.help_text.errors }}</div>
+                </div>
+
+                <div class="insp-divider question-config" data-config-for="single_choice multiple_choice dropdown ranking likert_matrix number short_text long_text scale"></div>
+
+                <div class="insp-group question-config" data-config-for="single_choice multiple_choice dropdown ranking likert_matrix">
+                    <label class="insp-label" for="{{ editor_form.choices_text.id_for_label }}" data-choice-label data-label-default="Options" data-label-likert="Columns (answer scale)">Options</label>
+                    <div class="choice-editor" data-choice-editor data-item-name="option">
+                        {{ editor_form.choices_text }}
+                    </div>
+                    <div class="field-errors" data-errors-for="choices_text">{{ editor_form.choices_text.errors }}</div>
+                </div>
+                <label class="insp-shuffle question-config" data-config-for="single_choice multiple_choice dropdown ranking likert_matrix">
+                    <span class="insp-shuffle-text"><strong>Shuffle options</strong><small>Randomize order for each respondent</small></span>
+                    <span class="switch">{{ editor_form.randomize_choices }}<span class="switch-track" aria-hidden="true"></span></span>
+                </label>
+                <div class="insp-group question-config" data-config-for="likert_matrix">
+                    <label class="insp-label" for="{{ editor_form.rows_text.id_for_label }}">Rows (statements)</label>
+                    <div class="choice-editor" data-choice-editor data-item-name="statement">
+                        {{ editor_form.rows_text }}
+                    </div>
+                    <div class="field-errors" data-errors-for="rows_text">{{ editor_form.rows_text.errors }}</div>
+                </div>
+                <div class="insp-group insp-grid question-config" data-config-for="number">
+                    <div><label class="insp-label" for="{{ editor_form.min_value.id_for_label }}">Min value</label>{{ editor_form.min_value }}</div>
+                    <div><label class="insp-label" for="{{ editor_form.max_value.id_for_label }}">Max value</label>{{ editor_form.max_value }}<div class="field-errors" data-errors-for="max_value">{{ editor_form.max_value.errors }}</div></div>
+                </div>
+                <div class="insp-group insp-grid question-config" data-config-for="short_text long_text">
+                    <div><label class="insp-label" for="{{ editor_form.min_length.id_for_label }}">Min length</label>{{ editor_form.min_length }}</div>
+                    <div><label class="insp-label" for="{{ editor_form.max_length.id_for_label }}">Max length</label>{{ editor_form.max_length }}<div class="field-errors" data-errors-for="max_length">{{ editor_form.max_length.errors }}</div></div>
+                </div>
+                <div class="insp-group insp-grid question-config" data-config-for="scale">
+                    <div><label class="insp-label" for="{{ editor_form.scale_min.id_for_label }}">From</label>{{ editor_form.scale_min }}</div>
+                    <div><label class="insp-label" for="{{ editor_form.scale_max.id_for_label }}">To</label>{{ editor_form.scale_max }}<div class="field-errors" data-errors-for="scale_max">{{ editor_form.scale_max.errors }}</div></div>
+                    <div><label class="insp-label" for="{{ editor_form.scale_min_label.id_for_label }}">Low label</label>{{ editor_form.scale_min_label }}</div>
+                    <div><label class="insp-label" for="{{ editor_form.scale_max_label.id_for_label }}">High label</label>{{ editor_form.scale_max_label }}</div>
+                </div>
             </form>
+
+            <form id="move-question-{{ selected_question.id }}" method="post" action="{% url 'question_move' survey.id selected_question.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"></form>
+            <form id="delete-question-{{ selected_question.id }}" method="post" action="{% url 'question_delete' survey.id selected_question.id %}" data-confirm="Delete this question?">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"></form>
+
+            <div class="insp-footer">
+                <button class="icon-button" form="move-question-{{ selected_question.id }}" name="direction" value="up" title="Move up" aria-label="Move question up">{% include 'partials/icon.html' with name='arrow-up' size='15' %}</button>
+                <button class="icon-button" form="move-question-{{ selected_question.id }}" name="direction" value="down" title="Move down" aria-label="Move question down">{% include 'partials/icon.html' with name='arrow-down' size='15' %}</button>
+            </div>
+
+            <div class="question-logic" id="question-logic-panel"{% if not branch_rules %} hidden{% endif %}>
+                <div class="question-logic-heading">{% include 'partials/icon.html' with name='logic' size='14' %} Branching logic</div>
+                {% for rule in branch_rules %}
+                    <div class="question-logic-rule">
+                        <span>If answer {{ rule.get_operator_display|lower }}{% if rule.compare_value %} “{{ rule.compare_value }}”{% endif %} → {{ rule.get_action_display|lower }}{% if rule.target_section %}: {{ rule.target_section.title }}{% endif %}</span>
+                        <form method="post" action="{% url 'question_branch_delete' survey.id rule.id %}">
+                            {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                            <button class="icon-button icon-button-danger" type="submit" title="Remove rule" aria-label="Remove rule">{% include 'partials/icon.html' with name='trash' size='13' %}</button>
+                        </form>
+                    </div>
+                {% empty %}
+                    <p class="question-logic-empty">Route respondents based on this answer.</p>
+                {% endfor %}
+                <form class="question-logic-form" method="post" action="{% url 'question_branch_add' survey.id selected_question.id %}">
+                    {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                    <label class="sr-only" for="{{ branch_form.operator.id_for_label }}">Condition</label>
+                    <span aria-hidden="true">If answer</span>
+                    {{ branch_form.operator }}
+                    <label class="sr-only" for="{{ branch_form.compare_value.id_for_label }}">Answer value</label>
+                    {{ branch_form.compare_value }}
+                    <label class="sr-only" for="{{ branch_form.action.id_for_label }}">Action</label>
+                    <span aria-hidden="true">then</span>
+                    {{ branch_form.action }}
+                    <label class="sr-only" for="{{ branch_form.target_section.id_for_label }}">Target section</label>
+                    {{ branch_form.target_section }}
+                    <button class="button button-secondary button-small" type="submit">Add rule</button>
+                </form>
+            </div>
         {% else %}
-            <p>Select a question to edit its wording, requirements, choices, and validation.</p>
+            <div class="insp-empty">
+                <span class="insp-empty-icon" aria-hidden="true">{% include 'partials/icon.html' with name='edit' size='20' %}</span>
+                <h2>Nothing selected</h2>
+                <p>Add a question from the toolbar, then click it in the responder view to configure it here.</p>
+            </div>
         {% endif %}
     </aside>
 </div>

@@ -63,7 +63,7 @@ class CollaboratorEmailInvitationTests(TestCase):
 
         accepted = self.client.post(url)
 
-        self.assertRedirects(accepted, reverse('survey_detail', args=[self.survey.id]))
+        self.assertRedirects(accepted, reverse('survey_detail', args=[self.survey.id]), target_status_code=302)
         membership = SurveyCollaborator.objects.get(user=self.invited_user)
         self.assertEqual(membership.role, SurveyCollaborator.Role.VIEWER)
         invitation.refresh_from_db()

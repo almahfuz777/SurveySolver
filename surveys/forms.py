@@ -22,11 +22,13 @@ class SurveyMetadataForm(forms.ModelForm):
             'identity_mode',
             'estimated_minutes',
             'banner',
-            'thumbnail',
         )
         widgets = {
             'description': forms.Textarea(attrs={'rows': 6}),
             'topics': forms.CheckboxSelectMultiple(),
+        }
+        labels = {
+            'banner': 'Cover image',
         }
         help_texts = {
             'summary': 'A concise explanation shown on survey discovery cards.',
@@ -34,8 +36,7 @@ class SurveyMetadataForm(forms.ModelForm):
             'visibility': 'Discoverable surveys can appear in matched respondent feeds.',
             'identity_mode': 'Identified collection requires explicit respondent consent.',
             'estimated_minutes': 'A realistic completion estimate between 1 and 120 minutes.',
-            'banner': 'Optional JPG, PNG, or WebP image up to 5 MB.',
-            'thumbnail': 'Optional square or landscape image up to 5 MB.',
+            'banner': 'Optional JPG, PNG, or WebP image up to 5 MB, shown on cards and the survey header.',
         }
 
     def clean_topics(self):
@@ -71,7 +72,10 @@ class QuestionEditorForm(forms.ModelForm):
     class Meta:
         model = Question
         fields = ('type', 'prompt', 'help_text', 'required', 'randomize_choices')
-        widgets = {'help_text': forms.Textarea(attrs={'rows': 2})}
+        widgets = {
+            'prompt': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Question prompt'}),
+            'help_text': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Shown under the question'}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -180,6 +184,25 @@ class BranchRuleForm(forms.ModelForm):
         self.instance.version = version
         self.fields['source_question'].queryset = Question.objects.filter(section__version=version)
         self.fields['target_section'].queryset = Section.objects.filter(version=version)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('operator') != BranchRule.Operator.ANSWERED and not cleaned_data.get('compare_value', '').strip():
+            self.add_error('compare_value', 'Enter the answer value used by this condition.')
+        return cleaned_data
+
+
+class QuestionBranchForm(forms.ModelForm):
+    class Meta:
+        model = BranchRule
+        fields = ('operator', 'compare_value', 'action', 'target_section')
+
+    def __init__(self, *args, version, question, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance.version = version
+        self.instance.source_question = question
+        self.fields['target_section'].queryset = Section.objects.filter(version=version)
+        self.fields['compare_value'].widget.attrs['placeholder'] = 'Answer value'
 
     def clean(self):
         cleaned_data = super().clean()

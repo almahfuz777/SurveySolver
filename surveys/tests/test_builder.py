@@ -24,7 +24,7 @@ class BuilderTests(TestCase):
         response = self.client.get(reverse('survey_builder', args=[self.survey.id]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Question types')
+        self.assertContains(response, 'Add question')
         self.assertContains(response, 'Short text')
 
     def test_question_mutations_increment_version_revision(self):

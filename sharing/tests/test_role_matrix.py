@@ -53,7 +53,7 @@ class CollaborationRoleMatrixTests(TestCase):
             reverse('survey_publish', args=[self.survey.id]),
             {'revision': self.survey.draft_version.revision},
         )
-        self.assertRedirects(published, reverse('survey_detail', args=[self.survey.id]))
+        self.assertRedirects(published, reverse('survey_builder', args=[self.survey.id]))
         self.assertEqual(
             self.client.get(reverse('creator_response_list', args=[self.survey.id])).status_code,
             200,
@@ -66,7 +66,10 @@ class CollaborationRoleMatrixTests(TestCase):
     def test_viewer_has_read_only_survey_and_response_access(self):
         self.login(self.viewer)
 
-        self.assertEqual(self.client.get(reverse('survey_detail', args=[self.survey.id])).status_code, 200)
+        self.assertRedirects(
+            self.client.get(reverse('survey_detail', args=[self.survey.id])),
+            reverse('survey_preview', args=[self.survey.id]),
+        )
         self.assertEqual(self.client.get(reverse('survey_preview', args=[self.survey.id])).status_code, 200)
         self.assertEqual(
             self.client.get(reverse('creator_response_list', args=[self.survey.id])).status_code,
