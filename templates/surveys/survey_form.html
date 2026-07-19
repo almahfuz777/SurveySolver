@@ -2,102 +2,555 @@
 {% load static %}
 
 {% block title %}{{ page_title }} | SurveySolver{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/builder.css' %}"><link rel="stylesheet" href="{% static 'css/surveys/survey-form.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/builder.css' %}"><link rel="stylesheet" href="{% static 'css/surveys/survey-form.css' %}"><link rel="stylesheet" href="{% static 'css/surveys/eligibility.css' %}">{% endblock %}
+{% block footer %}{% endblock %}
+{% block extra_head %}<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-disclosure-toggle]').forEach((toggle) => {
+    const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+    if (!panel) return;
+    const sync = () => {
+      panel.hidden = !toggle.checked;
+      toggle.setAttribute('aria-expanded', String(toggle.checked));
+    };
+    toggle.addEventListener('change', sync);
+    sync();
+  });
+
+  document.querySelectorAll('[data-stepper]').forEach((stepper) => {
+    const input = stepper.querySelector('input');
+    const min = parseInt(input.min || '1', 10);
+    const max = parseInt(input.max || '120', 10);
+    stepper.querySelectorAll('button').forEach((button) => {
+      button.addEventListener('click', () => {
+        const step = parseInt(button.dataset.step, 10);
+        const next = (parseInt(input.value, 10) || min) + step;
+        input.value = Math.min(max, Math.max(min, next));
+        input.dispatchEvent(new Event('input', {bubbles: true}));
+      });
+    });
+  });
+
+  document.querySelectorAll('.pill-select[data-max-select]').forEach((group) => {
+    const max = parseInt(group.dataset.maxSelect, 10);
+    const boxes = () => Array.from(group.querySelectorAll('input[type="checkbox"]'));
+    const sync = () => {
+      const checkedCount = boxes().filter((box) => box.checked).length;
+      boxes().forEach((box) => { box.disabled = !box.checked && checkedCount >= max; });
+    };
+    group.addEventListener('change', sync);
+    sync();
+  });
+
+  document.querySelectorAll('[data-country-select]').forEach((wrapper) => {
+    const search = wrapper.querySelector('[data-country-search]');
+    const dropdown = wrapper.querySelector('[data-country-dropdown]');
+    const tags = wrapper.querySelector('[data-country-tags]');
+    const count = wrapper.querySelector('[data-country-count]');
+    const clear = wrapper.querySelector('[data-country-clear]');
+    const empty = wrapper.querySelector('[data-country-empty]');
+    const boxes = Array.from(dropdown.querySelectorAll('input[type="checkbox"]'));
+
+    const close = () => {
+      wrapper.classList.remove('is-open');
+      dropdown.hidden = true;
+      search.setAttribute('aria-expanded', 'false');
+    };
+    const open = () => {
+      wrapper.classList.add('is-open');
+      dropdown.hidden = false;
+      search.setAttribute('aria-expanded', 'true');
+    };
+
+    const renderTags = () => {
+      tags.innerHTML = '';
+      const selected = boxes.filter((box) => box.checked);
+      selected.forEach((box) => {
+        const label = box.closest('label');
+        const name = label ? label.textContent.trim() : box.value;
+        const tag = document.createElement('span');
+        tag.className = 'country-tag';
+        const text = document.createElement('span');
+        const remove = document.createElement('button');
+        text.textContent = name;
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Remove ${name}`);
+        remove.textContent = '✕';
+        remove.addEventListener('click', () => {
+          box.checked = false;
+          renderTags();
+          wrapper.dispatchEvent(new Event('change', {bubbles: true}));
+        });
+        tag.append(text, remove);
+        tags.appendChild(tag);
+      });
+      count.textContent = selected.length ? `${selected.length} selected` : 'No countries selected';
+      clear.hidden = selected.length === 0;
+    };
+
+    const filter = () => {
+      const query = search.value.trim().toLowerCase();
+      let matches = 0;
+      boxes.forEach((box) => {
+        const label = box.closest('label');
+        const match = !query || label.textContent.trim().toLowerCase().includes(query);
+        label.hidden = !match;
+        if (match) matches += 1;
+      });
+      empty.hidden = matches !== 0;
+    };
+
+    search.addEventListener('focus', open);
+    search.addEventListener('input', filter);
+    search.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        close();
+        search.blur();
+      }
+    });
+    dropdown.addEventListener('change', renderTags);
+    clear.addEventListener('click', () => {
+      boxes.forEach((box) => { box.checked = false; });
+      renderTags();
+      wrapper.dispatchEvent(new Event('change', {bubbles: true}));
+      search.focus();
+    });
+    document.addEventListener('click', (event) => {
+      if (!wrapper.contains(event.target)) close();
+    });
+
+    renderTags();
+    filter();
+  });
+
+  const sectionLinks = Array.from(document.querySelectorAll('.settings-rail-nav a[href^="#"]'));
+  const sections = sectionLinks
+    .map((link) => document.querySelector(link.getAttribute('href')))
+    .filter(Boolean);
+  let scrollTicking = false;
+  const syncSection = () => {
+    const header = document.querySelector('.site-header');
+    const topbar = document.querySelector('.builder-topbar');
+    const offset = (header?.offsetHeight || 0) + (topbar?.offsetHeight || 0) + 32;
+    let current = sections[0];
+    sections.forEach((section) => {
+      if (section.getBoundingClientRect().top <= offset) current = section;
+    });
+    sectionLinks.forEach((link) => {
+      const active = link.getAttribute('href') === `#${current?.id}`;
+      link.classList.toggle('is-active', active);
+      if (active) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+    scrollTicking = false;
+  };
+  window.addEventListener('scroll', () => {
+    if (!scrollTicking) {
+      scrollTicking = true;
+      window.requestAnimationFrame(syncSection);
+    }
+  }, {passive: true});
+  syncSection();
+
+  const autosaveForms = Array.from(document.querySelectorAll('[data-settings-autosave]'));
+  const publishForm = document.querySelector('[data-settings-publish]');
+  const saveStatus = document.querySelector('[data-save-status]');
+  const saveText = saveStatus?.querySelector('[data-save-text]');
+  if (autosaveForms.length && saveStatus && saveText) {
+    const timers = new WeakMap();
+    const editVersions = new WeakMap();
+    const pendingForms = new Set();
+    let saveQueue = Promise.resolve();
+    let saving = 0;
+    let intentionalNavigation = false;
+
+    const setStatus = (state, text) => {
+      saveStatus.classList.remove('is-dirty', 'is-saving', 'is-error');
+      if (state) saveStatus.classList.add(state);
+      saveText.textContent = text;
+    };
+    const errorNode = (form) => form.querySelector('[data-autosave-error]');
+    const clearError = (form) => {
+      delete form.dataset.saveError;
+      const node = errorNode(form);
+      if (node) node.textContent = '';
+    };
+    const showError = (form, result) => {
+      form.dataset.saveError = 'true';
+      const fieldErrors = Object.values(result.errors || {}).flat();
+      const message = fieldErrors[0]?.message || result.error || 'Changes could not be saved.';
+      const node = errorNode(form);
+      if (node) node.textContent = message;
+      setStatus('is-error', message);
+    };
+    const updateRevision = (revision) => {
+      if (revision === undefined || revision === null) return;
+      document.querySelectorAll('input[name="revision"]').forEach((input) => {
+        input.value = revision;
+      });
+    };
+    const hasErrors = () => autosaveForms.some((form) => form.dataset.saveError === 'true');
+
+    const saveForm = async (form) => {
+      if (!pendingForms.has(form)) return true;
+      const savingVersion = editVersions.get(form) || 0;
+      saving += 1;
+      setStatus('is-saving', 'Saving…');
+      try {
+        const response = await fetch(form.getAttribute('action') || window.location.pathname, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+        const responseText = await response.text();
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          showError(form, {error: `Save failed (${response.status}).`});
+          return false;
+        }
+        if (!response.ok) {
+          showError(form, result);
+          return false;
+        }
+        clearError(form);
+        updateRevision(result.revision);
+        if ((editVersions.get(form) || 0) === savingVersion) pendingForms.delete(form);
+        return true;
+      } catch {
+        showError(form, {error: 'Offline — changes not saved'});
+        return false;
+      } finally {
+        saving -= 1;
+        if (!hasErrors()) {
+          if (pendingForms.size) setStatus('is-dirty', 'Unsaved changes');
+          else if (saving === 0) {
+            const time = new Date().toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+            setStatus('', `Saved · ${time}`);
+          }
+        }
+      }
+    };
+
+    const enqueueSave = (form) => {
+      clearTimeout(timers.get(form));
+      saveQueue = saveQueue.then(() => saveForm(form));
+      return saveQueue;
+    };
+    const scheduleSave = (form, delay) => {
+      editVersions.set(form, (editVersions.get(form) || 0) + 1);
+      pendingForms.add(form);
+      clearError(form);
+      setStatus('is-dirty', 'Unsaved changes');
+      clearTimeout(timers.get(form));
+      timers.set(form, setTimeout(() => enqueueSave(form), delay));
+    };
+
+    autosaveForms.forEach((form) => {
+      form.addEventListener('input', () => scheduleSave(form, 700));
+      form.addEventListener('change', () => scheduleSave(form, 450));
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        enqueueSave(form);
+      });
+    });
+
+    publishForm?.addEventListener('submit', async (event) => {
+      if (intentionalNavigation) return;
+      event.preventDefault();
+      for (const form of autosaveForms.filter((candidate) => pendingForms.has(candidate))) {
+        await enqueueSave(form);
+      }
+      await saveQueue;
+      if (pendingForms.size || hasErrors()) {
+        if (!hasErrors()) setStatus('is-error', 'Wait for settings to finish saving.');
+        return;
+      }
+      intentionalNavigation = true;
+      publishForm.submit();
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+      if (!intentionalNavigation && (pendingForms.size || saving > 0)) event.preventDefault();
+    });
+  }
+});
+</script>{% endblock %}
 
 {% block content %}
 {% include 'surveys/partials/builder_topbar.html' with active='settings' %}
-<section class="page-heading">
-    <div class="shell page-heading-inner">
-        <div>
-            <span class="eyebrow">{{ survey.title }}</span>
-            <h1>{{ page_title }}</h1>
-            <p>Audience, privacy, and discovery details for this survey.</p>
-        </div>
-    </div>
-</section>
 
-<section class="page-content">
-    <div class="shell form-shell">
-        <form class="panel profile-form" method="post" enctype="multipart/form-data" novalidate>
+<div class="settings-heading">
+    <div class="settings-heading-inner">
+        <span class="eyebrow">Settings</span>
+        <h1>{{ page_title }}</h1>
+        <p>Control discovery, respondent privacy, eligibility, and response limits. Changes save automatically.</p>
+    </div>
+</div>
+
+<div class="settings-body">
+<div class="settings-page" data-settings>
+    <aside class="settings-rail" aria-label="Settings sections">
+        <nav class="settings-rail-nav">
+            {% if survey.owner_id == request.user.id %}
+                {% if survey.status == 'published' or survey.status == 'closed' %}<a href="#collection">Response collection</a>{% endif %}
+            {% endif %}
+            <a href="#overview">Classification &amp; duration</a>
+            <a href="#audience">Audience &amp; privacy</a>
+            {% if version %}
+                <a href="#eligibility">Eligibility</a>
+                <a href="#response-limit">Response limit</a>
+            {% endif %}
+        </nav>
+        <div class="settings-rail-divider"></div>
+        <div class="settings-rail-stats">
+            <div>
+                <div class="settings-rail-stat-value">{{ survey.get_visibility_display }}</div>
+                <div class="settings-rail-stat-label">Visibility</div>
+            </div>
+            {% if version %}
+                <div>
+                    <div class="settings-rail-stat-value is-teal">{{ version.response_limit|default_if_none:"No limit" }}</div>
+                    <div class="settings-rail-stat-label">Response limit</div>
+                </div>
+            {% endif %}
+            <div>
+                <div class="settings-rail-stat-value">{{ survey.get_status_display }}</div>
+                <div class="settings-rail-stat-label">Survey status</div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="settings-main">
+        {% if survey.owner_id == request.user.id %}
+            {% if survey.status == 'published' or survey.status == 'closed' %}
+                <section id="collection" class="settings-card" aria-labelledby="collection-heading">
+                    <h2 id="collection-heading">Response collection</h2>
+                    <p class="settings-panel-hint">Pause new responses without affecting responses already collected.</p>
+                    <form method="post" action="{% url 'survey_response_collection' survey.id %}">
+                        {% csrf_token %}
+                        <label class="setting-toggle-row" for="accepting-responses">
+                            <span>
+                                <strong>Accept responses</strong>
+                                <small>{% if survey.status == 'published' %}Respondents can start and complete this survey.{% else %}Collection is paused; existing responses are preserved.{% endif %}</small>
+                            </span>
+                            <span class="settings-switch">
+                                <input id="accepting-responses" type="checkbox" name="accepting"{% if survey.status == 'published' %} checked{% endif %} onchange="this.form.requestSubmit()">
+                                <span class="settings-switch-track" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                        <noscript><div class="settings-actions"><button class="button button-primary" type="submit">Update response collection</button></div></noscript>
+                    </form>
+                </section>
+            {% endif %}
+        {% endif %}
+
+        <form id="survey-metadata-form" method="post" action="{% url 'survey_edit' survey.id %}" enctype="multipart/form-data" novalidate data-settings-autosave>
             {% csrf_token %}
+            <input type="hidden" name="autosave" value="1">
+            <input type="hidden" name="action" value="metadata">
+            {% if version %}<input type="hidden" name="revision" value="{{ version.revision }}">{% endif %}
             {{ form.non_field_errors }}
-            <div class="form-grid">
-                {% for field in form %}
-                    <div class="field-group{% if field.name == 'summary' or field.name == 'description' or field.name == 'topics' %} field-wide{% endif %}">
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if field.help_text %}<small class="helptext">{{ field.help_text }}</small>{% endif %}
-                        {{ field.errors }}
+
+            <section id="overview" class="settings-card">
+                <h2>Classification &amp; duration</h2>
+                <p class="settings-panel-hint">Set how respondents find this research and estimate the time it takes.</p>
+
+                <div class="settings-section-gap">
+                    <label class="settings-field-label" for="{{ form.topics.id_for_label }}">Topics <span class="optional-tag">choose up to 3</span></label>
+                    {{ form.topics }}
+                    {{ form.topics.errors }}
+                </div>
+
+                <div class="time-row">
+                    <div>
+                        <div class="time-row-title">Estimated time to complete</div>
+                        <div class="time-row-hint">Shown to respondents before they start</div>
                     </div>
-                {% endfor %}
-            </div>
-            <div class="form-actions">
-                <a class="button button-quiet" href="{% url 'survey_builder' survey.id %}">Cancel</a>
-                <button class="button button-primary" type="submit" name="action" value="metadata">Save settings</button>
-            </div>
+                    <div class="stepper" data-stepper>
+                        <button type="button" data-step="-1" aria-label="Decrease estimated minutes">&minus;</button>
+                        {{ form.estimated_minutes }}
+                        <button type="button" data-step="1" aria-label="Increase estimated minutes">+</button>
+                    </div>
+                </div>
+                {{ form.estimated_minutes.errors }}
+            </section>
+
+            <section id="audience" class="settings-card">
+                <h2>Audience &amp; privacy</h2>
+                <p class="settings-panel-hint">{{ form.visibility.help_text }}</p>
+
+                <label class="settings-field-label">Visibility</label>
+                <div class="option-card-grid cols-3 settings-section-gap">
+                    {% for radio in form.visibility %}
+                        <label class="option-card">
+                            {{ radio.tag }}
+                            <div class="option-card-top">
+                                {% if radio.data.value == 'discoverable' %}
+                                    {% include 'partials/icon.html' with name='eye' size='17' %}
+                                {% elif radio.data.value == 'unlisted' %}
+                                    {% include 'partials/icon.html' with name='unlink' size='17' %}
+                                {% else %}
+                                    {% include 'partials/icon.html' with name='lock-closed' size='17' %}
+                                {% endif %}
+                                <span class="option-card-dot"></span>
+                            </div>
+                            <div class="option-card-title">{{ radio.choice_label }}</div>
+                            <div class="option-card-desc">
+                                {% if radio.data.value == 'discoverable' %}Appears in matched respondent feeds
+                                {% elif radio.data.value == 'unlisted' %}Only reachable with a direct link
+                                {% else %}Only people you invite can respond{% endif %}
+                            </div>
+                        </label>
+                    {% endfor %}
+                </div>
+
+                <label class="settings-field-label">Respondent identity</label>
+                <div class="option-card-grid cols-2">
+                    {% for radio in form.identity_mode %}
+                        <label class="option-card">
+                            {{ radio.tag }}
+                            <div class="option-card-top">
+                                {% if radio.data.value == 'anonymous' %}
+                                    {% include 'partials/icon.html' with name='pen' size='17' %}
+                                {% else %}
+                                    {% include 'partials/icon.html' with name='user-circle' size='17' %}
+                                {% endif %}
+                                <span class="option-card-dot"></span>
+                            </div>
+                            <div class="option-card-title">{{ radio.choice_label }}</div>
+                            <div class="option-card-desc">
+                                {% if radio.data.value == 'anonymous' %}You never see who answered what
+                                {% else %}Respondents opt in to share identity{% endif %}
+                            </div>
+                        </label>
+                    {% endfor %}
+                </div>
+
+                <div class="settings-autosave-error" data-autosave-error aria-live="polite"></div>
+            </section>
         </form>
 
         {% if version %}
-            <section class="panel settings-panel" aria-labelledby="eligibility-heading">
+            <section id="eligibility" class="settings-card" aria-labelledby="eligibility-heading">
                 <h2 id="eligibility-heading">Respondent eligibility</h2>
-                <p class="settings-panel-hint">Leave every field empty for an unrestricted survey. Signed-in respondents are matched from their research profile; guests receive a screener.</p>
-                <form method="post" class="settings-subform">
+                <p class="settings-panel-hint">Everyone is eligible by default. Turn on only the restrictions this study needs.</p>
+                <form method="post" action="{% url 'survey_edit' survey.id %}" class="eligibility-form" data-settings-autosave>
                     {% csrf_token %}
+                    <input type="hidden" name="autosave" value="1">
                     <input type="hidden" name="revision" value="{{ version.revision }}">
                     <input type="hidden" name="action" value="update_eligibility">
-                    <div class="form-grid">
-                        <div class="field-group"><label for="{{ eligibility_form.min_age.id_for_label }}">Minimum age</label>{{ eligibility_form.min_age }}{{ eligibility_form.min_age.errors }}</div>
-                        <div class="field-group"><label for="{{ eligibility_form.max_age.id_for_label }}">Maximum age</label>{{ eligibility_form.max_age }}{{ eligibility_form.max_age.errors }}</div>
-                        <div class="field-group"><label for="{{ eligibility_form.genders.id_for_label }}">Genders</label>{{ eligibility_form.genders }}{{ eligibility_form.genders.errors }}</div>
-                        <div class="field-group"><label for="{{ eligibility_form.education_levels.id_for_label }}">Education levels</label>{{ eligibility_form.education_levels }}{{ eligibility_form.education_levels.errors }}</div>
-                        <div class="field-group"><label for="{{ eligibility_form.employment_statuses.id_for_label }}">Employment statuses</label>{{ eligibility_form.employment_statuses }}{{ eligibility_form.employment_statuses.errors }}</div>
-                        <div class="field-group"><label for="{{ eligibility_form.countries.id_for_label }}">Countries</label>{{ eligibility_form.countries }}{{ eligibility_form.countries.errors }}</div>
+                    <div class="eligibility-fields">
+                        <div class="eligibility-rule">
+                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_age.id_for_label }}">
+                                <span class="eligibility-rule-copy"><strong>Age</strong><small>Any age</small></span>
+                                <span class="settings-switch">{{ eligibility_form.restrict_age }}<span class="settings-switch-track"></span></span>
+                            </label>
+                            <div id="age-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_age.value %} hidden{% endif %}>
+                                <div class="age-range-inputs">
+                                    <div class="age-input-group">
+                                        {{ eligibility_form.min_age }}
+                                        <small>years</small>
+                                    </div>
+                                    <span class="age-range-sep">to</span>
+                                    <div class="age-input-group">
+                                        {{ eligibility_form.max_age }}
+                                        <small>years</small>
+                                    </div>
+                                </div>
+                                {{ eligibility_form.min_age.errors }}
+                                {{ eligibility_form.max_age.errors }}
+                            </div>
+                        </div>
+
+                        <div class="eligibility-cols-2">
+                            <div class="eligibility-rule">
+                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_genders.id_for_label }}">
+                                    <span class="eligibility-rule-copy"><strong>Gender</strong><small>Any gender</small></span>
+                                    <span class="settings-switch">{{ eligibility_form.restrict_genders }}<span class="settings-switch-track"></span></span>
+                                </label>
+                                <div id="gender-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_genders.value %} hidden{% endif %}>
+                                    {{ eligibility_form.genders }}
+                                    {{ eligibility_form.genders.errors }}
+                                </div>
+                            </div>
+                            <div class="eligibility-rule">
+                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_employment.id_for_label }}">
+                                    <span class="eligibility-rule-copy"><strong>Employment</strong><small>Any employment status</small></span>
+                                    <span class="settings-switch">{{ eligibility_form.restrict_employment }}<span class="settings-switch-track"></span></span>
+                                </label>
+                                <div id="employment-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_employment.value %} hidden{% endif %}>
+                                    {{ eligibility_form.employment_statuses }}
+                                    {{ eligibility_form.employment_statuses.errors }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="eligibility-rule">
+                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_education.id_for_label }}">
+                                <span class="eligibility-rule-copy"><strong>Education</strong><small>Any education level</small></span>
+                                <span class="settings-switch">{{ eligibility_form.restrict_education }}<span class="settings-switch-track"></span></span>
+                            </label>
+                            <div id="education-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_education.value %} hidden{% endif %}>
+                                {{ eligibility_form.education_levels }}
+                                {{ eligibility_form.education_levels.errors }}
+                            </div>
+                        </div>
+
+                        <div class="eligibility-rule">
+                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_countries.id_for_label }}">
+                                <span class="eligibility-rule-copy"><strong>Country</strong><small>Any country</small></span>
+                                <span class="settings-switch">{{ eligibility_form.restrict_countries }}<span class="settings-switch-track"></span></span>
+                            </label>
+                            <div id="country-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_countries.value %} hidden{% endif %}>
+                                <label class="country-search-label" for="country-search-input">Find countries</label>
+                                <div class="country-select" data-country-select>
+                                    <div class="country-tags" data-country-tags></div>
+                                    <div class="country-toolbar">
+                                        <span id="country-selected-count" data-country-count>No countries selected</span>
+                                        <button type="button" data-country-clear hidden>Clear selected</button>
+                                    </div>
+                                    <input type="text" id="country-search-input" class="country-search-input" placeholder="Search countries…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="country-options" aria-describedby="country-selected-count" data-country-search>
+                                    <div id="country-options" class="country-dropdown" data-country-dropdown hidden>
+                                        <p class="country-empty" data-country-empty hidden>No countries found.</p>
+                                        {{ eligibility_form.countries }}
+                                    </div>
+                                </div>
+                                {{ eligibility_form.countries.errors }}
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-actions"><button class="button button-primary" type="submit">Save eligibility</button></div>
+                    <div class="settings-autosave-error" data-autosave-error aria-live="polite"></div>
                 </form>
             </section>
 
-            <section class="panel settings-panel" aria-labelledby="quotas-heading">
-                <h2 id="quotas-heading">Response quotas</h2>
-                <p class="settings-panel-hint">Cap how many completed responses a segment can collect.</p>
-                {% for quota in version.quotas.all %}
-                    <div class="quota-row">
-                        <span><strong>{{ quota.name }}</strong> · limit {{ quota.limit }}{% if not quota.is_active %} · inactive{% endif %}</span>
-                        <form method="post" onsubmit="return confirm('Remove quota “{{ quota.name|escapejs }}”?')">
-                            {% csrf_token %}
-                            <input type="hidden" name="revision" value="{{ version.revision }}">
-                            <input type="hidden" name="action" value="delete_quota">
-                            <input type="hidden" name="quota_id" value="{{ quota.id }}">
-                            <button class="quota-remove" type="submit" title="Remove quota" aria-label="Remove {{ quota.name }}">{% include 'partials/icon.html' with name='trash' size='15' %}</button>
-                        </form>
-                    </div>
-                {% empty %}
-                    <p class="settings-panel-hint">No quotas configured.</p>
-                {% endfor %}
-                <form method="post" class="settings-subform quota-add-form">
+            <section id="response-limit" class="settings-card" aria-labelledby="response-limit-heading">
+                <h2 id="response-limit-heading">Response limit</h2>
+                <p class="settings-panel-hint">Optionally stop new completions after the published survey reaches a maximum.</p>
+                <form method="post" action="{% url 'survey_edit' survey.id %}" class="response-limit-form" data-settings-autosave>
                     {% csrf_token %}
+                    <input type="hidden" name="autosave" value="1">
                     <input type="hidden" name="revision" value="{{ version.revision }}">
-                    <input type="hidden" name="action" value="add_quota">
-                    <div class="form-grid">
-                        <div class="field-group"><label for="{{ quota_form.name.id_for_label }}">Name</label>{{ quota_form.name }}{{ quota_form.name.errors }}</div>
-                        <div class="field-group"><label for="{{ quota_form.limit.id_for_label }}">Limit</label>{{ quota_form.limit }}{{ quota_form.limit.errors }}</div>
-                        <div class="field-group quota-active-field"><label>{{ quota_form.is_active }} Active</label></div>
+                    <input type="hidden" name="action" value="update_response_limit">
+                    <label class="setting-toggle-row" for="{{ response_limit_form.enabled.id_for_label }}">
+                        <span><strong>Limit completed responses</strong><small>Off means the survey can collect responses without a numeric cap.</small></span>
+                        <span class="settings-switch">{{ response_limit_form.enabled }}<span class="settings-switch-track"></span></span>
+                    </label>
+                    <div id="response-limit-fields" class="response-limit-fields"{% if not response_limit_form.enabled.value %} hidden{% endif %}>
+                        <label for="{{ response_limit_form.response_limit.id_for_label }}">Maximum completed responses</label>
+                        {{ response_limit_form.response_limit }}
+                        <small>The limit takes effect when these draft settings are published.</small>
+                        {{ response_limit_form.response_limit.errors }}
                     </div>
-                    <div class="form-actions"><button class="button button-secondary" type="submit">Add quota</button></div>
+                    <div class="settings-autosave-error" data-autosave-error aria-live="polite"></div>
                 </form>
             </section>
-        {% endif %}
-
-        {% if survey.access_role == 'owner' and survey.status != 'archived' %}
-            <form class="panel archive-panel" method="post" action="{% url 'survey_archive' survey.id %}">
-                {% csrf_token %}
-                <div>
-                    <h2>Archive survey</h2>
-                    <p>Stops collection and hides the survey from respondents. Collected data is kept.</p>
-                </div>
-                <button class="button button-quiet" type="submit">{% include 'partials/icon.html' with name='archive' size='16' %} Archive</button>
-            </form>
         {% endif %}
     </div>
-</section>
+</div>
+</div>
 {% endblock %}

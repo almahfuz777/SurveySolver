@@ -16,6 +16,34 @@ if (navToggle && primaryNavigation) {
     });
 }
 
+const accountTrigger = document.getElementById('account-menu-button');
+const accountDropdown = document.getElementById('account-menu');
+
+if (accountTrigger && accountDropdown) {
+    const closeAccountMenu = () => {
+        accountTrigger.setAttribute('aria-expanded', 'false');
+        accountDropdown.classList.remove('is-open');
+    };
+
+    accountTrigger.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const isOpen = accountDropdown.classList.toggle('is-open');
+        accountTrigger.setAttribute('aria-expanded', String(isOpen));
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.account-menu')) {
+            closeAccountMenu();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeAccountMenu();
+        }
+    });
+}
+
 document.querySelectorAll('[data-copy-previous]').forEach((button) => {
     button.addEventListener('click', async () => {
         const input = button.previousElementSibling;

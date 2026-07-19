@@ -18,7 +18,7 @@ def profile_edit(request):
     profile = request.user.profile
     if request.method == 'POST':
         user_form = UserNameForm(request.POST, instance=request.user)
-        profile_form = ResearchProfileForm(request.POST, instance=profile)
+        profile_form = ResearchProfileForm(request.POST, request.FILES, instance=profile)
         if user_form.is_valid() and profile_form.is_valid():
             with transaction.atomic():
                 user_form.save()

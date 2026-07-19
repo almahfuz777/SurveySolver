@@ -2,12 +2,23 @@ import uuid
 
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models.functions import Lower
 from django_countries.fields import CountryField
 
 from .managers import UserManager
-from .validators import validate_birth_date
+from .validators import validate_avatar_size, validate_birth_date
+
+
+def profile_avatar_path(instance, filename):
+    return f'accounts/{instance.user_id}/avatar/{filename}'
+
+
+avatar_validators = [
+    FileExtensionValidator(('jpg', 'jpeg', 'png', 'webp')),
+    validate_avatar_size,
+]
 
 
 class User(AbstractUser):
@@ -97,7 +108,25 @@ class Profile(models.Model):
     occupation = models.CharField(max_length=120, blank=True)
     institution = models.CharField(max_length=160, blank=True)
     research_interests = models.CharField(max_length=500, blank=True)
+    avatar = models.ImageField(
+        upload_to=profile_avatar_path,
+        blank=True,
+        validators=avatar_validators,
+    )
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def avatar_url(self):
+        if self.avatar:
+            return self.avatar.url
+
+        from allauth.socialaccount.models import SocialAccount
+        google_account = SocialAccount.objects.filter(
+            user=self.user, provider='google',
+        ).first()
+        if google_account:
+            return google_account.extra_data.get('picture') or None
+        return None
 
     @property
     def completion_percentage(self):

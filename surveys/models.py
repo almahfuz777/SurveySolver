@@ -166,6 +166,11 @@ class SurveyVersion(models.Model):
     number = models.PositiveIntegerField()
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
     revision = models.PositiveIntegerField(default=1)
+    response_limit = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(1)],
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

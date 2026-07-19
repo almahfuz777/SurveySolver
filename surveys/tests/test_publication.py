@@ -77,3 +77,17 @@ class PublicationTests(TestCase):
         self.assertNotEqual(cloned.pk, criteria.pk)
         self.assertEqual(cloned.min_age, 18)
         self.assertEqual(cloned.education_levels, ['undergraduate'])
+
+    def test_publication_clones_response_limit_into_next_draft(self):
+        draft = self.survey.draft_version
+        _, revision = services.add_question(
+            draft.sections.get().id,
+            Question.Type.SHORT_TEXT,
+            draft.revision,
+        )
+        revision = services.update_response_limit(draft.id, revision, 250)
+
+        published, next_draft = publish_survey(self.survey.id, self.user, revision)
+
+        self.assertEqual(published.response_limit, 250)
+        self.assertEqual(next_draft.response_limit, 250)

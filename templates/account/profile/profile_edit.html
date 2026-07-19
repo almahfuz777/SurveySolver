@@ -18,7 +18,7 @@
 
 <section class="page-content">
     <div class="shell form-shell">
-        <form class="panel profile-form" method="post" novalidate>
+        <form class="panel profile-form" method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             {% if user_form.non_field_errors or profile_form.non_field_errors %}
                 {{ user_form.non_field_errors }}

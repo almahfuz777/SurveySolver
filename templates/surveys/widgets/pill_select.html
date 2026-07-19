@@ -1,0 +1,7 @@
+<div class="pill-select"{% if widget.attrs.id %} id="{{ widget.attrs.id }}"{% endif %}{% if widget.attrs.maxselect %} data-max-select="{{ widget.attrs.maxselect }}"{% endif %}>
+  {% for group_name, options, index in widget.optgroups %}
+    {% for option in options %}
+      {% include option.template_name with widget=option %}
+    {% endfor %}
+  {% endfor %}
+</div>

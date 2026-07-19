@@ -277,7 +277,7 @@ def submission_form(request, submission_id):
             errors = error.errors
         except DuplicateSubmission as error:
             return redirect('response_complete', submission_id=error.submission.id)
-        except QuotaReached as error:
+        except (QuotaReached, ResponseUnavailable) as error:
             errors = {'submission': str(error)}
         else:
             if request.POST.get('action') == 'save':

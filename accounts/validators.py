@@ -4,6 +4,14 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 
+MAX_AVATAR_SIZE = 5 * 1024 * 1024
+
+
+def validate_avatar_size(image):
+    if image.size > MAX_AVATAR_SIZE:
+        raise ValidationError('Profile photos must be 5 MB or smaller.')
+
+
 def validate_birth_date(value):
     today = timezone.localdate()
     if value > today:

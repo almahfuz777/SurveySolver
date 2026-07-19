@@ -3,7 +3,42 @@
 
 {% block title %}Edit {{ survey.title }} | SurveySolver{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/builder.css' %}">{% endblock %}
-{% block extra_head %}<script src="{% static 'js/builder.js' %}" defer></script>{% endblock %}
+{% block footer %}{% endblock %}
+{% block extra_head %}<script src="{% static 'js/builder.js' %}" defer></script><script>
+document.addEventListener('DOMContentLoaded', () => {
+  const bannerEditBtn = document.querySelector('[data-banner-edit]');
+  const bannerFileInput = document.getElementById('banner-file-input');
+  const bannerUploadForm = document.getElementById('banner-upload-form');
+  const headerForm = document.getElementById('header-edit-form');
+
+  if (bannerEditBtn && bannerFileInput) {
+    bannerEditBtn.addEventListener('click', () => bannerFileInput.click());
+    bannerFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0 && bannerUploadForm) {
+        bannerUploadForm.submit();
+      }
+    });
+  }
+
+  if (headerForm) {
+    const titleInput = headerForm.querySelector('[name="title"]');
+    const summaryInput = headerForm.querySelector('[name="summary"]');
+    const autoSaveFields = [titleInput, summaryInput];
+    let autoSaveTimer;
+
+    autoSaveFields.forEach(field => {
+      if (field) {
+        field.addEventListener('input', () => {
+          clearTimeout(autoSaveTimer);
+          autoSaveTimer = setTimeout(() => {
+            headerForm.submit();
+          }, 1500);
+        });
+      }
+    });
+  }
+});
+</script>{% endblock %}
 
 {% block content %}
 {% include 'surveys/partials/builder_topbar.html' with active='questions' %}
@@ -46,6 +81,39 @@
 
     <main class="studio-canvas" aria-label="Survey questionnaire">
         <div class="canvas-inner">
+            <div class="survey-banner-section">
+                <div class="survey-banner-placeholder" id="banner-upload-zone">
+                    {% if survey.banner %}
+                        <img src="{{ survey.banner.url }}" alt="Survey banner" class="banner-image">
+                    {% else %}
+                        <div class="banner-empty">
+                            {% include 'partials/icon.html' with name='image' size='32' %}
+                        </div>
+                    {% endif %}
+                    <form id="banner-upload-form" method="post" action="{% url 'survey_edit' survey.id %}" enctype="multipart/form-data" style="display: none;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="metadata">
+                        <input type="file" id="banner-file-input" name="banner" accept="image/jpeg,image/png,image/webp" class="sr-only">
+                    </form>
+                    <button type="button" class="banner-edit-btn" data-banner-edit title="Edit banner image">
+                        {% include 'partials/icon.html' with name='edit' size='16' %}
+                    </button>
+                </div>
+            </div>
+
+            <div class="survey-header-edit">
+                <form method="post" action="{% url 'survey_edit' survey.id %}" class="survey-header-form" enctype="multipart/form-data" id="header-edit-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="metadata">
+                    <div class="header-input-group">
+                        <input type="text" name="title" value="{{ survey.title }}" class="survey-title-input" placeholder="Survey title" maxlength="160" data-autosave>
+                    </div>
+                    <div class="header-input-group">
+                        <textarea name="summary" class="survey-summary-input" placeholder="Short description (shown on discovery cards)" maxlength="320" data-autosave>{{ survey.summary }}</textarea>
+                    </div>
+                </form>
+            </div>
+
             <div class="rv-head">
                 <span class="rv-eyebrow">{% include 'partials/icon.html' with name='preview' size='13' %} Responder view</span>
                 <span class="rv-hint">Click any question to edit it</span>

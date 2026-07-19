@@ -3,6 +3,7 @@
 
 {% block title %}Preview {{ survey.title }} | SurveySolver{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/builder.css' %}">{% endblock %}
+{% block footer %}{% endblock %}
 
 {% block content %}
 {% include 'surveys/partials/builder_topbar.html' with active='preview' %}

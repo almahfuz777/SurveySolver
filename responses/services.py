@@ -193,10 +193,11 @@ def _validated_eligibility(version, user, screener_data):
 
 
 def _ensure_quota_available(version):
+    if version.response_limit is None:
+        return
     completed = version.submissions.filter(status=Submission.Status.COMPLETED).count()
-    for quota in version.quotas.filter(is_active=True, criteria={}):
-        if completed >= quota.limit:
-            raise QuotaReached('This survey has reached its response quota.')
+    if completed >= version.response_limit:
+        raise QuotaReached('This survey has reached its response limit.')
 
 
 @transaction.atomic
@@ -532,7 +533,9 @@ def complete_submission(submission_id, user, session_key, data):
     if submission.status == Submission.Status.COMPLETED:
         return submission
 
-    Survey.objects.select_for_update().get(pk=submission.survey_id)
+    survey = Survey.objects.select_for_update().get(pk=submission.survey_id)
+    if survey.status != Survey.Status.PUBLISHED:
+        raise ResponseUnavailable('This survey is not accepting responses.')
     duplicate_filter = Q(session_key_hash=submission.session_key_hash)
     if submission.respondent_id:
         duplicate_filter |= Q(respondent_id=submission.respondent_id)

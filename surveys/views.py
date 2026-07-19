@@ -14,11 +14,11 @@ from .forms import (
     EligibilityCriteriaForm,
     QuestionBranchForm,
     QuestionEditorForm,
-    QuotaForm,
+    ResponseLimitForm,
     SectionForm,
     SurveyMetadataForm,
 )
-from .models import BranchRule, Question, Quota, Section, Survey, SurveyVersion
+from .models import BranchRule, Question, Section, Survey, SurveyVersion
 
 
 @login_required
@@ -51,16 +51,31 @@ def survey_detail(request, survey_id):
 def survey_edit(request, survey_id):
     survey = get_accessible_survey(request.user, survey_id, EDIT_ROLES)
     version = survey.draft_version
+    wants_json = (
+        'application/json' in request.headers.get('Accept', '')
+        or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or request.POST.get('autosave') == '1'
+    )
     form = SurveyMetadataForm(instance=survey)
-    quota_form = QuotaForm()
+    response_limit_form = ResponseLimitForm(
+        initial={
+            'enabled': version.response_limit is not None if version else False,
+            'response_limit': version.response_limit if version else None,
+        }
+    )
     criteria = getattr(version, 'eligibility_criteria', None) if version else None
     eligibility_form = EligibilityCriteriaForm(
         initial={
+            'restrict_age': bool(criteria and (criteria.min_age is not None or criteria.max_age is not None)),
             'min_age': criteria.min_age if criteria else None,
             'max_age': criteria.max_age if criteria else None,
+            'restrict_education': bool(criteria and criteria.education_levels),
             'education_levels': criteria.education_levels if criteria else [],
+            'restrict_countries': bool(criteria and criteria.countries),
             'countries': criteria.countries if criteria else [],
+            'restrict_genders': bool(criteria and criteria.genders),
             'genders': criteria.genders if criteria else [],
+            'restrict_employment': bool(criteria and criteria.employment_statuses),
             'employment_statuses': criteria.employment_statuses if criteria else [],
         }
     )
@@ -71,31 +86,57 @@ def survey_edit(request, survey_id):
                 form = SurveyMetadataForm(request.POST, request.FILES, instance=survey)
                 if form.is_valid():
                     form.save()
+                    if wants_json:
+                        return JsonResponse({'revision': version.revision if version else None})
                     messages.success(request, 'Survey settings saved.')
                     return redirect('survey_edit', survey_id=survey.id)
-            elif action == 'add_quota' and version:
-                quota_form = QuotaForm(request.POST)
-                if quota_form.is_valid():
-                    services.add_quota(version.id, _revision(request), quota_form.cleaned_data)
-                    messages.success(request, 'Quota added.')
+            elif action == 'update_response_limit' and version:
+                response_limit_form = ResponseLimitForm(request.POST)
+                if response_limit_form.is_valid():
+                    revision = services.update_response_limit(
+                        version.id,
+                        _revision(request),
+                        response_limit_form.cleaned_data['response_limit'],
+                    )
+                    if wants_json:
+                        return JsonResponse({'revision': revision})
+                    messages.success(request, 'Response limit updated.')
                     return redirect('survey_edit', survey_id=survey.id)
-            elif action == 'delete_quota' and version:
-                quota = get_object_or_404(Quota, id=request.POST.get('quota_id'), version=version)
-                services.delete_quota(quota.id, _revision(request))
-                messages.success(request, 'Quota removed.')
-                return redirect('survey_edit', survey_id=survey.id)
             elif action == 'update_eligibility' and version:
                 eligibility_form = EligibilityCriteriaForm(request.POST)
                 if eligibility_form.is_valid():
-                    services.update_eligibility(version.id, _revision(request), eligibility_form.cleaned_data)
+                    _, revision = services.update_eligibility(
+                        version.id,
+                        _revision(request),
+                        eligibility_form.cleaned_data,
+                    )
+                    if wants_json:
+                        return JsonResponse({'revision': revision})
                     messages.success(request, 'Eligibility criteria updated.')
                     return redirect('survey_edit', survey_id=survey.id)
         except (services.StaleVersionError, ValidationError) as error:
+            if wants_json:
+                message = (
+                    'This survey changed in another tab. Reload before continuing.'
+                    if isinstance(error, services.StaleVersionError)
+                    else '; '.join(error.messages)
+                )
+                return JsonResponse({'error': message}, status=409 if isinstance(error, services.StaleVersionError) else 422)
             if isinstance(error, services.StaleVersionError):
                 messages.error(request, 'This survey changed in another tab. Reload before continuing.')
             else:
                 messages.error(request, '; '.join(error.messages))
             return redirect('survey_edit', survey_id=survey.id)
+
+        if wants_json:
+            action_forms = {
+                'metadata': form,
+                'update_eligibility': eligibility_form,
+                'update_response_limit': response_limit_form,
+            }
+            invalid_form = action_forms.get(action)
+            errors = invalid_form.errors.get_json_data() if invalid_form else {}
+            return JsonResponse({'error': 'Check the highlighted settings.', 'errors': errors}, status=422)
 
     return render(
         request,
@@ -104,7 +145,7 @@ def survey_edit(request, survey_id):
             'form': form,
             'survey': survey,
             'version': version,
-            'quota_form': quota_form,
+            'response_limit_form': response_limit_form,
             'eligibility_form': eligibility_form,
             'readiness_errors': readiness_errors(version) if version else [],
             'page_title': 'Survey settings',
@@ -119,6 +160,21 @@ def survey_archive(request, survey_id):
     survey.archive()
     messages.success(request, 'Survey archived.')
     return redirect('survey_list')
+
+
+@require_POST
+@login_required
+def survey_response_collection(request, survey_id):
+    survey = get_accessible_survey(request.user, survey_id, OWNER_ROLES)
+    accepting = request.POST.get('accepting') == 'on'
+    try:
+        services.set_response_collection(survey.id, accepting)
+    except ValidationError as error:
+        messages.error(request, '; '.join(error.messages))
+    else:
+        state = 'accepting responses' if accepting else 'paused'
+        messages.success(request, f'“{survey.title}” is now {state}.')
+    return redirect('survey_edit', survey_id=survey.id)
 
 
 @require_POST

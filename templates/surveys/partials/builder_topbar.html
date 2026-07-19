@@ -10,7 +10,11 @@
                     <div class="field-errors" data-errors-for="title"></div>
                 </form>
             {% else %}
-                <h1 class="builder-title-static">{{ survey.title }}</h1>
+                {% if active == 'settings' %}
+                    <div class="builder-title-static">{{ survey.title }}</div>
+                {% else %}
+                    <h1 class="builder-title-static">{{ survey.title }}</h1>
+                {% endif %}
             {% endif %}
             <span class="builder-save-status" data-save-status aria-live="polite"><span class="save-dot" aria-hidden="true"></span><span data-save-text>All changes saved</span></span>
         </div>
@@ -30,10 +34,10 @@
                         <ul>{% for error in readiness_errors %}<li>{{ error }}</li>{% endfor %}</ul>
                     </details>
                 {% else %}
-                    <form method="post" action="{% url 'survey_publish' survey.id %}">
+                    <form method="post" action="{% url 'survey_publish' survey.id %}"{% if active == 'settings' %} data-settings-publish{% endif %}>
                         {% csrf_token %}
                         <input type="hidden" name="revision" value="{{ version.revision }}">
-                        <button class="button button-primary button-small" type="submit">{% include 'partials/icon.html' with name='publish' size='15' %} {% if survey.status == 'published' %}Publish changes{% else %}Publish{% endif %}</button>
+                        <button class="button button-primary button-small" type="submit" aria-label="{% if survey.status == 'published' %}Publish changes{% else %}Publish survey{% endif %}">{% include 'partials/icon.html' with name='publish' size='15' %}<span class="builder-publish-label">{% if survey.status == 'published' %}Publish changes{% else %}Publish{% endif %}</span></button>
                     </form>
                 {% endif %}
             {% endif %}

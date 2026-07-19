@@ -59,6 +59,7 @@ def _clone_version(source, created_by):
         survey=source.survey,
         number=source.number + 1,
         created_by=created_by,
+        response_limit=source.response_limit,
     )
     section_map = {}
     question_map = {}

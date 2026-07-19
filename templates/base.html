@@ -43,8 +43,21 @@
                 {% if user.is_authenticated %}
                     <a href="{% url 'dashboard' %}">Dashboard</a>
                     <a href="{% url 'survey_list' %}">My surveys</a>
-                    <a href="{% url 'profile_detail' %}">Profile</a>
-                    <a class="button button-quiet button-small" href="{% url 'account_logout' %}">Sign out</a>
+                    <div class="account-menu">
+                        <button type="button" class="account-trigger" id="account-menu-button" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu">
+                            {% if user.profile.avatar_url %}
+                                <img class="account-avatar" src="{{ user.profile.avatar_url }}" alt="">
+                            {% else %}
+                                <span class="account-avatar account-avatar-fallback">{{ user.first_name|default:user.email|first|upper }}</span>
+                            {% endif %}
+                            <span class="sr-only">Account menu</span>
+                        </button>
+                        <div class="account-dropdown" id="account-menu" role="menu" aria-labelledby="account-menu-button">
+                            <a role="menuitem" href="{% url 'profile_detail' %}">Profile</a>
+                            <a role="menuitem" href="#">Settings</a>
+                            <a role="menuitem" href="{% url 'account_logout' %}">Sign out</a>
+                        </div>
+                    </div>
                 {% elif request.resolver_match.url_name != 'account_login' and request.resolver_match.url_name != 'account_signup' %}
                     <a href="{% url 'account_login' %}">Sign in</a>
                 {% endif %}
@@ -66,7 +79,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="site-footer">
+    {% block footer %}<footer class="site-footer">
         <div class="shell footer-inner">
             <div class="footer-brand">
                 <a class="brand brand-footer" href="{% url 'home' %}">SurveySolver</a>
@@ -82,6 +95,6 @@
             <p>&copy; {% now "Y" %} SurveySolver. All rights reserved.</p>
             {% comment %} <p>Created by Mahfuz · Built for better research.</p> {% endcomment %}
         </div>
-    </footer>
+    </footer>{% endblock %}
 </body>
 </html>

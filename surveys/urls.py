@@ -10,6 +10,7 @@ urlpatterns = [
     path('<uuid:survey_id>/', views.survey_detail, name='survey_detail'),
     path('<uuid:survey_id>/edit/', views.survey_edit, name='survey_edit'),
     path('<uuid:survey_id>/archive/', views.survey_archive, name='survey_archive'),
+    path('<uuid:survey_id>/responses/collection/', views.survey_response_collection, name='survey_response_collection'),
     path('<uuid:survey_id>/rename/', views.survey_rename, name='survey_rename'),
     path('<uuid:survey_id>/delete/', views.survey_delete, name='survey_delete'),
     path('<uuid:survey_id>/restore/', views.survey_restore, name='survey_restore'),

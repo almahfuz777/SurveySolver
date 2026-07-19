@@ -52,6 +52,7 @@ class ResearchProfileForm(forms.ModelForm):
     class Meta:
         model = Profile
         fields = (
+            'avatar',
             'birth_date',
             'gender',
             'gender_self_description',

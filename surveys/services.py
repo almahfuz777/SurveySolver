@@ -1,8 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Max
+from django.utils import timezone
 
-from .models import BranchRule, EligibilityCriteria, MatrixRow, Question, QuestionChoice, Quota, Section, SurveyVersion
+from .models import BranchRule, EligibilityCriteria, MatrixRow, Question, QuestionChoice, Section, Survey, SurveyVersion
 
 
 class StaleVersionError(Exception):
@@ -145,15 +146,6 @@ def add_branch_rule(version_id, expected_revision, cleaned_data):
 
 
 @transaction.atomic
-def add_quota(version_id, expected_revision, cleaned_data):
-    version = _lock_version(version_id, expected_revision)
-    quota = Quota(version=version, **cleaned_data)
-    quota.full_clean()
-    quota.save()
-    return quota, _bump_revision(version)
-
-
-@transaction.atomic
 def delete_branch_rule(rule_id, expected_revision):
     rule = BranchRule.objects.select_related('version').get(pk=rule_id)
     version = _lock_version(rule.version_id, expected_revision)
@@ -162,21 +154,47 @@ def delete_branch_rule(rule_id, expected_revision):
 
 
 @transaction.atomic
-def delete_quota(quota_id, expected_revision):
-    quota = Quota.objects.select_related('version').get(pk=quota_id)
-    version = _lock_version(quota.version_id, expected_revision)
-    quota.delete()
+def update_response_limit(version_id, expected_revision, response_limit):
+    version = _lock_version(version_id, expected_revision)
+    version.response_limit = response_limit
+    version.save(update_fields=('response_limit',))
     return _bump_revision(version)
 
 
 @transaction.atomic
 def update_eligibility(version_id, expected_revision, cleaned_data):
     version = _lock_version(version_id, expected_revision)
+    criteria_fields = (
+        'min_age',
+        'max_age',
+        'education_levels',
+        'countries',
+        'genders',
+        'employment_statuses',
+    )
     criteria, _ = EligibilityCriteria.objects.update_or_create(
         version=version,
-        defaults=cleaned_data,
+        defaults={field: cleaned_data[field] for field in criteria_fields},
     )
     return criteria, _bump_revision(version)
+
+
+@transaction.atomic
+def set_response_collection(survey_id, accepting):
+    survey = Survey.objects.select_for_update().get(pk=survey_id)
+    if survey.status not in {Survey.Status.PUBLISHED, Survey.Status.CLOSED}:
+        raise ValidationError('Only published surveys can accept or pause responses.')
+    if accepting and not survey.versions.filter(status=SurveyVersion.Status.PUBLISHED).exists():
+        raise ValidationError('Publish a survey version before accepting responses.')
+
+    target_status = Survey.Status.PUBLISHED if accepting else Survey.Status.CLOSED
+    if survey.status == target_status:
+        return survey
+
+    survey.status = target_status
+    survey.closed_at = None if accepting else timezone.now()
+    survey.save(update_fields=('status', 'closed_at', 'updated_at'))
+    return survey
 
 
 @transaction.atomic

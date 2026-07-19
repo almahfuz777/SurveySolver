@@ -89,12 +89,12 @@ class ResponseRuntimeTests(TestCase):
         self.question = self.published.sections.order_by('order').first().questions.get()
         return self.published.sections.order_by('order').last().questions.get()
 
-    def add_total_quota(self, limit=1):
+    def add_response_limit(self, limit=1):
         draft = self.survey.draft_version
-        _, revision = survey_services.add_quota(
+        revision = survey_services.update_response_limit(
             draft.id,
             draft.revision,
-            {'name': 'Total responses', 'limit': limit, 'is_active': True},
+            limit,
         )
         self.published, _ = publish_survey(self.survey.id, self.owner, revision)
         self.survey.refresh_from_db()
@@ -454,8 +454,8 @@ class ResponseRuntimeTests(TestCase):
         self.assertEqual(submission.status, Submission.Status.IN_PROGRESS)
         self.assertFalse(submission.answers.filter(question=second_question).exists())
 
-    def test_quota_is_checked_atomically_again_at_completion(self):
-        self.add_total_quota(limit=1)
+    def test_response_limit_is_checked_again_at_completion(self):
+        self.add_response_limit(limit=1)
         first_browser = self.client
         second_browser = self.client_class()
         first_browser.post(reverse('respond_survey', args=[self.survey.slug]))
@@ -473,12 +473,12 @@ class ResponseRuntimeTests(TestCase):
         )
 
         self.assertEqual(blocked.status_code, 422)
-        self.assertContains(blocked, 'reached its response quota', status_code=422)
+        self.assertContains(blocked, 'reached its response limit', status_code=422)
         submissions[1].refresh_from_db()
         self.assertEqual(submissions[1].status, Submission.Status.IN_PROGRESS)
 
-    def test_full_quota_blocks_new_starts(self):
-        self.add_total_quota(limit=1)
+    def test_full_response_limit_blocks_new_starts(self):
+        self.add_response_limit(limit=1)
         self.start()
         submission = Submission.objects.get()
         self.client.post(
@@ -491,5 +491,20 @@ class ResponseRuntimeTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, 'reached its response quota', status_code=403)
+        self.assertContains(response, 'reached its response limit', status_code=403)
         self.assertEqual(Submission.objects.count(), 1)
+
+    def test_pausing_collection_blocks_an_in_progress_completion(self):
+        self.start()
+        submission = Submission.objects.get()
+        survey_services.set_response_collection(self.survey.id, False)
+
+        response = self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Saved for later'},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertContains(response, 'not accepting responses', status_code=422)
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, Submission.Status.IN_PROGRESS)

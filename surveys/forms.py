@@ -3,7 +3,13 @@ from django_countries import countries
 
 from accounts.models import Profile
 
-from .models import BranchRule, Question, Quota, Section, Survey, Topic
+from .models import BranchRule, Question, Section, Survey, Topic
+
+
+
+
+class PillCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
+    template_name = 'surveys/widgets/pill_select.html'
 
 
 class SurveyMetadataForm(forms.ModelForm):
@@ -14,35 +20,28 @@ class SurveyMetadataForm(forms.ModelForm):
     class Meta:
         model = Survey
         fields = (
-            'title',
-            'summary',
-            'description',
             'topics',
             'visibility',
             'identity_mode',
             'estimated_minutes',
-            'banner',
         )
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 6}),
-            'topics': forms.CheckboxSelectMultiple(),
-        }
-        labels = {
-            'banner': 'Cover image',
+            'topics': PillCheckboxSelectMultiple(attrs={'maxselect': 3}),
+            'visibility': forms.RadioSelect(),
+            'identity_mode': forms.RadioSelect(),
+            'estimated_minutes': forms.NumberInput(attrs={'data-stepper-input': 'estimated_minutes', 'min': 1, 'max': 120}),
         }
         help_texts = {
-            'summary': 'A concise explanation shown on survey discovery cards.',
-            'topics': 'Select up to five subjects that accurately describe this research.',
+            'topics': 'Select up to three subjects that accurately describe this research.',
             'visibility': 'Discoverable surveys can appear in matched respondent feeds.',
             'identity_mode': 'Identified collection requires explicit respondent consent.',
             'estimated_minutes': 'A realistic completion estimate between 1 and 120 minutes.',
-            'banner': 'Optional JPG, PNG, or WebP image up to 5 MB, shown on cards and the survey header.',
         }
 
     def clean_topics(self):
         topics = self.cleaned_data['topics']
-        if topics.count() > 5:
-            raise forms.ValidationError('Select no more than five topics.')
+        if topics.count() > 3:
+            raise forms.ValidationError('Select no more than three topics.')
         return topics
 
 
@@ -211,28 +210,122 @@ class QuestionBranchForm(forms.ModelForm):
         return cleaned_data
 
 
-class QuotaForm(forms.ModelForm):
-    class Meta:
-        model = Quota
-        fields = ('name', 'limit', 'is_active')
-
-
-class EligibilityCriteriaForm(forms.Form):
-    min_age = forms.IntegerField(required=False, min_value=0, max_value=120)
-    max_age = forms.IntegerField(required=False, min_value=0, max_value=120)
-    education_levels = forms.MultipleChoiceField(
+class ResponseLimitForm(forms.Form):
+    enabled = forms.BooleanField(
         required=False,
-        choices=Profile.EducationLevel.choices,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'response-limit-fields'}
+        ),
     )
-    countries = forms.MultipleChoiceField(required=False, choices=countries)
-    genders = forms.MultipleChoiceField(required=False, choices=Profile.Gender.choices)
-    employment_statuses = forms.MultipleChoiceField(
+    response_limit = forms.IntegerField(
         required=False,
-        choices=Profile.EmploymentStatus.choices,
+        min_value=1,
+        max_value=10_000_000,
+        widget=forms.NumberInput(
+            attrs={
+                'inputmode': 'numeric',
+                'min': 1,
+                'max': 10_000_000,
+                'placeholder': 'e.g. 500',
+            }
+        ),
     )
 
     def clean(self):
         cleaned_data = super().clean()
+        if cleaned_data.get('enabled'):
+            if cleaned_data.get('response_limit') is None:
+                self.add_error('response_limit', 'Enter the maximum number of completed responses.')
+        else:
+            cleaned_data['response_limit'] = None
+        return cleaned_data
+
+
+class EligibilityCriteriaForm(forms.Form):
+    restrict_age = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'age-restrictions'}
+        ),
+    )
+    min_age = forms.IntegerField(
+        required=False,
+        min_value=0,
+        max_value=120,
+        widget=forms.NumberInput(attrs={'class': 'age-input', 'placeholder': 'No minimum'}),
+    )
+    max_age = forms.IntegerField(
+        required=False,
+        min_value=0,
+        max_value=120,
+        widget=forms.NumberInput(attrs={'class': 'age-input', 'placeholder': 'No maximum'}),
+    )
+    restrict_education = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'education-restrictions'}
+        ),
+    )
+    education_levels = forms.MultipleChoiceField(
+        required=False,
+        choices=Profile.EducationLevel.choices,
+        widget=PillCheckboxSelectMultiple(),
+    )
+    countries = forms.MultipleChoiceField(
+        required=False,
+        choices=countries,
+        widget=PillCheckboxSelectMultiple(),
+    )
+    restrict_countries = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'country-restrictions'}
+        ),
+    )
+    restrict_genders = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'gender-restrictions'}
+        ),
+    )
+    genders = forms.MultipleChoiceField(
+        required=False,
+        choices=Profile.Gender.choices,
+        widget=PillCheckboxSelectMultiple(),
+    )
+    restrict_employment = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'employment-restrictions'}
+        ),
+    )
+    employment_statuses = forms.MultipleChoiceField(
+        required=False,
+        choices=Profile.EmploymentStatus.choices,
+        widget=PillCheckboxSelectMultiple(),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get('restrict_age'):
+            cleaned_data['min_age'] = None
+            cleaned_data['max_age'] = None
+        elif cleaned_data.get('min_age') is None and cleaned_data.get('max_age') is None:
+            self.add_error('min_age', 'Enter a minimum or maximum age.')
+
+        restricted_fields = (
+            ('restrict_genders', 'genders', 'Select at least one gender.'),
+            ('restrict_employment', 'employment_statuses', 'Select at least one employment status.'),
+            ('restrict_education', 'education_levels', 'Select at least one education level.'),
+            ('restrict_countries', 'countries', 'Select at least one country.'),
+        )
+        for toggle, field_name, message in restricted_fields:
+            if cleaned_data.get(toggle):
+                if not cleaned_data.get(field_name):
+                    self.add_error(field_name, message)
+            else:
+                cleaned_data[field_name] = []
+
         minimum = cleaned_data.get('min_age')
         maximum = cleaned_data.get('max_age')
         if minimum is not None and maximum is not None and minimum > maximum:
