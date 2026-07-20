@@ -186,7 +186,12 @@ a.rv-q:focus-visible { border-color: var(--indigo-500); outline: none; box-shado
 
 /* ---------- Add question ---------- */
 
-.add-question-wrap { position: relative; margin: 1.1rem 0 0; }
+.builder-add-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.1rem 0 0; }
+.builder-add-bar .add-question-wrap { flex: 1 1 14rem; }
+.builder-add-bar .add-section-form { flex: 0 0 auto; margin: 0; }
+.add-section-cta { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 100%; min-height: 3.15rem; padding: 0.9rem 1.25rem; color: var(--ink-700); background: var(--surface-raised); border: 1.5px dashed var(--border-strong); border-radius: 0.95rem; cursor: pointer; font-size: 0.86rem; font-weight: 700; white-space: nowrap; transition: background 140ms ease, border-color 140ms ease, color 140ms ease; }
+.add-section-cta:hover { color: var(--indigo-700); background: var(--indigo-50); border-color: var(--indigo-300); }
+.add-question-wrap { position: relative; }
 .add-question-cta { display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; padding: 0.9rem 1.1rem; color: var(--indigo-700); background: var(--indigo-50); border: 1.5px dashed var(--indigo-300); border-radius: 0.95rem; cursor: pointer; font-size: 0.86rem; font-weight: 700; transition: background 140ms ease, border-color 140ms ease; }
 .add-question-cta:hover, .add-question-cta[aria-expanded='true'] { background: var(--indigo-100); border-color: var(--indigo-500); }
 .add-popover { position: absolute; right: 0; bottom: calc(100% + 0.5rem); left: 0; z-index: 20; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem; padding: 0.6rem; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 1rem; box-shadow: var(--shadow-pop); }
@@ -203,6 +208,7 @@ form.add-popover button.add-chip:focus-visible { outline: 2px solid var(--indigo
 .insp-headings { display: grid; flex: 1; min-width: 0; }
 .insp-headings strong { overflow: hidden; font-size: 0.92rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .insp-headings small { overflow: hidden; color: var(--ink-600); font-size: 0.72rem; text-overflow: ellipsis; white-space: nowrap; }
+.insp-head-actions { display: contents; }
 .insp-head .icon-button { flex: 0 0 auto; }
 .insp-head .icon-button-danger { color: var(--danger); background: var(--danger-soft); }
 .insp-head .insp-required { flex: 0 0 auto; margin: 0; }
@@ -433,15 +439,45 @@ form.add-popover button.add-chip:focus-visible { outline: 2px solid var(--indigo
 .studio-preview .canvas-inner { max-width: 44rem; }
 .studio-preview .rv-head { justify-content: flex-start; }
 
+/* ---------- Mobile drawers (rail + inspector) ---------- */
+
+/* Hidden on desktop; revealed by the responsive rules below. */
+.builder-rail-toggle { display: none; align-items: center; justify-content: center; flex: 0 0 2.4rem; width: 2.4rem; height: 2.4rem; color: var(--ink-600); background: var(--surface-muted); border: 0; border-radius: 0.65rem; cursor: pointer; }
+.builder-rail-toggle:hover { color: var(--indigo-700); background: var(--indigo-50); }
+.rail-close, .insp-mobile-head, .rv-open-inspector { display: none; }
+.studio-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(23, 22, 43, 0.5); opacity: 0; visibility: hidden; transition: opacity 200ms ease, visibility 200ms ease; }
+.studio-backdrop.is-open { opacity: 1; visibility: visible; }
+body.studio-drawer-open { overflow: hidden; }
+.insp-mobile-head { align-items: center; justify-content: space-between; margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+.insp-mobile-title { font-size: 0.95rem; font-weight: 800; }
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1200px) {
     :root { --rail-w: 13.5rem; --inspector-w: 21rem; }
 }
 
+/* Below 1080px the rail collapses into a slide-in drawer opened via the
+   topbar hamburger. Inspector stays a visible column down to 900px. */
 @media (max-width: 1080px) {
     .studio { grid-template-columns: minmax(0, 1fr) var(--inspector-w); }
-    .studio-rail { display: none; }
+    .builder-rail-toggle { display: inline-flex; }
+    .rail-close { display: inline-flex; }
+    .studio-rail {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 55;
+        width: min(19rem, 84vw);
+        height: 100%;
+        border-right: 1px solid var(--border);
+        border-radius: 0 1rem 1rem 0;
+        box-shadow: var(--shadow-pop);
+        transform: translateX(-100%);
+        transition: transform 220ms ease;
+    }
+    .studio-rail.is-open { transform: translateX(0); }
 }
 
 @media (max-width: 900px) {
@@ -451,8 +487,39 @@ form.add-popover button.add-chip:focus-visible { outline: 2px solid var(--indigo
     .builder-tabs a { flex: 1; justify-content: center; }
     .builder-meta { display: none; }
     .studio { display: block; }
-    .studio-inspector { position: static; height: auto; margin: 0.75rem 1rem 1.5rem; border: 1px solid var(--border); border-left: 1px solid var(--border); border-radius: 1rem; box-shadow: var(--shadow-sm); }
-    .studio-inspector.is-inline { margin: 0.85rem -0.5rem; border-radius: 0.9rem; }
+
+    /* Inspector becomes a right-hand slide-in drawer, opened when a question
+       is selected (or via the responder-view tap). */
+    .studio-inspector {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 55;
+        width: min(26rem, 92vw);
+        height: 100%;
+        margin: 0;
+        border: 0;
+        border-left: 1px solid var(--border);
+        border-radius: 1rem 0 0 1rem;
+        box-shadow: var(--shadow-pop);
+        transform: translateX(100%);
+        transition: transform 220ms ease;
+    }
+    .studio-inspector.is-open { transform: translateX(0); }
+    .insp-mobile-head { display: flex; }
+
+    /* Reopen affordance: after dismissing the inspector drawer, the selected
+       card keeps a Settings pill to slide it back in. */
+    .rv-open-inspector { display: inline-flex; align-items: center; gap: 0.3rem; position: absolute; top: -0.7rem; right: 1rem; padding: 0.2rem 0.65rem; color: var(--indigo-700); background: var(--surface-raised); border: 1px solid var(--indigo-300); border-radius: 999px; cursor: pointer; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+    .rv-open-inspector:hover { background: var(--indigo-50); }
+
+    /* Give the question number + section their own full-width row so they no
+       longer get truncated by the Required toggle and delete button. */
+    .insp-head { flex-wrap: wrap; }
+    .insp-headings strong, .insp-headings small { white-space: normal; overflow: visible; }
+    .insp-head-actions { display: flex; align-items: center; gap: 0.6rem; flex: 1 1 100%; order: 2; justify-content: flex-end; margin-top: 0.25rem; }
+
     .canvas-inner { padding: 1rem 1rem 1.5rem; }
     .rv-card { padding: 1.25rem 1rem 1.1rem; }
     .rv-q { margin-inline: -0.5rem; padding-inline: 0.6rem; }
@@ -460,7 +527,7 @@ form.add-popover button.add-chip:focus-visible { outline: 2px solid var(--indigo
 
 @media (max-width: 560px) {
     .builder-topbar { gap: 0.45rem 0.6rem; padding-inline: 0.65rem; }
-    .builder-title-form input, .builder-title-static { width: clamp(5.5rem, 32vw, 8rem); }
+    .builder-title-form input, .builder-title-static { width: clamp(5.5rem, 30vw, 8rem); }
     .builder-save-status { min-width: 0; }
     .builder-tabs { min-width: 0; }
     .builder-tabs a { min-width: 0; gap: 0.3rem; padding: 0.45rem 0.5rem; font-size: 0.78rem; }
@@ -468,4 +535,6 @@ form.add-popover button.add-chip:focus-visible { outline: 2px solid var(--indigo
     .builder-topbar-actions .button svg { margin: 0; }
     .builder-publish-label { display: none; }
     .insp-grid { grid-template-columns: 1fr; }
+    .builder-add-bar { flex-direction: column; }
+    .builder-add-bar .add-section-form .add-section-cta { width: 100%; }
 }

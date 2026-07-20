@@ -627,29 +627,84 @@ if (builder) {
         });
     });
 
-    // ---------- Inspector placement on small screens ----------
+    // ---------- Mobile drawers (structure rail + inspector) ----------
+    // On small screens the rail and inspector collapse into slide-in panels.
+    // A shared backdrop dims the canvas; only one drawer is open at a time.
 
-    if (inspector) {
-        const home = document.createComment('inspector-home');
-        inspector.before(home);
-        const narrow = window.matchMedia('(max-width: 900px)');
-        const placeInspector = () => {
-            if (narrow.matches && selectedCard) {
-                selectedCard.after(inspector);
-                inspector.classList.add('is-inline');
-            } else if (inspector.previousSibling !== home) {
-                home.after(inspector);
-                inspector.classList.remove('is-inline');
-            }
+    (() => {
+        const railToggle = document.querySelector('[data-rail-toggle]');
+        const railClose = document.querySelector('[data-rail-close]');
+        const inspectorClose = document.querySelector('[data-inspector-close]');
+        if (!rail && !inspector) return;
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'studio-backdrop';
+        backdrop.setAttribute('hidden', '');
+        document.body.append(backdrop);
+
+        const railDrawer = window.matchMedia('(max-width: 1080px)');
+        const inspectorDrawer = window.matchMedia('(max-width: 900px)');
+
+        const syncBackdrop = () => {
+            const open = (rail && rail.classList.contains('is-open')) ||
+                (inspector && inspector.classList.contains('is-open'));
+            backdrop.classList.toggle('is-open', open);
+            backdrop.toggleAttribute('hidden', !open);
+            document.body.classList.toggle('studio-drawer-open', open);
         };
-        if (narrow.addEventListener) narrow.addEventListener('change', placeInspector);
-        let resizeTimer;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(placeInspector, 150);
+        const closeRail = () => {
+            if (rail) rail.classList.remove('is-open');
+            if (railToggle) railToggle.setAttribute('aria-expanded', 'false');
+            syncBackdrop();
+        };
+        const openRail = () => {
+            if (!rail) return;
+            if (inspector) inspector.classList.remove('is-open');
+            rail.classList.add('is-open');
+            if (railToggle) railToggle.setAttribute('aria-expanded', 'true');
+            syncBackdrop();
+        };
+        const closeInspector = () => {
+            if (inspector) inspector.classList.remove('is-open');
+            syncBackdrop();
+        };
+        const openInspector = () => {
+            if (!inspector) return;
+            closeRail();
+            inspector.classList.add('is-open');
+            syncBackdrop();
+        };
+        const closeAll = () => { closeRail(); closeInspector(); };
+
+        if (railToggle) railToggle.addEventListener('click', () => {
+            if (rail && rail.classList.contains('is-open')) closeRail(); else openRail();
         });
-        placeInspector();
-    }
+        if (railClose) railClose.addEventListener('click', closeRail);
+        if (inspectorClose) inspectorClose.addEventListener('click', closeInspector);
+        document.querySelectorAll('[data-inspector-open]').forEach((btn) => btn.addEventListener('click', openInspector));
+        backdrop.addEventListener('click', closeAll);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeAll();
+        });
+
+        // Tapping a question navigates (full reload) with ?question=… ; when the
+        // page comes back on a small screen, slide the inspector in so its
+        // settings are immediately reachable. A default selection (no explicit
+        // ?question in the URL) must not cover the canvas on arrival.
+        const cameFromTap = new URLSearchParams(window.location.search).has('question');
+        if (inspectorDrawer.matches && selectedCard && cameFromTap) openInspector();
+
+        // Leaving drawer widths must reset transient state so the desktop grid
+        // shows both panels normally.
+        const onWidthChange = () => {
+            if (!railDrawer.matches) closeRail();
+            if (!inspectorDrawer.matches) closeInspector();
+        };
+        if (railDrawer.addEventListener) {
+            railDrawer.addEventListener('change', onWidthChange);
+            inspectorDrawer.addEventListener('change', onWidthChange);
+        }
+    })();
 
     // ---------- Selection scroll continuity ----------
 

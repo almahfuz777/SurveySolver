@@ -1,5 +1,6 @@
 <header class="builder-topbar">
     <div class="builder-topbar-lead">
+        {% if active == 'questions' %}<button type="button" class="builder-rail-toggle" data-rail-toggle aria-label="Show survey structure" aria-expanded="false">{% include 'partials/icon.html' with name='menu' %}</button>{% endif %}
         <a class="builder-back" href="{% url 'survey_list' %}" aria-label="Back to my surveys">{% include 'partials/icon.html' with name='arrow-left' %}</a>
         <div class="builder-title">
             {% if active == 'questions' %}

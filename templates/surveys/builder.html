@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="rail-head">
             <span class="rail-heading">Structure</span>
             <span class="rail-total">{{ question_total }} Q{{ question_total|pluralize }}</span>
+            <button type="button" class="icon-button rail-close" data-rail-close aria-label="Close structure panel">{% include 'partials/icon.html' with name='close' size='16' %}</button>
         </div>
         {% for section in sections %}
             <div class="rail-section{% if selected_question.section_id == section.id %} is-current{% endif %}" data-section-id="{{ section.id }}" data-rail-section>
@@ -143,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             {% if selected_question.id == question.id %}
                                 <div class="rv-q is-editing" id="question-{{ question.id }}" data-selected-card>
                                     <span class="editing-chip">{% include 'partials/icon.html' with name='edit' size='11' %} Editing</span>
+                                    <button type="button" class="rv-open-inspector" data-inspector-open aria-label="Open question settings">{% include 'partials/icon.html' with name='settings' size='13' %} Settings</button>
                                     {% include 'surveys/partials/question_view.html' with editable=True %}
                                     <div class="rv-q-toolbar" data-q-toolbar>
                                         <div class="rv-tool-group">
@@ -183,24 +185,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 {% endfor %}
             </div>
 
-            {% if toolbar_section_id %}
-                <div class="add-question-wrap">
-                    <button type="button" class="add-question-cta" data-add-toggle aria-expanded="false" aria-controls="add-question-popover">{% include 'partials/icon.html' with name='plus' size='16' %} Add question</button>
-                    <form class="add-popover" id="add-question-popover" method="post" action="{% url 'question_add' survey.id %}" aria-label="Choose a question type" data-add-popover hidden>
-                        {% csrf_token %}
-                        <input type="hidden" name="revision" value="{{ version.revision }}">
-                        <input type="hidden" name="section_id" value="{{ toolbar_section_id }}">
-                        {% if selected_question %}<input type="hidden" name="after_question_id" value="{{ selected_question.id }}">{% endif %}
-                        {% for value, label in question_types %}
-                            <button class="add-chip" type="submit" name="type" value="{{ value }}">{% include 'surveys/partials/type_icon.html' with type=value size='15' %} {{ label }}</button>
-                        {% endfor %}
-                    </form>
-                </div>
-            {% endif %}
+            <div class="builder-add-bar">
+                {% if toolbar_section_id %}
+                    <div class="add-question-wrap">
+                        <button type="button" class="add-question-cta" data-add-toggle aria-expanded="false" aria-controls="add-question-popover">{% include 'partials/icon.html' with name='plus' size='16' %} Add question</button>
+                        <form class="add-popover" id="add-question-popover" method="post" action="{% url 'question_add' survey.id %}" aria-label="Choose a question type" data-add-popover hidden>
+                            {% csrf_token %}
+                            <input type="hidden" name="revision" value="{{ version.revision }}">
+                            <input type="hidden" name="section_id" value="{{ toolbar_section_id }}">
+                            {% if selected_question %}<input type="hidden" name="after_question_id" value="{{ selected_question.id }}">{% endif %}
+                            {% for value, label in question_types %}
+                                <button class="add-chip" type="submit" name="type" value="{{ value }}">{% include 'surveys/partials/type_icon.html' with type=value size='15' %} {{ label }}</button>
+                            {% endfor %}
+                        </form>
+                    </div>
+                {% endif %}
+                <form class="add-section-form" method="post" action="{% url 'section_add' survey.id %}">
+                    {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                    <button type="submit" class="add-section-cta">{% include 'partials/icon.html' with name='plus' size='16' %} Add section</button>
+                </form>
+            </div>
         </div>
     </main>
 
     <aside class="studio-inspector" aria-label="Question settings" data-inspector>
+        <div class="insp-mobile-head">
+            <span class="insp-mobile-title">Question settings</span>
+            <button type="button" class="icon-button insp-close" data-inspector-close aria-label="Close question settings">{% include 'partials/icon.html' with name='close' size='18' %}</button>
+        </div>
         {% if selected_question %}
             <form class="autosave-form question-autosave" method="post" action="{% url 'question_update' survey.id selected_question.id %}">
                 {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
@@ -211,11 +223,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         <strong>Question {{ selected_question.number }}</strong>
                         <small>{{ selected_question.section.title }}</small>
                     </div>
-                    <label class="insp-required insp-required-compact" title="Respondents must answer this question">
-                        <span class="insp-required-text"><strong>Required</strong></span>
-                        <span class="switch">{{ editor_form.required }}<span class="switch-track" aria-hidden="true"></span></span>
-                    </label>
-                    <button class="icon-button icon-button-danger" type="submit" form="delete-question-{{ selected_question.id }}" title="Delete question" aria-label="Delete question">{% include 'partials/icon.html' with name='trash' size='16' %}</button>
+                    <div class="insp-head-actions">
+                        <label class="insp-required insp-required-compact" title="Respondents must answer this question">
+                            <span class="insp-required-text"><strong>Required</strong></span>
+                            <span class="switch">{{ editor_form.required }}<span class="switch-track" aria-hidden="true"></span></span>
+                        </label>
+                        <button class="icon-button icon-button-danger" type="submit" form="delete-question-{{ selected_question.id }}" title="Delete question" aria-label="Delete question">{% include 'partials/icon.html' with name='trash' size='16' %}</button>
+                    </div>
                 </div>
 
                 <div class="insp-group">
