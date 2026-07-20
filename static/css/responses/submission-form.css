@@ -10,7 +10,7 @@
 
 .response-question { border: 0; border-bottom: 1px solid var(--border); margin: 0; padding: 1.75rem clamp(1rem, 4vw, 2rem); }
 .response-question:last-child { border-bottom: 0; }
-.response-question.has-error { background: #fff7f7; box-shadow: inset 3px 0 #dc2626; }
+.response-question.has-error { background: var(--danger-soft); box-shadow: inset 3px 0 var(--danger); }
 .response-question legend { color: var(--text); font-size: 1.02rem; font-weight: 700; padding: 0; width: 100%; }
 .question-number { align-items: center; background: var(--indigo-50); border-radius: 50%; color: var(--indigo-700); display: inline-flex; font-size: 0.76rem; height: 1.65rem; justify-content: center; margin-right: 0.4rem; width: 1.65rem; }
 
@@ -25,7 +25,7 @@
 .scale-options { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
 .scale-options label input { position: absolute; opacity: 0; }
 .scale-options label span { align-items: center; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; display: flex; height: 2.8rem; justify-content: center; min-width: 2.8rem; }
-.scale-options input:checked + span { background: var(--indigo-700); border-color: var(--indigo-700); color: white; }
+.scale-options input:checked + span { background: var(--brand-strong); border-color: var(--brand-strong); color: white; }
 .scale-options input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
 .scale-labels { color: var(--text-muted); display: flex; font-size: 0.8rem; justify-content: space-between; max-width: 30rem; }
 .matrix-scroll { margin-top: 1rem; overflow-x: auto; }

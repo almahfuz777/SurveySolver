@@ -1,6 +1,7 @@
 /* Global design tokens, layout, components, forms, and accessibility */
 
 :root {
+    /* Brand ramps (fixed hues) */
     --ink-950: #17162b;
     --ink-800: #302e4d;
     --ink-600: #5d5a78;
@@ -17,13 +18,39 @@
     --teal-200: #99f6e4;
     --teal-100: #ccfbf1;
     --teal-50: #f0fdfa;
+
+    /* Solid brand fills (stay saturated in dark; always pair with white text) */
+    --brand: #4f46e5;
+    --brand-strong: #4338ca;
+
+    /* Theme-aware surfaces */
     --surface: #ffffff;
+    --surface-raised: #ffffff;
     --surface-muted: #f6f7fb;
+    --surface-sunken: #eceef4;
     --surface-warm: #fbfaf7;
+    --surface-glass: rgba(255, 255, 255, 0.9);
+    --footer-bg: #17162b;
+
+    /* Borders */
     --border: #e3e4ec;
-    --danger: #b42318;
+    --border-strong: #c9cad6;
+
+    /* Text */
     --text: var(--ink-950);
     --text-muted: var(--ink-600);
+    --text-faint: #a3a1b5;
+
+    /* Status tints */
+    --danger: #b42318;
+    --danger-strong: #b91c1c;
+    --danger-soft: #fef2f2;
+    --danger-border: #fecaca;
+    --warn-soft: #fef3c7;
+    --warn-border: #fcd34d;
+    --warn-text: #92400e;
+    --info-soft: #f5f6ff;
+
     --focus: rgba(20, 184, 166, 0.5);
     --shadow-sm: 0 1px 2px rgba(23, 22, 43, 0.06);
     --shadow-md: 0 16px 40px rgba(49, 46, 129, 0.12);
@@ -34,6 +61,54 @@
     --shell: 74rem;
 }
 
+/* Dark theme: remap ramps + surfaces in one place. The inline head guard
+   resolves "system" to a concrete light/dark, so CSS only ever sees this. */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    /* Text ramp flips light (ink-950 no longer used as a surface — see --footer-bg) */
+    --ink-950: #f3f2fb;
+    --ink-800: #d8d6e8;
+    --ink-600: #a6a2c1;
+
+    /* Accent ramps: text ends lighten, tint ends darken */
+    --indigo-700: #aab4ff;
+    --indigo-600: #9aa3fb;
+    --indigo-300: #5a5896;
+    --indigo-100: #2b2552;
+    --indigo-50: #221d45;
+    --teal-700: #6fe3d0;
+    --teal-200: #1f5f57;
+    --teal-100: #123f3a;
+    --teal-50: #0f2f2c;
+
+    --surface: #17162b;
+    --surface-raised: #201f39;
+    --surface-muted: #262440;
+    --surface-sunken: #110f22;
+    --surface-warm: #1c1a33;
+    --surface-glass: rgba(23, 22, 43, 0.85);
+
+    --border: #322e4c;
+    --border-strong: #423d60;
+
+    --text: var(--ink-950);
+    --text-muted: var(--ink-600);
+    --text-faint: #7d7a99;
+
+    --danger: #f87171;
+    --danger-soft: rgba(239, 68, 68, 0.16);
+    --danger-border: rgba(239, 68, 68, 0.34);
+    --warn-soft: rgba(217, 119, 6, 0.18);
+    --warn-border: rgba(252, 211, 77, 0.32);
+    --warn-text: #fbcf5b;
+    --info-soft: rgba(99, 102, 241, 0.12);
+
+    --focus: rgba(45, 212, 191, 0.55);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+
 *,
 *::before,
 *::after {
@@ -41,14 +116,13 @@
 }
 
 html {
-    color-scheme: light;
     scroll-behavior: smooth;
 }
 
 body {
     margin: 0;
     min-height: 100vh;
-    color: var(--ink-950);
+    color: var(--text);
     background: var(--surface);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.6;
@@ -115,8 +189,8 @@ a {
     position: sticky;
     top: 0;
     z-index: 50;
-    border-bottom: 1px solid rgba(227, 228, 236, 0.8);
-    background: rgba(255, 255, 255, 0.9);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-glass);
     backdrop-filter: blur(18px);
 }
 
@@ -132,7 +206,7 @@ a {
     display: inline-flex;
     align-items: center;
     gap: 0.7rem;
-    color: var(--ink-950);
+    color: var(--text);
     font-weight: 800;
     letter-spacing: -0.03em;
     text-decoration: none;
@@ -144,7 +218,7 @@ a {
     height: 2rem;
     place-items: center;
     color: white;
-    background: linear-gradient(145deg, var(--indigo-700), var(--indigo-500));
+    background: linear-gradient(145deg, var(--brand-strong), var(--indigo-500));
     border-radius: 0.7rem;
     box-shadow: 0 6px 16px rgba(67, 56, 202, 0.25);
 }
@@ -156,7 +230,7 @@ a {
 
 .brand-mark .brand-check {
     fill: none;
-    stroke: var(--indigo-700);
+    stroke: var(--brand-strong);
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-width: 2.4;
@@ -169,7 +243,7 @@ a {
 }
 
 .primary-nav > a:not(.button) {
-    color: var(--ink-600);
+    color: var(--text-muted);
     font-size: 0.94rem;
     font-weight: 650;
     text-decoration: none;
@@ -177,6 +251,72 @@ a {
 
 .primary-nav > a:not(.button):hover {
     color: var(--indigo-700);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Theme switcher — segmented light / system / dark, lives in the account menu */
+.account-theme {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.account-theme-label {
+    padding-inline: 0.35rem;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.theme-switcher {
+    display: flex;
+    gap: 0.15rem;
+    padding: 0.2rem;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+}
+
+.theme-option {
+    display: inline-grid;
+    flex: 1;
+    height: 2rem;
+    place-items: center;
+    color: var(--text-muted);
+    background: none;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color 140ms ease, background 140ms ease;
+}
+
+.theme-option svg {
+    width: 1.05rem;
+    height: 1.05rem;
+}
+
+.theme-option:hover {
+    color: var(--text);
+}
+
+.theme-option[aria-pressed="true"] {
+    color: var(--indigo-700);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-sm);
+}
+
+.theme-option:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
 }
 
 .account-menu {
@@ -199,7 +339,7 @@ a {
     height: 2.25rem;
     place-items: center;
     color: white;
-    background: linear-gradient(145deg, var(--indigo-700), var(--indigo-500));
+    background: linear-gradient(145deg, var(--brand-strong), var(--indigo-500));
     border-radius: 999px;
     object-fit: cover;
     font-size: 0.9rem;
@@ -220,7 +360,7 @@ a {
     flex-direction: column;
     min-width: 10rem;
     padding: 0.4rem;
-    background: var(--surface);
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
@@ -232,7 +372,7 @@ a {
 
 .account-dropdown a {
     padding: 0.55rem 0.7rem;
-    color: var(--ink-950);
+    color: var(--text);
     font-size: 0.9rem;
     font-weight: 600;
     text-decoration: none;
@@ -249,7 +389,7 @@ a {
     height: 2.75rem;
     padding: 0.7rem;
     border: 1px solid var(--border);
-    background: white;
+    background: var(--surface-raised);
     border-radius: var(--radius-sm);
 }
 
@@ -257,7 +397,7 @@ a {
     display: block;
     height: 2px;
     margin: 4px 0;
-    background: var(--ink-950);
+    background: var(--text);
 }
 
 .button {
@@ -286,14 +426,14 @@ a {
 
 .button-primary {
     color: white;
-    background: linear-gradient(135deg, var(--indigo-700), var(--indigo-500));
+    background: linear-gradient(135deg, var(--brand-strong), var(--indigo-500));
     box-shadow: 0 8px 20px rgba(67, 56, 202, 0.23);
 }
 
 .button-secondary,
 .button-quiet {
     color: var(--indigo-700);
-    background: white;
+    background: var(--surface-raised);
     border-color: var(--border);
     box-shadow: var(--shadow-sm);
 }
@@ -314,8 +454,8 @@ a {
 
 .message {
     padding: 0.85rem 1rem;
-    border: 1px solid var(--indigo-100);
-    background: #f5f6ff;
+    border: 1px solid var(--border);
+    background: var(--info-soft);
     border-radius: var(--radius-sm);
 }
 
@@ -389,14 +529,14 @@ a {
 }
 
 .section-heading p {
-    color: var(--ink-600);
+    color: var(--text-muted);
     font-size: 1.05rem;
 }
 
 .feature-card,
 .panel,
 .metric-card {
-    background: white;
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
@@ -417,7 +557,7 @@ a {
 .metric-card > span,
 .metric-card small {
     display: block;
-    color: var(--ink-600);
+    color: var(--text-muted);
 }
 
 .metric-card strong {
@@ -473,7 +613,7 @@ a {
 .progress-panel p {
     max-width: 28rem;
     margin: 0;
-    color: var(--ink-600);
+    color: var(--text-muted);
 }
 
 .progress-panel {
@@ -496,7 +636,7 @@ a {
     position: absolute;
     width: 6.4rem;
     height: 6.4rem;
-    background: white;
+    background: var(--surface-raised);
     border-radius: 50%;
 }
 
@@ -507,7 +647,7 @@ a {
     font-weight: 850;
 }
 
-.completion-page { align-items: center; background: linear-gradient(145deg, var(--indigo-50), var(--surface-warm)); display: flex; min-height: calc(100vh - 12rem); padding: 4rem 0; }
+.completion-page { align-items: center; background: linear-gradient(145deg, var(--surface-muted), var(--surface-warm)); display: flex; min-height: calc(100vh - 12rem); padding: 4rem 0; }
 .completion-shell { display: flex; justify-content: center; }
 .completion-card { max-width: 38rem; padding: clamp(2rem, 7vw, 4rem); text-align: center; }
 .completion-card .completion-mark { height: 4rem; margin-bottom: 1.25rem; width: 4rem; }
@@ -521,7 +661,8 @@ a {
 .site-footer {
     padding-block: 3rem;
     color: #c9c8dd;
-    background: var(--ink-950);
+    background: var(--footer-bg);
+    border-top: 1px solid var(--border);
 }
 
 .page-heading {
@@ -680,9 +821,9 @@ form textarea {
     width: 100%;
     min-height: 3rem;
     padding: 0.7rem 0.8rem;
-    color: var(--ink-950);
-    background: white;
-    border: 1px solid #c9cad6;
+    color: var(--text);
+    background: var(--surface-raised);
+    border: 1px solid var(--border-strong);
     border-radius: 0.65rem;
 }
 
@@ -707,7 +848,7 @@ form button[type="submit"] {
     min-height: 2.9rem;
     padding: 0.7rem 1.15rem;
     color: white;
-    background: var(--indigo-700);
+    background: var(--brand-strong);
     border: 0;
     border-radius: 0.75rem;
     font-weight: 750;
@@ -717,7 +858,7 @@ form button[type="submit"] {
 .errorlist {
     padding: 0.75rem 1rem;
     color: var(--danger);
-    background: #fff1f0;
+    background: var(--danger-soft);
     border-radius: var(--radius-sm);
     list-style: none;
 }
@@ -725,13 +866,13 @@ form button[type="submit"] {
 .helptext {
     display: block;
     margin-top: 0.35rem;
-    color: var(--ink-600);
+    color: var(--text-muted);
     font-size: 0.82rem;
 }
 
-.status-label { display: inline-flex; width: fit-content; padding: 0.25rem 0.55rem; color: var(--ink-600); background: #ececf2; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.status-label { display: inline-flex; width: fit-content; padding: 0.25rem 0.55rem; color: var(--text-muted); background: var(--surface-muted); border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
 .status-published { color: var(--teal-700); background: var(--teal-100); }
-.status-closed, .status-archived { color: #6b6474; background: #eeeaf0; }
+.status-closed, .status-archived { color: var(--text-muted); background: var(--surface-muted); }
 
 .field-group ul:not(.errorlist) { display: grid; gap: 0.45rem; margin: 0.5rem 0 0; padding: 0; grid-template-columns: repeat(2, 1fr); list-style: none; }
 .field-group ul:not(.errorlist) label { display: flex; align-items: center; gap: 0.55rem; margin: 0; padding: 0.7rem; background: var(--surface-muted); border-radius: var(--radius-sm); }
@@ -743,7 +884,7 @@ form button[type="submit"] {
 
 .section-number { color: var(--indigo-700); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 
-.required-mark, .field-error { color: #b91c1c; }
+.required-mark, .field-error { color: var(--danger); }
 .question-help { color: var(--text-muted); font-size: 0.9rem; margin: 0.5rem 0 1rem; }
 .field-error { font-size: 0.88rem; font-weight: 650; margin: 0.5rem 0; }
 
@@ -766,7 +907,7 @@ form button[type="submit"] {
         padding: 1rem;
         align-items: stretch;
         flex-direction: column;
-        background: white;
+        background: var(--surface-raised);
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
         box-shadow: var(--shadow-md);

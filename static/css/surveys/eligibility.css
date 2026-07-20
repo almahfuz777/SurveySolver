@@ -10,7 +10,7 @@
 }
 
 .eligibility-rule {
-    background: var(--surface);
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: 0.85rem;
 }
@@ -78,9 +78,9 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.55rem 0.8rem;
-    border: 1px solid #c9cad6;
+    border: 1px solid var(--border-strong);
     border-radius: 0.65rem;
-    background: var(--surface);
+    background: var(--surface-raised);
     flex: 1;
 }
 
@@ -111,7 +111,7 @@
     color: var(--text-muted);
 }
 
-.age-range-sep { font-size: 0.75rem; font-weight: 600; color: #a3a1b5; }
+.age-range-sep { font-size: 0.75rem; font-weight: 600; color: var(--text-faint); }
 
 /* Pill select (topics, genders, education, employment) */
 .pill-select {
@@ -149,8 +149,8 @@
 .pill-select label:has(input:checked) {
     color: #fff;
     font-weight: 600;
-    background: var(--indigo-700);
-    border-color: var(--indigo-700);
+    background: var(--brand-strong);
+    border-color: var(--brand-strong);
 }
 
 .pill-select label input:focus-visible {
@@ -220,7 +220,7 @@
     padding: 0.35rem 0.4rem 0.35rem 0.75rem;
     font-size: 0.76rem;
     font-weight: 600;
-    color: var(--indigo-900);
+    color: var(--indigo-700);
     background: var(--indigo-100);
     border-radius: 999px;
 }
@@ -246,7 +246,7 @@
     padding: 0.6rem 0.8rem;
     font-size: 0.85rem;
     color: var(--text);
-    border: 1px solid #c9cad6;
+    border: 1px solid var(--border-strong);
     border-radius: 0.65rem;
     outline: 0;
 }
@@ -264,10 +264,10 @@
     z-index: 10;
     margin-top: 0.3rem;
     padding: 0.4rem;
-    background: var(--surface);
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
-    box-shadow: 0 12px 30px rgba(23, 22, 43, 0.14);
+    box-shadow: var(--shadow-md);
 }
 
 .country-dropdown .pill-select {
@@ -301,7 +301,7 @@
 }
 
 .country-dropdown .pill-select label:has(input:checked) {
-    color: var(--indigo-900);
+    color: var(--indigo-700);
     font-weight: 700;
     background: var(--indigo-50);
 }

@@ -39,7 +39,7 @@
 .filter-actions { display: flex; gap: 0.65rem; }
 .export-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .55rem; justify-content: flex-end; }
 .export-actions span { color: var(--text-muted); font-size: .82rem; margin-right: .25rem; }
-.response-row-excluded { background: #fff7ed; opacity: 0.82; }
+.response-row-excluded { background: var(--warn-soft); opacity: 0.82; }
 .response-management { border-top: 1px solid var(--border); display: grid; gap: 0.7rem; margin-top: 1.2rem; padding-top: 1rem; }
 .response-management h3 { font-size: 0.9rem; margin: 0; }
 .response-management form { display: grid; gap: 0.55rem; }

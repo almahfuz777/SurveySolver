@@ -7,10 +7,10 @@
 }
 
 .auth-shell {
-    background: var(--surface);
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow: 0 24px 70px rgba(23, 22, 43, 0.1);
+    box-shadow: var(--shadow-md);
     display: grid;
     grid-template-columns: minmax(18rem, 0.68fr) minmax(32rem, 1.32fr);
     max-width: 74rem;
@@ -93,8 +93,8 @@
 }
 
 .auth-tab.is-active {
-    background: var(--surface);
-    box-shadow: 0 1px 3px rgba(23, 22, 43, 0.12);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-sm);
     color: var(--indigo-700);
 }
 
@@ -145,8 +145,8 @@
 }
 
 .auth-field input:not([type='hidden']) {
-    background: white;
-    border: 1px solid #cfd1dc;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-strong);
     border-radius: 0.75rem;
     min-height: 2.85rem;
     padding: 0.6rem 0.85rem;
@@ -154,7 +154,7 @@
 }
 
 .auth-field input:not([type='hidden']):hover {
-    border-color: #a9acbb;
+    border-color: var(--text-faint);
 }
 
 .auth-field input:not([type='hidden']):focus {

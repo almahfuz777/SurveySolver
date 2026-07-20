@@ -44,6 +44,42 @@ if (accountTrigger && accountDropdown) {
     });
 }
 
+const themeOptions = document.querySelectorAll('.theme-option');
+
+if (themeOptions.length) {
+    const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const getMode = () => localStorage.getItem('theme') || 'system';
+
+    const applyMode = (mode) => {
+        const dark = mode === 'dark' || (mode === 'system' && darkQuery.matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        themeOptions.forEach((option) => {
+            option.setAttribute('aria-pressed', String(option.dataset.themeChoice === mode));
+        });
+    };
+
+    themeOptions.forEach((option) => {
+        option.addEventListener('click', () => {
+            const mode = option.dataset.themeChoice;
+            if (mode === 'system') {
+                localStorage.removeItem('theme');
+            } else {
+                localStorage.setItem('theme', mode);
+            }
+            applyMode(mode);
+        });
+    });
+
+    darkQuery.addEventListener('change', () => {
+        if (getMode() === 'system') {
+            applyMode('system');
+        }
+    });
+
+    applyMode(getMode());
+}
+
 document.querySelectorAll('[data-copy-previous]').forEach((button) => {
     button.addEventListener('click', async () => {
         const input = button.previousElementSibling;

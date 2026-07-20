@@ -6,7 +6,7 @@
     background:
         radial-gradient(circle at 8% 12%, rgba(20, 184, 166, 0.12), transparent 30rem),
         radial-gradient(circle at 88% 30%, rgba(99, 102, 241, 0.14), transparent 34rem),
-        linear-gradient(180deg, #fdfdff, #f7f7fc);
+        linear-gradient(180deg, var(--surface), var(--surface-muted));
 }
 
 .hero-grid {
@@ -64,8 +64,8 @@
     z-index: 2;
     width: min(100%, 24rem);
     overflow: hidden;
-    background: white;
-    border: 1px solid rgba(255, 255, 255, 0.8);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
     transform: rotate(1.5deg);
@@ -142,8 +142,8 @@
     display: flex;
     padding: 0.8rem 1rem;
     flex-direction: column;
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid white;
+    background: var(--surface-glass);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
     backdrop-filter: blur(12px);
@@ -254,7 +254,7 @@
 .analytics-preview {
     margin: 0;
     padding: clamp(1rem, 2.5vw, 1.5rem);
-    background: var(--surface);
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
@@ -495,7 +495,7 @@
     display: flex;
     gap: 1rem;
     padding: 1.25rem;
-    background: var(--surface);
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
@@ -575,7 +575,7 @@
     place-items: center;
     width: 7rem;
     height: 7rem;
-    color: var(--ink-950);
+    color: #17162b;
     background: linear-gradient(145deg, #fef3c7, #f59e0b);
     border: 5px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
@@ -610,8 +610,8 @@
     align-items: center;
     gap: 0.55rem;
     padding: 0.65rem 0.75rem;
-    color: var(--ink-950);
-    background: rgba(255, 255, 255, 0.9);
+    color: var(--text);
+    background: var(--surface-raised);
     border-radius: var(--radius-sm);
     font-size: 0.72rem;
     font-weight: 800;

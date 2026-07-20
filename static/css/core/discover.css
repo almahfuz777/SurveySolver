@@ -49,7 +49,7 @@
 }
 
 .discovery-card {
-    background: var(--surface);
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
@@ -59,7 +59,7 @@
 }
 
 .discovery-card-media {
-    background: linear-gradient(135deg, var(--indigo-700), var(--teal-600));
+    background: linear-gradient(135deg, var(--brand-strong), var(--teal-600));
     background-position: center;
     background-size: cover;
     display: flex;

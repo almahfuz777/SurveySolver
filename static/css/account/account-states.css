@@ -8,7 +8,7 @@ main > section[aria-labelledby="sign-out-heading"] {
     min-height: 36rem;
     margin: 4rem auto;
     padding: 2rem;
-    background: white;
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);

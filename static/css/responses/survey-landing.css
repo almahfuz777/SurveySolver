@@ -1,7 +1,7 @@
 /* Respondent survey landing and eligibility */
 
 .response-hero {
-    background: linear-gradient(145deg, #eef2ff 0%, var(--surface-warm) 60%, #ecfdf5 100%);
+    background: linear-gradient(145deg, var(--indigo-50) 0%, var(--surface-warm) 60%, var(--teal-50) 100%);
     min-height: calc(100vh - 8rem);
     padding: clamp(3rem, 8vw, 7rem) 0;
 }
@@ -24,10 +24,10 @@
 .response-summary { color: var(--text-muted); font-size: 1.2rem; max-width: 52rem; }
 .response-description { max-width: 52rem; }
 .survey-meta { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.5rem 0 1rem; }
-.survey-meta span { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); font-size: 0.88rem; padding: 0.45rem 0.8rem; }
+.survey-meta span { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); font-size: 0.88rem; padding: 0.45rem 0.8rem; }
 .topic-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
 
-.identity-consent { background: rgba(255, 255, 255, 0.72); border: 1px solid var(--border); border-radius: var(--radius-lg); display: grid; gap: 0.55rem; margin: 1.5rem 0; max-width: 38rem; padding: 1.2rem; }
+.identity-consent { background: var(--surface-glass); border: 1px solid var(--border); border-radius: var(--radius-lg); display: grid; gap: 0.55rem; margin: 1.5rem 0; max-width: 38rem; padding: 1.2rem; }
 .identity-consent legend { color: var(--text); font-weight: 800; padding: 0 0.35rem; }
 .identity-consent p { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 0.5rem; }
 .identity-consent > label:not(.consent-check) { font-size: 0.85rem; font-weight: 700; }
