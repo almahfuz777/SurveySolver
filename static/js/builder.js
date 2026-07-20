@@ -481,20 +481,62 @@ if (builder) {
         });
     }
 
-    // ---------- Logic shortcut ----------
+    // ---------- Canvas question toolbar toggles ----------
+    // Mirror the in-canvas Required/Shuffle switches to the inspector's real
+    // form fields so they ride the existing autosave debounce, and reflect
+    // inspector-side changes back onto the canvas switches.
+    if (editorForm) {
+        const linkToggle = (canvasSelector, fieldName) => {
+            const canvas = document.querySelector(canvasSelector);
+            const field = editorForm.querySelector(`[name="${fieldName}"]`);
+            if (!canvas || !field) return;
+            canvas.addEventListener('change', () => {
+                if (field.checked === canvas.checked) return;
+                field.checked = canvas.checked;
+                field.dispatchEvent(new Event('change', {bubbles: true}));
+            });
+            field.addEventListener('change', () => { canvas.checked = field.checked; });
+        };
+        linkToggle('[data-canvas-required]', 'required');
+        linkToggle('[data-canvas-shuffle]', 'randomize_choices');
+    }
 
-    document.querySelectorAll('[data-logic-shortcut]').forEach((button) => {
-        button.addEventListener('click', () => {
-            const panel = document.getElementById('question-logic-panel');
-            if (!panel) return;
-            panel.hidden = !panel.hidden;
-            if (!panel.hidden) {
-                panel.scrollIntoView({block: 'center', behavior: 'smooth'});
-                const firstField = panel.querySelector('select, input[type="text"]');
+    // ---------- Branch rule editor ----------
+    const branchForm = document.querySelector('[data-logic-form]');
+    if (branchForm) {
+        // "Is answered" needs no comparison value; only "go to section" needs a
+        // target section. Hide each conditional field when it doesn't apply.
+        const toggleField = (control, field, showWhen) => {
+            if (!control || !field) return;
+            const sync = () => { field.style.display = control.value === showWhen ? '' : 'none'; };
+            control.addEventListener('change', sync);
+            sync();
+        };
+        const invert = (control, field, hideWhen) => {
+            if (!control || !field) return;
+            const sync = () => { field.style.display = control.value === hideWhen ? 'none' : ''; };
+            control.addEventListener('change', sync);
+            sync();
+        };
+        invert(branchForm.querySelector('[data-branch-operator]'), branchForm.querySelector('[data-branch-value]'), 'answered');
+        toggleField(branchForm.querySelector('[data-branch-action]'), branchForm.querySelector('[data-branch-target]'), 'go_to_section');
+    }
+
+    // ---------- Branching logic add toggle ----------
+    // The branching section is always visible; the "+" reveals its add form.
+    const logicAdd = document.querySelector('[data-logic-add]');
+    if (logicAdd && branchForm) {
+        logicAdd.addEventListener('click', () => {
+            const willOpen = branchForm.hidden;
+            branchForm.hidden = !willOpen;
+            logicAdd.setAttribute('aria-expanded', String(willOpen));
+            if (willOpen) {
+                const firstField = branchForm.querySelector('select, input[type="text"]');
                 if (firstField) firstField.focus({preventScroll: true});
+                branchForm.scrollIntoView({block: 'nearest', behavior: 'smooth'});
             }
         });
-    });
+    }
 
     // ---------- Add-question popover ----------
 
@@ -637,6 +679,94 @@ if (builder) {
     } catch (error) { /* ignore malformed storage */ }
     if (!restored && selectedCard && !window.location.hash) {
         selectedCard.scrollIntoView({block: 'center'});
+    }
+
+    // ---------- Rail drag-and-drop reordering ----------
+
+    if (rail) {
+        const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        const reorderTemplate = builder.dataset.reorderUrl || '';
+        const PLACEHOLDER = '00000000-0000-0000-0000-000000000000';
+        let dragRow = null;
+        let originSection = null;
+        let originNext = null;
+
+        const sectionOf = (node) => node.closest('[data-rail-section]');
+
+        // Find the row the dragged item should sit *before* for a given pointer
+        // Y within a section; null means "past the last row" (append).
+        const rowBefore = (section, y) => {
+            const rows = [...section.querySelectorAll('.rail-q-row:not(.is-dragging)')];
+            for (const row of rows) {
+                const box = row.getBoundingClientRect();
+                if (y < box.top + box.height / 2) return row;
+            }
+            return null;
+        };
+
+        const submitReorder = (questionId, sectionId, position) => {
+            if (!csrfInput || !reorderTemplate) return;
+            const revision = document.querySelector('input[name="revision"]');
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.action = reorderTemplate.replace(PLACEHOLDER, questionId);
+            const add = (name, value) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                form.append(input);
+            };
+            add('csrfmiddlewaretoken', csrfInput.value);
+            add('revision', revision ? revision.value : '');
+            add('section_id', sectionId);
+            add('position', position);
+            intentionalNav = true;
+            document.body.append(form);
+            form.submit();
+        };
+
+        rail.querySelectorAll('.rail-q-row').forEach((row) => {
+            row.setAttribute('draggable', 'true');
+            const link = row.querySelector('.rail-q');
+            if (link) link.setAttribute('draggable', 'false');
+            row.addEventListener('dragstart', (event) => {
+                dragRow = row;
+                originSection = sectionOf(row);
+                originNext = row.nextElementSibling;
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', row.dataset.questionId);
+                requestAnimationFrame(() => row.classList.add('is-dragging'));
+            });
+            row.addEventListener('dragend', () => {
+                row.classList.remove('is-dragging');
+                rail.querySelectorAll('[data-rail-section]').forEach((s) => s.classList.remove('is-drop-target'));
+                dragRow = null;
+            });
+        });
+
+        rail.querySelectorAll('[data-rail-section]').forEach((section) => {
+            section.addEventListener('dragover', (event) => {
+                if (!dragRow) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                rail.querySelectorAll('[data-rail-section]').forEach((s) => s.classList.toggle('is-drop-target', s === section));
+                const reference = rowBefore(section, event.clientY);
+                if (reference) section.insertBefore(dragRow, reference);
+                else section.append(dragRow);
+            });
+        });
+
+        rail.addEventListener('drop', (event) => {
+            if (!dragRow) return;
+            event.preventDefault();
+            const section = sectionOf(dragRow);
+            const rows = [...section.querySelectorAll('.rail-q-row')];
+            const position = rows.indexOf(dragRow);
+            // Skip a no-op drop (same slot) so we don't burn a revision/reload.
+            if (section === originSection && dragRow.nextElementSibling === originNext) return;
+            submitReorder(dragRow.dataset.questionId, section.dataset.sectionId, position);
+        });
     }
 
     // ---------- Unsaved-changes guard ----------

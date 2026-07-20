@@ -395,6 +395,26 @@ class BranchRule(models.Model):
         GO_TO_SECTION = 'go_to_section', 'Go to section'
         END_SURVEY = 'end_survey', 'End survey'
 
+    # Which conditions actually make sense to evaluate against each answer shape.
+    # e.g. "contains" is meaningless for a single-answer choice, "equals" is
+    # meaningless for a matrix whose answer is one value per row.
+    OPERATORS_BY_QUESTION_TYPE = {
+        Question.Type.SINGLE_CHOICE: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
+        Question.Type.DROPDOWN: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
+        Question.Type.MULTIPLE_CHOICE: (Operator.CONTAINS, Operator.ANSWERED),
+        Question.Type.RANKING: (Operator.ANSWERED,),
+        Question.Type.LIKERT_MATRIX: (Operator.ANSWERED,),
+        Question.Type.SCALE: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
+        Question.Type.NUMBER: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
+        Question.Type.SHORT_TEXT: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.CONTAINS, Operator.ANSWERED),
+        Question.Type.LONG_TEXT: (Operator.CONTAINS, Operator.ANSWERED),
+        Question.Type.DATE: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
+    }
+
+    @classmethod
+    def allowed_operators(cls, question_type):
+        return cls.OPERATORS_BY_QUESTION_TYPE.get(question_type, tuple(cls.Operator.values))
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     version = models.ForeignKey(SurveyVersion, on_delete=models.CASCADE, related_name='branch_rules')
     source_question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='branch_rules')

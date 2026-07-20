@@ -43,24 +43,25 @@ document.addEventListener('DOMContentLoaded', () => {
 {% block content %}
 {% include 'surveys/partials/builder_topbar.html' with active='questions' %}
 
-<div class="studio" data-builder data-survey-id="{{ survey.id }}">
+<div class="studio" data-builder data-survey-id="{{ survey.id }}" data-reorder-url="{% url 'question_reorder' survey.id '00000000-0000-0000-0000-000000000000' %}">
     <aside class="studio-rail" aria-label="Survey structure" data-rail>
         <div class="rail-head">
             <span class="rail-heading">Structure</span>
             <span class="rail-total">{{ question_total }} Q{{ question_total|pluralize }}</span>
         </div>
         {% for section in sections %}
-            <div class="rail-section{% if selected_question.section_id == section.id %} is-current{% endif %}">
+            <div class="rail-section{% if selected_question.section_id == section.id %} is-current{% endif %}" data-section-id="{{ section.id }}" data-rail-section>
                 <a class="rail-section-head" href="#section-{{ section.id }}">
                     <span class="rail-section-num">{{ forloop.counter|stringformat:'02d' }}</span>
                     <span class="rail-section-name">{{ section.title }}</span>
                     <span class="rail-section-count">{{ section.questions.all|length }}</span>
                 </a>
                 {% for question in section.questions.all %}
-                    <div class="rail-q-row{% if selected_question.id == question.id %} is-active{% endif %}">
+                    <div class="rail-q-row{% if selected_question.id == question.id %} is-active{% endif %}" data-question-id="{{ question.id }}">
                         <a class="rail-q" href="{% url 'survey_builder' survey.id %}?question={{ question.id }}#question-{{ question.id }}" data-select>
                             <span class="rail-q-icon">{% include 'surveys/partials/type_icon.html' with type=question.type size='13' %}</span>
                             <span class="rail-q-label">{{ question.prompt|truncatechars:30 }}</span>
+                            {% if question.has_branching %}<span class="rail-branch-badge" title="Has branching logic" aria-label="Has branching logic">{% include 'partials/icon.html' with name='logic' size='12' %}</span>{% endif %}
                         </a>
                         {% if section.questions.all|length > 1 %}
                             <form class="rail-q-tools" method="post" action="{% url 'question_move' survey.id question.id %}">
@@ -143,6 +144,32 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="rv-q is-editing" id="question-{{ question.id }}" data-selected-card>
                                     <span class="editing-chip">{% include 'partials/icon.html' with name='edit' size='11' %} Editing</span>
                                     {% include 'surveys/partials/question_view.html' with editable=True %}
+                                    <div class="rv-q-toolbar" data-q-toolbar>
+                                        <div class="rv-tool-group">
+                                            <form method="post" action="{% url 'question_move' survey.id question.id %}">
+                                                {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                                                <button class="icon-button" name="direction" value="up" title="Move up" aria-label="Move question up">{% include 'partials/icon.html' with name='arrow-up' size='16' %}</button>
+                                                <button class="icon-button" name="direction" value="down" title="Move down" aria-label="Move question down">{% include 'partials/icon.html' with name='arrow-down' size='16' %}</button>
+                                            </form>
+                                            <form method="post" action="{% url 'question_duplicate' survey.id question.id %}">
+                                                {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                                                <button class="icon-button" title="Duplicate" aria-label="Duplicate question">{% include 'partials/icon.html' with name='copy' size='16' %}</button>
+                                            </form>
+                                            <button class="icon-button icon-button-danger" type="submit" form="delete-question-{{ question.id }}" title="Delete" aria-label="Delete question">{% include 'partials/icon.html' with name='trash' size='16' %}</button>
+                                        </div>
+                                        <div class="rv-tool-group rv-tool-group-end">
+                                            <label class="rv-tool-toggle" title="Respondents must answer this question">
+                                                <span>Required</span>
+                                                <span class="switch"><input type="checkbox" data-canvas-required{% if question.required %} checked{% endif %}><span class="switch-track" aria-hidden="true"></span></span>
+                                            </label>
+                                            {% if question.accepts_choices %}
+                                                <label class="rv-tool-toggle" title="Randomize option order for each respondent">
+                                                    <span>Shuffle</span>
+                                                    <span class="switch"><input type="checkbox" data-canvas-shuffle{% if question.randomize_choices %} checked{% endif %}><span class="switch-track" aria-hidden="true"></span></span>
+                                                </label>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 </div>
                             {% else %}
                                 <a class="rv-q" id="question-{{ question.id }}" href="{% url 'survey_builder' survey.id %}?question={{ question.id }}#question-{{ question.id }}" data-select aria-label="Edit question {{ question.number }}: {{ question.prompt }}">
@@ -163,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         {% csrf_token %}
                         <input type="hidden" name="revision" value="{{ version.revision }}">
                         <input type="hidden" name="section_id" value="{{ toolbar_section_id }}">
+                        {% if selected_question %}<input type="hidden" name="after_question_id" value="{{ selected_question.id }}">{% endif %}
                         {% for value, label in question_types %}
                             <button class="add-chip" type="submit" name="type" value="{{ value }}">{% include 'surveys/partials/type_icon.html' with type=value size='15' %} {{ label }}</button>
                         {% endfor %}
@@ -174,24 +202,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <aside class="studio-inspector" aria-label="Question settings" data-inspector>
         {% if selected_question %}
-            <div class="insp-head">
-                <span class="insp-type-badge">{% include 'surveys/partials/type_icon.html' with type=selected_question.type size='16' %}</span>
-                <div class="insp-headings">
-                    <strong>Question {{ selected_question.number }}</strong>
-                    <small>Section · {{ selected_question.section.title }}</small>
-                </div>
-                <button class="icon-button icon-button-danger" type="submit" form="delete-question-{{ selected_question.id }}" title="Delete question" aria-label="Delete question">{% include 'partials/icon.html' with name='trash' size='16' %}</button>
-            </div>
-
             <form class="autosave-form question-autosave" method="post" action="{% url 'question_update' survey.id selected_question.id %}">
                 {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
 
-                <div class="insp-toprow">
+                <div class="insp-head">
+                    <span class="insp-type-badge">{% include 'surveys/partials/type_icon.html' with type=selected_question.type size='16' %}</span>
+                    <div class="insp-headings">
+                        <strong>Question {{ selected_question.number }}</strong>
+                        <small>{{ selected_question.section.title }}</small>
+                    </div>
                     <label class="insp-required insp-required-compact" title="Respondents must answer this question">
                         <span class="insp-required-text"><strong>Required</strong></span>
                         <span class="switch">{{ editor_form.required }}<span class="switch-track" aria-hidden="true"></span></span>
                     </label>
-                    <button type="button" class="insp-logic-shortcut" data-logic-shortcut>{% include 'partials/icon.html' with name='logic' size='14' %} {% if branch_rules %}Branching logic ({{ branch_rules|length }}){% else %}Add branching logic{% endif %}</button>
+                    <button class="icon-button icon-button-danger" type="submit" form="delete-question-{{ selected_question.id }}" title="Delete question" aria-label="Delete question">{% include 'partials/icon.html' with name='trash' size='16' %}</button>
                 </div>
 
                 <div class="insp-group">
@@ -248,27 +272,37 @@ document.addEventListener('DOMContentLoaded', () => {
             </form>
 
             <form id="move-question-{{ selected_question.id }}" method="post" action="{% url 'question_move' survey.id selected_question.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"></form>
+            <form id="duplicate-question-{{ selected_question.id }}" method="post" action="{% url 'question_duplicate' survey.id selected_question.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"></form>
             <form id="delete-question-{{ selected_question.id }}" method="post" action="{% url 'question_delete' survey.id selected_question.id %}" data-confirm="Delete this question?">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}"></form>
 
             <div class="insp-footer">
                 <button class="icon-button" form="move-question-{{ selected_question.id }}" name="direction" value="up" title="Move up" aria-label="Move question up">{% include 'partials/icon.html' with name='arrow-up' size='15' %}</button>
                 <button class="icon-button" form="move-question-{{ selected_question.id }}" name="direction" value="down" title="Move down" aria-label="Move question down">{% include 'partials/icon.html' with name='arrow-down' size='15' %}</button>
+                <button class="button button-secondary button-small insp-duplicate" form="duplicate-question-{{ selected_question.id }}" title="Duplicate question" aria-label="Duplicate question">{% include 'partials/icon.html' with name='copy' size='14' %} Duplicate</button>
             </div>
 
-            <div class="question-logic" id="question-logic-panel"{% if not branch_rules %} hidden{% endif %}>
-                <div class="question-logic-heading">{% include 'partials/icon.html' with name='logic' size='14' %} Branching logic</div>
+            <div class="question-logic" id="question-logic-panel">
+                <div class="question-logic-heading">
+                    <span class="question-logic-title">{% include 'partials/icon.html' with name='logic' size='14' %} Branching logic{% if branch_rules %} ({{ branch_rules|length }}){% endif %}</span>
+                    <button type="button" class="icon-button question-logic-add" data-logic-add title="Add rule" aria-label="Add branching rule" aria-expanded="false">{% include 'partials/icon.html' with name='plus' size='15' %}</button>
+                </div>
                 {% for rule in branch_rules %}
-                    <div class="question-logic-rule">
-                        <span>If answer {{ rule.get_operator_display|lower }}{% if rule.compare_value %} “{{ rule.compare_value }}”{% endif %} → {{ rule.get_action_display|lower }}{% if rule.target_section %}: {{ rule.target_section.title }}{% endif %}</span>
-                        <form method="post" action="{% url 'question_branch_delete' survey.id rule.id %}">
-                            {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
-                            <button class="icon-button icon-button-danger" type="submit" title="Remove rule" aria-label="Remove rule">{% include 'partials/icon.html' with name='trash' size='13' %}</button>
-                        </form>
+                    <div class="question-logic-item{% if rule.warnings %} has-warning{% endif %}">
+                        <div class="question-logic-rule">
+                            <span>If answer {{ rule.get_operator_display|lower }}{% if rule.compare_value %} “{{ rule.compare_value }}”{% endif %} → {{ rule.get_action_display|lower }}{% if rule.target_section %}: {{ rule.target_section.title }}{% endif %}</span>
+                            <form method="post" action="{% url 'question_branch_delete' survey.id rule.id %}">
+                                {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                                <button class="icon-button icon-button-danger" type="submit" title="Remove rule" aria-label="Remove rule">{% include 'partials/icon.html' with name='trash' size='13' %}</button>
+                            </form>
+                        </div>
+                        {% for warning in rule.warnings %}
+                            <p class="question-logic-warning">{% include 'partials/icon.html' with name='alert' size='13' %}<span>{{ warning }}</span></p>
+                        {% endfor %}
                     </div>
                 {% empty %}
                     <p class="question-logic-empty">Route respondents based on this answer.</p>
                 {% endfor %}
-                <form class="question-logic-form" method="post" action="{% url 'question_branch_add' survey.id selected_question.id %}">
+                <form class="question-logic-form" method="post" action="{% url 'question_branch_add' survey.id selected_question.id %}" data-logic-form hidden>
                     {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
                     <label class="sr-only" for="{{ branch_form.operator.id_for_label }}">Condition</label>
                     <span aria-hidden="true">If answer</span>

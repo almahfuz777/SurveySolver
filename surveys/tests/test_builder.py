@@ -63,6 +63,59 @@ class BuilderTests(TestCase):
         second.refresh_from_db()
         self.assertEqual((second.order, first.order), (1, 2))
 
+    def test_add_question_after_inserts_and_shifts_tail(self):
+        first, revision = services.add_question(self.section.id, Question.Type.SHORT_TEXT, self.version.revision)
+        second, revision = services.add_question(self.section.id, Question.Type.LONG_TEXT, revision)
+
+        inserted, revision = services.add_question(
+            self.section.id, Question.Type.NUMBER, revision, after_order=first.order
+        )
+
+        second.refresh_from_db()
+        self.assertEqual(inserted.order, 2)
+        self.assertEqual(second.order, 3)
+
+    def test_duplicate_question_clones_choices_after_original(self):
+        original, revision = services.add_question(self.section.id, Question.Type.SINGLE_CHOICE, self.version.revision)
+        tail, revision = services.add_question(self.section.id, Question.Type.SHORT_TEXT, revision)
+
+        clone, revision = services.duplicate_question(original.id, revision)
+
+        tail.refresh_from_db()
+        self.assertEqual(clone.order, original.order + 1)
+        self.assertEqual(tail.order, 3)
+        self.assertEqual(clone.type, original.type)
+        self.assertEqual(
+            list(clone.choices.order_by('order').values_list('label', flat=True)),
+            list(original.choices.order_by('order').values_list('label', flat=True)),
+        )
+        self.assertNotEqual(clone.id, original.id)
+
+    def test_reorder_question_moves_across_sections(self):
+        other, revision = services.add_section(self.version.id, self.version.revision)
+        first, revision = services.add_question(self.section.id, Question.Type.SHORT_TEXT, revision)
+        second, revision = services.add_question(self.section.id, Question.Type.LONG_TEXT, revision)
+
+        services.reorder_question(first.id, revision, other.id, 0)
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.section_id, other.id)
+        self.assertEqual(first.order, 1)
+        self.assertEqual(second.order, 1)
+
+    def test_reorder_question_within_section(self):
+        first, revision = services.add_question(self.section.id, Question.Type.SHORT_TEXT, self.version.revision)
+        second, revision = services.add_question(self.section.id, Question.Type.LONG_TEXT, revision)
+        third, revision = services.add_question(self.section.id, Question.Type.NUMBER, revision)
+
+        services.reorder_question(third.id, revision, self.section.id, 0)
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        third.refresh_from_db()
+        self.assertEqual((third.order, first.order, second.order), (1, 2, 3))
+
     def test_only_section_cannot_be_deleted(self):
         with self.assertRaisesMessage(
             ValidationError,

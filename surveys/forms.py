@@ -200,12 +200,42 @@ class QuestionBranchForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.instance.version = version
         self.instance.source_question = question
+        self.question = question
         self.fields['target_section'].queryset = Section.objects.filter(version=version)
+
+        # Only offer conditions that can actually match this question's answers.
+        allowed = BranchRule.allowed_operators(question.type)
+        self.fields['operator'].choices = [
+            (value, label) for value, label in BranchRule.Operator.choices if value in allowed
+        ]
+
+        # For choice questions the compared value must be one of the defined
+        # options, so pick from them instead of free-typing a value that can
+        # never match. Ranking/matrix only support "is answered" (no value).
+        value_from_choices = question.accepts_choices and question.type not in {
+            Question.Type.RANKING,
+            Question.Type.LIKERT_MATRIX,
+        }
+        if value_from_choices:
+            labels = list(question.choices.values_list('label', flat=True))
+            self.fields['compare_value'] = forms.ChoiceField(
+                required=False,
+                choices=[('', 'Choose an option…')] + [(label, label) for label in labels],
+            )
         self.fields['compare_value'].widget.attrs['placeholder'] = 'Answer value'
+        self.fields['compare_value'].widget.attrs['data-branch-value'] = ''
+        self.fields['operator'].widget.attrs['data-branch-operator'] = ''
+        self.fields['action'].choices = BranchRule.Action.choices
+        self.fields['action'].initial = BranchRule.Action.GO_TO_SECTION
+        self.fields['action'].widget.attrs['data-branch-action'] = ''
+        self.fields['target_section'].widget.attrs['data-branch-target'] = ''
 
     def clean(self):
         cleaned_data = super().clean()
-        if cleaned_data.get('operator') != BranchRule.Operator.ANSWERED and not cleaned_data.get('compare_value', '').strip():
+        operator = cleaned_data.get('operator')
+        if operator and operator not in BranchRule.allowed_operators(self.question.type):
+            self.add_error('operator', 'Choose a condition that fits this question type.')
+        if operator != BranchRule.Operator.ANSWERED and not cleaned_data.get('compare_value', '').strip():
             self.add_error('compare_value', 'Enter the answer value used by this condition.')
         return cleaned_data
 

@@ -29,29 +29,46 @@ def readiness_errors(version):
         if question.uses_matrix_rows and question.matrix_rows.count() < 2:
             errors.append(f'“{question.prompt}” needs at least two matrix statements.')
 
-    edges = {}
-    for rule in version.branch_rules.filter(action=BranchRule.Action.GO_TO_SECTION):
-        source = rule.source_question.section_id
-        edges.setdefault(source, set()).add(rule.target_section_id)
-
-    visiting = set()
-    visited = set()
-
-    def has_cycle(section_id):
-        if section_id in visiting:
-            return True
-        if section_id in visited:
-            return False
-        visiting.add(section_id)
-        if any(has_cycle(target) for target in edges.get(section_id, ())):
-            return True
-        visiting.remove(section_id)
-        visited.add(section_id)
-        return False
-
-    if any(has_cycle(section_id) for section_id in edges):
-        errors.append('Branch rules contain a cycle.')
+    cycle_sections = branch_cycle_sections(version)
+    if cycle_sections:
+        titles = list(
+            Section.objects.filter(id__in=cycle_sections).order_by('order').values_list('title', flat=True)
+        )
+        errors.append(
+            'Branch rules loop between sections (' + ' ↔ '.join(titles) + '), '
+            'so respondents can never reach the end. Point one of these rules at a '
+            'later section or “End survey”.'
+        )
     return errors
+
+
+def branch_cycle_sections(version):
+    """Return the set of section ids that take part in a go-to-section loop."""
+    edges = {}
+    for rule in version.branch_rules.filter(action=BranchRule.Action.GO_TO_SECTION).select_related('source_question'):
+        if rule.target_section_id:
+            edges.setdefault(rule.source_question.section_id, set()).add(rule.target_section_id)
+
+    color = {}
+    stack = []
+    cycle = set()
+
+    def visit(node):
+        color[node] = 'grey'
+        stack.append(node)
+        for target in edges.get(node, ()):
+            state = color.get(target)
+            if state == 'grey' and target in stack:
+                cycle.update(stack[stack.index(target):])
+            elif state is None:
+                visit(target)
+        stack.pop()
+        color[node] = 'black'
+
+    for node in list(edges):
+        if node not in color:
+            visit(node)
+    return cycle
 
 
 def _clone_version(source, created_by):

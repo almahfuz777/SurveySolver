@@ -8,6 +8,7 @@ so the whole block can safely sit inside a selection link.
     <span class="rv-num">{{ question.number }}.</span>
     <span class="rv-prompt-text" data-mirror="prompt"{% if editable %} contenteditable="true" role="textbox" aria-label="Question prompt"{% endif %}>{{ question.prompt }}</span>
     <span class="rv-req" data-mirror="required"{% if not question.required %} hidden{% endif %} title="Required">*</span>
+    {% if question.has_branching %}<span class="rv-branch-badge" title="Has branching logic" aria-label="Has branching logic">{% include 'partials/icon.html' with name='logic' size='14' %}</span>{% endif %}
 </div>
 <p class="rv-help" data-mirror="help"{% if editable %} contenteditable="true" role="textbox" aria-label="Help text"{% endif %}{% if not question.help_text %} hidden{% endif %}>{{ question.help_text }}</p>
 <div class="rv-body" data-mirror="body">

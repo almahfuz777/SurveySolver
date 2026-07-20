@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from sharing.permissions import EDIT_ROLES, OWNER_ROLES, VIEW_ROLES, accessible_surveys, get_accessible_survey
 
 from . import services
-from .publication import PublicationError, publish_survey, readiness_errors
+from .publication import PublicationError, branch_cycle_sections, publish_survey, readiness_errors
 from .forms import (
     EligibilityCriteriaForm,
     QuestionBranchForm,
@@ -294,6 +294,46 @@ def _mutation_error(request, survey, error):
     return redirect('survey_builder', survey_id=survey.id)
 
 
+def _annotate_branch_warnings(version, question, rules):
+    """Attach a `.warnings` list to each rule so the builder can flag conditions
+    that can never match or that trap respondents in a loop, inline where the
+    creator is setting them up."""
+    if not rules:
+        return
+    cycle_sections = branch_cycle_sections(version)
+    allowed = set(BranchRule.allowed_operators(question.type))
+    choice_labels = (
+        set(question.choices.values_list('label', flat=True)) if question.accepts_choices else None
+    )
+    for rule in rules:
+        warnings = []
+        if rule.operator not in allowed:
+            warnings.append(
+                f'“{rule.get_operator_display()}” doesn’t apply to a {question.get_type_display()} '
+                'question, so this rule can never match. Pick another condition.'
+            )
+        if (
+            rule.action == BranchRule.Action.GO_TO_SECTION
+            and question.section_id in cycle_sections
+            and rule.target_section_id in cycle_sections
+        ):
+            warnings.append(
+                'This jump loops back to a section that leads here again — respondents could '
+                'never finish. Send them to a later section or “End survey”.'
+            )
+        if (
+            choice_labels is not None
+            and rule.operator != BranchRule.Operator.ANSWERED
+            and rule.compare_value
+            and rule.compare_value not in choice_labels
+        ):
+            warnings.append(
+                f'“{rule.compare_value}” is no longer one of this question’s options, '
+                'so this rule will never trigger.'
+            )
+        rule.warnings = warnings
+
+
 @login_required
 def survey_builder(request, survey_id):
     survey = _editable_survey(request, survey_id)
@@ -318,8 +358,15 @@ def survey_builder(request, survey_id):
     branch_rules = []
     if selected_question:
         branch_form = QuestionBranchForm(version=version, question=selected_question)
-        branch_rules = selected_question.branch_rules.select_related('target_section').order_by('order')
+        branch_rules = list(
+            selected_question.branch_rules.select_related('target_section').order_by('order')
+        )
+        _annotate_branch_warnings(version, selected_question, branch_rules)
     sections, question_total = _annotate_questions(version)
+    branched_ids = set(version.branch_rules.values_list('source_question_id', flat=True))
+    for section in sections:
+        for question in section.questions.all():
+            question.has_branching = question.id in branched_ids
     if selected_question:
         toolbar_section_id = selected_question.section_id
         selected_question.number = next(
@@ -469,8 +516,44 @@ def question_add(request, survey_id):
     question_type = request.POST.get('type')
     if question_type not in Question.Type.values:
         return JsonResponse({'error': 'Invalid question type.'}, status=422)
+    after_order = None
+    after_id = request.POST.get('after_question_id')
+    if after_id:
+        after = Question.objects.filter(id=after_id, section=section).values_list('order', flat=True).first()
+        if after is not None:
+            after_order = after
     try:
-        question, _ = services.add_question(section.id, question_type, _revision(request))
+        question, _ = services.add_question(section.id, question_type, _revision(request), after_order)
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return redirect(f"{reverse('survey_builder', args=[survey.id])}?question={question.id}")
+
+
+@require_POST
+@login_required
+def question_duplicate(request, survey_id, question_id):
+    survey = _editable_survey(request, survey_id)
+    question = get_object_or_404(Question, id=question_id, section__version__survey=survey)
+    try:
+        clone, _ = services.duplicate_question(question.id, _revision(request))
+    except (services.StaleVersionError, ValidationError) as error:
+        return _mutation_error(request, survey, error)
+    return redirect(f"{reverse('survey_builder', args=[survey.id])}?question={clone.id}")
+
+
+@require_POST
+@login_required
+def question_reorder(request, survey_id, question_id):
+    survey = _editable_survey(request, survey_id)
+    version = _draft_version(survey)
+    question = get_object_or_404(Question, id=question_id, section__version=version)
+    section = get_object_or_404(Section, id=request.POST.get('section_id'), version=version)
+    try:
+        position = int(request.POST.get('position', ''))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid position.'}, status=422)
+    try:
+        services.reorder_question(question.id, _revision(request), section.id, position)
     except (services.StaleVersionError, ValidationError) as error:
         return _mutation_error(request, survey, error)
     return redirect(f"{reverse('survey_builder', args=[survey.id])}?question={question.id}")

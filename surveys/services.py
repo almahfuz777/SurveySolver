@@ -96,10 +96,17 @@ def _default_question_values(question_type):
 
 
 @transaction.atomic
-def add_question(section_id, question_type, expected_revision):
+def add_question(section_id, question_type, expected_revision, after_order=None):
     section = Section.objects.select_related('version').get(pk=section_id)
     version = _lock_version(section.version_id, expected_revision)
-    order = (section.questions.aggregate(max_order=Max('order'))['max_order'] or 0) + 1
+    if after_order is None:
+        order = (section.questions.aggregate(max_order=Max('order'))['max_order'] or 0) + 1
+    else:
+        order = after_order + 1
+        # Open a slot at `order` by shifting the tail down, highest first so the
+        # per-(section, order) unique constraint never collides mid-shift.
+        for existing in section.questions.filter(order__gte=order).order_by('-order'):
+            Question.objects.filter(pk=existing.pk).update(order=existing.order + 1)
     config, choices, rows = _default_question_values(question_type)
     question = Question.objects.create(
         section=section,
@@ -113,6 +120,76 @@ def add_question(section_id, question_type, expected_revision):
     )
     MatrixRow.objects.bulk_create([MatrixRow(question=question, label=label, order=index) for index, label in enumerate(rows, 1)])
     return question, _bump_revision(version)
+
+
+@transaction.atomic
+def duplicate_question(question_id, expected_revision):
+    original = (
+        Question.objects.select_related('section__version')
+        .prefetch_related('choices', 'matrix_rows')
+        .get(pk=question_id)
+    )
+    version = _lock_version(original.section.version_id, expected_revision)
+    section = original.section
+    order = original.order + 1
+    for existing in section.questions.filter(order__gte=order).order_by('-order'):
+        Question.objects.filter(pk=existing.pk).update(order=existing.order + 1)
+    clone = Question.objects.create(
+        section=section,
+        type=original.type,
+        prompt=original.prompt,
+        help_text=original.help_text,
+        required=original.required,
+        randomize_choices=original.randomize_choices,
+        order=order,
+        config=original.config,
+    )
+    QuestionChoice.objects.bulk_create(
+        [QuestionChoice(question=clone, label=choice.label, order=choice.order) for choice in original.choices.all()]
+    )
+    MatrixRow.objects.bulk_create(
+        [MatrixRow(question=clone, label=row.label, order=row.order) for row in original.matrix_rows.all()]
+    )
+    return clone, _bump_revision(version)
+
+
+@transaction.atomic
+def reorder_question(question_id, expected_revision, target_section_id, position):
+    """Move a question to `target_section_id` at 0-based `position`, supporting
+    both within-section reordering and cross-section moves (drag and drop)."""
+    question = Question.objects.select_related('section__version').get(pk=question_id)
+    version = _lock_version(question.section.version_id, expected_revision)
+    target_section = Section.objects.select_related('version').get(pk=target_section_id)
+    if target_section.version_id != version.id:
+        raise ValidationError('Target section must belong to this survey version.')
+
+    source_section = question.section
+    target_questions = list(
+        Question.objects.filter(section=target_section).exclude(pk=question.pk).order_by('order')
+    )
+    position = max(0, min(int(position), len(target_questions)))
+    target_questions.insert(position, question)
+
+    # Two-phase renumber: park every touched row at a high, collision-free order
+    # first, then assign the final 1..n. Keeps the (section, order) unique
+    # constraint satisfied at every intermediate step.
+    offset = 100000
+    if source_section.id != target_section.id:
+        source_questions = list(
+            Question.objects.filter(section=source_section).exclude(pk=question.pk).order_by('order')
+        )
+        for index, item in enumerate(source_questions):
+            Question.objects.filter(pk=item.pk).update(order=offset + index)
+    for index, item in enumerate(target_questions):
+        Question.objects.filter(pk=item.pk).update(section=target_section, order=offset + index)
+
+    if source_section.id != target_section.id:
+        for index, item in enumerate(source_questions, start=1):
+            Question.objects.filter(pk=item.pk).update(order=index)
+    for index, item in enumerate(target_questions, start=1):
+        Question.objects.filter(pk=item.pk).update(order=index)
+
+    return _bump_revision(version)
 
 
 @transaction.atomic
