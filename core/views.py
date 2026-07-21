@@ -7,6 +7,7 @@ from rewards.models import BadgeAward, PointTransaction
 from rewards.claims import BASE_COMPLETION_POINTS
 from surveys.discovery import discover_surveys
 from surveys.models import Survey, Topic
+from surveys.services import discard_empty_drafts
 
 
 def home(request):
@@ -63,6 +64,7 @@ def discover(request):
 @login_required
 def overview(request):
     user = request.user
+    discard_empty_drafts(user)
     owned_surveys = Survey.objects.owned_by(user).filter(deleted_at__isnull=True)
 
     # Per-status breakdown of the user's own (non-deleted) surveys.

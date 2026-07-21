@@ -25,6 +25,7 @@ from .models import BranchRule, Question, Section, Survey, SurveyVersion
 
 @login_required
 def survey_list(request):
+    services.discard_empty_drafts(request.user)
     accessible = list(accessible_surveys(request.user, VIEW_ROLES).prefetch_related('topics'))
 
     # Completed-response counts for every accessible survey, in one query.
@@ -75,7 +76,7 @@ def survey_list(request):
 @require_POST
 @login_required
 def survey_create(request):
-    survey = Survey.objects.create(owner=request.user, title='Untitled survey', summary='')
+    survey = Survey.objects.create(owner=request.user, title=services.DEFAULT_SURVEY_TITLE, summary='')
     return redirect('survey_builder', survey_id=survey.id)
 
 

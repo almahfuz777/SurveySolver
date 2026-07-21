@@ -31,6 +31,41 @@ class SurveyManagementTests(TestCase):
         self.assertTrue(survey.slug.startswith('untitled-survey-'))
         self.assertIsNotNone(survey.draft_version)
 
+    def test_survey_list_discards_untouched_draft(self):
+        self.client.force_login(self.user)
+        self.client.post(reverse('survey_create'))
+        survey = Survey.objects.get()
+
+        self.client.get(reverse('survey_list'))
+
+        self.assertFalse(Survey.objects.filter(pk=survey.pk).exists())
+
+    def test_survey_list_keeps_draft_with_content(self):
+        self.client.force_login(self.user)
+        self.client.post(reverse('survey_create'))
+        survey = Survey.objects.get()
+        section = survey.draft_version.sections.first()
+        Question.objects.create(
+            section=section,
+            type=Question.Type.SHORT_TEXT,
+            prompt='Your name?',
+            order=1,
+        )
+
+        self.client.get(reverse('survey_list'))
+
+        self.assertTrue(Survey.objects.filter(pk=survey.pk).exists())
+
+    def test_survey_list_keeps_renamed_draft(self):
+        self.client.force_login(self.user)
+        self.client.post(reverse('survey_create'))
+        Survey.objects.update(title='My real survey')
+        survey = Survey.objects.get()
+
+        self.client.get(reverse('survey_list'))
+
+        self.assertTrue(Survey.objects.filter(pk=survey.pk).exists())
+
     def test_survey_list_offers_card_and_compact_views(self):
         Survey.objects.create(owner=self.user, title='View options', summary='')
         self.client.force_login(self.user)
