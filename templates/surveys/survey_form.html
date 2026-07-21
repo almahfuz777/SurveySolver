@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const clear = wrapper.querySelector('[data-country-clear]');
     const empty = wrapper.querySelector('[data-country-empty]');
     const boxes = Array.from(dropdown.querySelectorAll('input[type="checkbox"]'));
+    const noun = wrapper.dataset.noun || 'countries';
 
     const close = () => {
       wrapper.classList.remove('is-open');
@@ -84,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tag.append(text, remove);
         tags.appendChild(tag);
       });
-      count.textContent = selected.length ? `${selected.length} selected` : 'No countries selected';
+      count.textContent = selected.length ? `${selected.length} selected` : `No ${noun} selected`;
       clear.hidden = selected.length === 0;
     };
 
@@ -521,6 +522,86 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                 </div>
                                 {{ eligibility_form.countries.errors }}
+                            </div>
+                        </div>
+
+                        <div class="eligibility-rule">
+                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_regions.id_for_label }}">
+                                <span class="eligibility-rule-copy"><strong>Region</strong><small>Any region or district</small></span>
+                                <span class="settings-switch">{{ eligibility_form.restrict_regions }}<span class="settings-switch-track"></span></span>
+                            </label>
+                            <div id="region-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_regions.value %} hidden{% endif %}>
+                                <label class="country-search-label" for="region-search-input">Find regions</label>
+                                <div class="country-select" data-country-select data-noun="regions">
+                                    <div class="country-tags" data-country-tags></div>
+                                    <div class="country-toolbar">
+                                        <span id="region-selected-count" data-country-count>No regions selected</span>
+                                        <button type="button" data-country-clear hidden>Clear selected</button>
+                                    </div>
+                                    <input type="text" id="region-search-input" class="country-search-input" placeholder="Search regions…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="region-options" aria-describedby="region-selected-count" data-country-search>
+                                    <div id="region-options" class="country-dropdown" data-country-dropdown hidden>
+                                        <p class="country-empty" data-country-empty hidden>No regions found.</p>
+                                        {{ eligibility_form.regions }}
+                                    </div>
+                                </div>
+                                {{ eligibility_form.regions.errors }}
+                            </div>
+                        </div>
+
+                        <div class="eligibility-cols-2">
+                            <div class="eligibility-rule">
+                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_industries.id_for_label }}">
+                                    <span class="eligibility-rule-copy"><strong>Industry</strong><small>Any industry</small></span>
+                                    <span class="settings-switch">{{ eligibility_form.restrict_industries }}<span class="settings-switch-track"></span></span>
+                                </label>
+                                <div id="industry-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_industries.value %} hidden{% endif %}>
+                                    {{ eligibility_form.industries }}
+                                    {{ eligibility_form.industries.errors }}
+                                </div>
+                            </div>
+                            <div class="eligibility-rule">
+                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_income.id_for_label }}">
+                                    <span class="eligibility-rule-copy"><strong>Income</strong><small>Any income band</small></span>
+                                    <span class="settings-switch">{{ eligibility_form.restrict_income }}<span class="settings-switch-track"></span></span>
+                                </label>
+                                <div id="income-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_income.value %} hidden{% endif %}>
+                                    {{ eligibility_form.income_brackets }}
+                                    {{ eligibility_form.income_brackets.errors }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="eligibility-cols-2">
+                            <div class="eligibility-rule">
+                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_religions.id_for_label }}">
+                                    <span class="eligibility-rule-copy"><strong>Religion</strong><small>Any religion</small></span>
+                                    <span class="settings-switch">{{ eligibility_form.restrict_religions }}<span class="settings-switch-track"></span></span>
+                                </label>
+                                <div id="religion-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_religions.value %} hidden{% endif %}>
+                                    {{ eligibility_form.religions }}
+                                    {{ eligibility_form.religions.errors }}
+                                </div>
+                            </div>
+                            <div class="eligibility-rule">
+                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_ethnicities.id_for_label }}">
+                                    <span class="eligibility-rule-copy"><strong>Ethnicity</strong><small>Any ethnicity</small></span>
+                                    <span class="settings-switch">{{ eligibility_form.restrict_ethnicities }}<span class="settings-switch-track"></span></span>
+                                </label>
+                                <div id="ethnicity-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_ethnicities.value %} hidden{% endif %}>
+                                    {{ eligibility_form.ethnicities }}
+                                    {{ eligibility_form.ethnicities.errors }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="eligibility-rule">
+                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_languages.id_for_label }}">
+                                <span class="eligibility-rule-copy"><strong>Language</strong><small>Any language</small></span>
+                                <span class="settings-switch">{{ eligibility_form.restrict_languages }}<span class="settings-switch-track"></span></span>
+                            </label>
+                            <div id="language-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_languages.value %} hidden{% endif %}>
+                                {{ eligibility_form.languages }}
+                                {{ eligibility_form.languages.errors }}
                             </div>
                         </div>
                     </div>

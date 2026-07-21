@@ -142,6 +142,45 @@ class SurveyDiscoveryTests(TestCase):
         self.assertNotContains(response, ineligible.title)
         self.assertContains(response, 'Profile matched')
 
+    def test_new_demographic_dimensions_gate_targeting(self):
+        criteria = {
+            'regions': ['BD-13'],
+            'industries': ['it'],
+            'income_brackets': ['1000_2500'],
+            'religions': ['islam'],
+            'ethnicities': ['south_asian'],
+            'languages': ['bn', 'en'],
+        }
+        targeted, _ = self.publish_survey('Fine-grained study', criteria=criteria)
+
+        def make_respondent(email, **overrides):
+            user = get_user_model().objects.create_user(email=email)
+            profile = user.profile
+            profile.region = 'BD-13'
+            profile.industry = 'it'
+            profile.income_bracket = '1000_2500'
+            profile.religion = 'islam'
+            profile.ethnicity = 'south_asian'
+            profile.languages = ['bn']
+            for field, value in overrides.items():
+                setattr(profile, field, value)
+            profile.save()
+            return user
+
+        match = make_respondent('demo-match@example.com')
+        self.client.force_login(match)
+        self.assertContains(self.client.get(reverse('discover')), targeted.title)
+
+        # Wrong region → excluded, even with everything else matching.
+        wrong_region = make_respondent('demo-region@example.com', region='BD-27')
+        self.client.force_login(wrong_region)
+        self.assertNotContains(self.client.get(reverse('discover')), targeted.title)
+
+        # No shared language → excluded.
+        wrong_lang = make_respondent('demo-lang@example.com', languages=['hi'])
+        self.client.force_login(wrong_lang)
+        self.assertNotContains(self.client.get(reverse('discover')), targeted.title)
+
     def test_incomplete_profile_does_not_receive_targeted_surveys(self):
         unrestricted, _ = self.publish_survey('Unrestricted study')
         targeted, _ = self.publish_survey('Targeted study', criteria=self.criteria())

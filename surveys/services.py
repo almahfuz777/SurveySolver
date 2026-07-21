@@ -271,12 +271,22 @@ def update_eligibility(version_id, expected_revision, cleaned_data):
         'max_age',
         'education_levels',
         'countries',
+        'regions',
         'genders',
         'employment_statuses',
+        'industries',
+        'income_brackets',
+        'religions',
+        'ethnicities',
+        'languages',
     )
+    defaults = {}
+    for field in criteria_fields:
+        default = None if field in ('min_age', 'max_age') else []
+        defaults[field] = cleaned_data.get(field, default)
     criteria, _ = EligibilityCriteria.objects.update_or_create(
         version=version,
-        defaults={field: cleaned_data[field] for field in criteria_fields},
+        defaults=defaults,
     )
     return criteria, _bump_revision(version)
 

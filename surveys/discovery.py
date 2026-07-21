@@ -22,13 +22,28 @@ def profile_matches(criteria, profile):
             return False
         if criteria.max_age is not None and age > criteria.max_age:
             return False
-    values = (
+    # Single-value profile attributes: the respondent's value must be one of
+    # the creator's allowed values (an unset criterion allows everyone).
+    scalar_checks = (
         (criteria.education_levels, profile.education_level),
         (criteria.countries, profile.country.code if profile.country else ''),
+        (criteria.regions, profile.region),
         (criteria.genders, profile.gender),
         (criteria.employment_statuses, profile.employment_status),
+        (criteria.industries, profile.industry),
+        (criteria.income_brackets, profile.income_bracket),
+        (criteria.religions, profile.religion),
+        (criteria.ethnicities, profile.ethnicity),
     )
-    return all(not allowed or value in allowed for allowed, value in values)
+    if not all(not allowed or value in allowed for allowed, value in scalar_checks):
+        return False
+    # Languages are multi-valued on the profile: match when they share at
+    # least one language with the criteria.
+    if criteria.languages:
+        spoken = set(profile.languages or [])
+        if spoken.isdisjoint(criteria.languages):
+            return False
+    return True
 
 
 def discover_surveys(user=None, topic=None, duration=None, identity_mode=None):

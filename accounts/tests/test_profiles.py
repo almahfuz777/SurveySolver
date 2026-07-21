@@ -71,6 +71,41 @@ class ProfileTests(TestCase):
         self.assertGreater(self.user.profile.completion_percentage, 0)
         self.assertFalse(PointTransaction.objects.exists())
 
+    def test_profile_saves_region_and_languages(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('profile_edit'),
+            {
+                'first_name': 'Amina',
+                'last_name': 'Rahman',
+                'country': 'BD',
+                'region': 'BD-13',
+                'languages': ['bn', 'en'],
+                'industry': 'it',
+                'income_bracket': '1000_2500',
+                'religion': 'islam',
+                'ethnicity': 'south_asian',
+            },
+        )
+
+        self.assertRedirects(response, reverse('profile_detail'))
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.region, 'BD-13')
+        self.assertEqual(sorted(self.user.profile.languages), ['bn', 'en'])
+        self.assertEqual(self.user.profile.industry, 'it')
+
+    def test_region_must_match_selected_country(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('profile_edit'),
+            {'country': 'US', 'region': 'BD-13'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Choose a region inside your selected country.')
+
     def test_self_described_gender_requires_description(self):
         self.client.force_login(self.user)
 

@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models.functions import Lower
 from django_countries.fields import CountryField
 
+from . import demographics
 from .managers import UserManager
 from .validators import validate_avatar_size, validate_birth_date
 
@@ -94,6 +95,7 @@ class Profile(models.Model):
     gender = models.CharField(max_length=20, choices=Gender.choices, blank=True)
     gender_self_description = models.CharField(max_length=80, blank=True)
     country = CountryField(blank=True)
+    region = models.CharField(max_length=10, blank=True)
     education_level = models.CharField(
         max_length=24,
         choices=EducationLevel.choices,
@@ -105,6 +107,27 @@ class Profile(models.Model):
         choices=EmploymentStatus.choices,
         blank=True,
     )
+    industry = models.CharField(
+        max_length=24,
+        choices=demographics.INDUSTRY_CHOICES,
+        blank=True,
+    )
+    income_bracket = models.CharField(
+        max_length=24,
+        choices=demographics.INCOME_CHOICES,
+        blank=True,
+    )
+    religion = models.CharField(
+        max_length=24,
+        choices=demographics.RELIGION_CHOICES,
+        blank=True,
+    )
+    ethnicity = models.CharField(
+        max_length=24,
+        choices=demographics.ETHNICITY_CHOICES,
+        blank=True,
+    )
+    languages = models.JSONField(default=list, blank=True)
     occupation = models.CharField(max_length=120, blank=True)
     institution = models.CharField(max_length=160, blank=True)
     research_interests = models.CharField(max_length=500, blank=True)

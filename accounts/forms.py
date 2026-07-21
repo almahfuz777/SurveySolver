@@ -2,6 +2,7 @@ from allauth.account.forms import LoginForm, SignupForm
 from django import forms
 from django.contrib.auth import get_user_model
 
+from . import demographics
 from .models import Profile
 
 
@@ -49,6 +50,19 @@ class UserNameForm(forms.ModelForm):
 
 
 class ResearchProfileForm(forms.ModelForm):
+    region = forms.ChoiceField(
+        required=False,
+        choices=lambda: [('', 'Select your country first')] + demographics.subdivision_choices(),
+        widget=forms.Select(attrs={'data-region-select': ''}),
+        help_text='Region or district within your country.',
+    )
+    languages = forms.MultipleChoiceField(
+        required=False,
+        choices=demographics.LANGUAGE_CHOICES,
+        widget=forms.CheckboxSelectMultiple(),
+        help_text='Select every language you can respond to a survey in.',
+    )
+
     class Meta:
         model = Profile
         fields = (
@@ -57,21 +71,35 @@ class ResearchProfileForm(forms.ModelForm):
             'gender',
             'gender_self_description',
             'country',
+            'region',
+            'languages',
             'education_level',
             'field_of_study',
             'employment_status',
+            'industry',
+            'income_bracket',
+            'religion',
+            'ethnicity',
             'occupation',
             'institution',
             'research_interests',
         )
         widgets = {
             'birth_date': forms.DateInput(attrs={'type': 'date'}),
+            'country': forms.Select(attrs={'data-region-country': ''}),
             'research_interests': forms.Textarea(attrs={'rows': 4}),
         }
         help_texts = {
             'research_interests': 'Describe the topics you are interested in responding to.',
             'gender_self_description': 'Complete only when you selected “Prefer to self-describe”.',
+            'income_bracket': 'Approximate personal income, kept private.',
         }
+
+    def clean_region(self):
+        region = self.cleaned_data.get('region', '')
+        if region and region not in demographics.valid_subdivision_codes():
+            raise forms.ValidationError('Select a supported region.')
+        return region
 
     def clean(self):
         cleaned_data = super().clean()
@@ -83,4 +111,13 @@ class ResearchProfileForm(forms.ModelForm):
                 'gender_self_description',
                 'Describe your gender or choose another option.',
             )
+        # A region must belong to the chosen country (its code is prefixed with
+        # the ISO country code, e.g. ``BD-13``), otherwise clear it.
+        country = cleaned_data.get('country')
+        country_code = getattr(country, 'code', country) or ''
+        region = cleaned_data.get('region')
+        if region and country_code and not region.startswith(f'{country_code}-'):
+            self.add_error('region', 'Choose a region inside your selected country.')
+        elif region and not country_code:
+            self.add_error('region', 'Select your country before choosing a region.')
         return cleaned_data

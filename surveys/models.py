@@ -496,8 +496,14 @@ class EligibilityCriteria(models.Model):
     )
     education_levels = models.JSONField(default=list, blank=True)
     countries = models.JSONField(default=list, blank=True)
+    regions = models.JSONField(default=list, blank=True)
     genders = models.JSONField(default=list, blank=True)
     employment_statuses = models.JSONField(default=list, blank=True)
+    industries = models.JSONField(default=list, blank=True)
+    income_brackets = models.JSONField(default=list, blank=True)
+    religions = models.JSONField(default=list, blank=True)
+    ethnicities = models.JSONField(default=list, blank=True)
+    languages = models.JSONField(default=list, blank=True)
 
     class Meta:
         verbose_name_plural = 'eligibility criteria'
@@ -509,11 +515,18 @@ class EligibilityCriteria(models.Model):
             or self.max_age is not None
             or self.education_levels
             or self.countries
+            or self.regions
             or self.genders
             or self.employment_statuses
+            or self.industries
+            or self.income_brackets
+            or self.religions
+            or self.ethnicities
+            or self.languages
         )
 
     def clean(self):
+        from accounts import demographics
         from accounts.models import Profile
         from django_countries import countries
 
@@ -522,8 +535,14 @@ class EligibilityCriteria(models.Model):
         valid_values = {
             'education_levels': set(Profile.EducationLevel.values),
             'countries': {code for code, _ in countries},
+            'regions': demographics.valid_subdivision_codes(),
             'genders': set(Profile.Gender.values),
             'employment_statuses': set(Profile.EmploymentStatus.values),
+            'industries': demographics.INDUSTRY_VALUES,
+            'income_brackets': demographics.INCOME_VALUES,
+            'religions': demographics.RELIGION_VALUES,
+            'ethnicities': demographics.ETHNICITY_VALUES,
+            'languages': demographics.LANGUAGE_VALUES,
         }
         for field_name, allowed in valid_values.items():
             values = getattr(self, field_name)

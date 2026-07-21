@@ -60,3 +60,33 @@
     </div>
 </section>
 {% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    const country = document.querySelector('[data-region-country]');
+    const region = document.querySelector('[data-region-select]');
+    if (!country || !region) return;
+    const options = Array.from(region.options);
+
+    const syncRegions = () => {
+        const code = country.value;
+        let selectedStillValid = false;
+        options.forEach((option) => {
+            const match = option.value === '' || (code && option.value.startsWith(code + '-'));
+            option.hidden = !match;
+            option.disabled = !match && option.value !== '';
+            if (match && option.value === region.value) selectedStillValid = true;
+        });
+        if (!selectedStillValid) region.value = '';
+        const placeholder = options[0];
+        if (placeholder && placeholder.value === '') {
+            placeholder.textContent = code ? 'Select your region' : 'Select your country first';
+        }
+    };
+
+    country.addEventListener('change', syncRegions);
+    syncRegions();
+})();
+</script>
+{% endblock %}

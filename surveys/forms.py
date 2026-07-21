@@ -1,6 +1,7 @@
 from django import forms
 from django_countries import countries
 
+from accounts import demographics
 from accounts.models import Profile
 
 from .models import BranchRule, Question, Section, Survey, Topic
@@ -334,6 +335,72 @@ class EligibilityCriteriaForm(forms.Form):
         choices=Profile.EmploymentStatus.choices,
         widget=PillCheckboxSelectMultiple(),
     )
+    restrict_regions = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'region-restrictions'}
+        ),
+    )
+    regions = forms.MultipleChoiceField(
+        required=False,
+        choices=demographics.subdivision_choices,
+        widget=PillCheckboxSelectMultiple(),
+    )
+    restrict_industries = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'industry-restrictions'}
+        ),
+    )
+    industries = forms.MultipleChoiceField(
+        required=False,
+        choices=demographics.INDUSTRY_CHOICES,
+        widget=PillCheckboxSelectMultiple(),
+    )
+    restrict_income = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'income-restrictions'}
+        ),
+    )
+    income_brackets = forms.MultipleChoiceField(
+        required=False,
+        choices=demographics.INCOME_CHOICES,
+        widget=PillCheckboxSelectMultiple(),
+    )
+    restrict_religions = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'religion-restrictions'}
+        ),
+    )
+    religions = forms.MultipleChoiceField(
+        required=False,
+        choices=demographics.RELIGION_CHOICES,
+        widget=PillCheckboxSelectMultiple(),
+    )
+    restrict_ethnicities = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'ethnicity-restrictions'}
+        ),
+    )
+    ethnicities = forms.MultipleChoiceField(
+        required=False,
+        choices=demographics.ETHNICITY_CHOICES,
+        widget=PillCheckboxSelectMultiple(),
+    )
+    restrict_languages = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'language-restrictions'}
+        ),
+    )
+    languages = forms.MultipleChoiceField(
+        required=False,
+        choices=demographics.LANGUAGE_CHOICES,
+        widget=PillCheckboxSelectMultiple(),
+    )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -348,6 +415,12 @@ class EligibilityCriteriaForm(forms.Form):
             ('restrict_employment', 'employment_statuses', 'Select at least one employment status.'),
             ('restrict_education', 'education_levels', 'Select at least one education level.'),
             ('restrict_countries', 'countries', 'Select at least one country.'),
+            ('restrict_regions', 'regions', 'Select at least one region.'),
+            ('restrict_industries', 'industries', 'Select at least one industry.'),
+            ('restrict_income', 'income_brackets', 'Select at least one income band.'),
+            ('restrict_religions', 'religions', 'Select at least one religion.'),
+            ('restrict_ethnicities', 'ethnicities', 'Select at least one ethnicity.'),
+            ('restrict_languages', 'languages', 'Select at least one language.'),
         )
         for toggle, field_name, message in restricted_fields:
             if cleaned_data.get(toggle):
