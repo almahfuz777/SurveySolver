@@ -14,7 +14,7 @@
             <p>Manage studies you own and collaborate on.</p>
         </div>
         <div class="survey-heading-actions">
-            {% if surveys %}
+            {% if has_owned %}
                 <label class="survey-view-control" for="survey-view-select">
                     <span>View</span>
                     <select id="survey-view-select" data-survey-view>
@@ -33,49 +33,24 @@
 
 <section class="page-content">
     <div class="shell">
-        {% if surveys %}
-            <div class="survey-grid" data-survey-grid data-view="card">
-                {% for survey in surveys %}
-                    <article class="survey-management-card">
-                        <a
-                            class="survey-card-visual"
-                            href="{% url 'survey_detail' survey.id %}"
-                            {% if survey.banner %}style="background-image: linear-gradient(135deg, rgba(49,46,129,.78), rgba(20,184,166,.48)), url('{{ survey.banner.url }}')"{% endif %}
-                            aria-label="Open {{ survey.title }}"
-                        >
-                            <span class="status-label status-{{ survey.status }}">{{ survey.get_status_display }}</span>
-                        </a>
-                        <div class="survey-card-body">
-                            <h2><a href="{% url 'survey_detail' survey.id %}">{{ survey.title }}</a></h2>
-                            {% if survey.summary %}
-                                <p class="survey-card-summary">{{ survey.summary }}</p>
-                            {% else %}
-                                <p class="survey-card-summary survey-card-summary-placeholder" aria-hidden="true">&nbsp;</p>
-                            {% endif %}
-                            <div class="survey-card-meta">
-                                <span>{% include 'partials/icon.html' with name='clock' size='14' %} {{ survey.estimated_minutes }} min</span>
-                                <span>{{ survey.get_visibility_display }}</span>
-                                {% for topic in survey.topics.all|slice:':2' %}<span class="tag">{{ topic.name }}</span>{% endfor %}
-                            </div>
-                            <p class="survey-card-dates">Edited {{ survey.updated_at|date:'M j, Y' }} · Created {{ survey.created_at|date:'M j, Y' }}</p>
-                        </div>
-                        <div class="survey-card-actions" aria-label="Survey actions">
-                            <a href="{% url 'survey_builder' survey.id %}" title="Edit questions" aria-label="Edit {{ survey.title }}">{% include 'partials/icon.html' with name='edit' %}</a>
-                            <a href="{% url 'creator_response_list' survey.id %}" title="Responses" aria-label="Responses for {{ survey.title }}">{% include 'partials/icon.html' with name='responses' %}</a>
-                            <a href="{% url 'survey_analytics' survey.id %}" title="Analytics" aria-label="Analytics for {{ survey.title }}">{% include 'partials/icon.html' with name='analytics' %}</a>
-                            <a href="{% url 'sharing_settings' survey.id %}" title="Share access" aria-label="Share {{ survey.title }}">{% include 'partials/icon.html' with name='share' %}</a>
-                            <a href="{% url 'survey_edit' survey.id %}" title="Settings" aria-label="Settings for {{ survey.title }}">{% include 'partials/icon.html' with name='settings' %}</a>
-                            {% if survey.owner_id == request.user.id %}
-                                <form class="card-action-form" method="post" action="{% url 'survey_delete' survey.id %}" onsubmit="return confirm('Move “{{ survey.title|escapejs }}” to recently deleted?')">
-                                    {% csrf_token %}
-                                    <button class="card-action-danger" type="submit" title="Delete" aria-label="Delete {{ survey.title }}">{% include 'partials/icon.html' with name='trash' %}</button>
-                                </form>
-                            {% endif %}
-                        </div>
-                    </article>
-                {% endfor %}
-            </div>
-        {% else %}
+        {% if has_owned %}
+            <nav class="status-filter" aria-label="Filter by status">
+                <a class="filter-chip{% if status_filter == 'all' %} is-active{% endif %}" href="{% url 'survey_list' %}"{% if status_filter == 'all' %} aria-current="true"{% endif %}>All <span class="filter-count">{{ status_counts.all }}</span></a>
+                <a class="filter-chip{% if status_filter == 'draft' %} is-active{% endif %}" href="?status=draft"{% if status_filter == 'draft' %} aria-current="true"{% endif %}>Drafts <span class="filter-count">{{ status_counts.draft }}</span></a>
+                <a class="filter-chip{% if status_filter == 'published' %} is-active{% endif %}" href="?status=published"{% if status_filter == 'published' %} aria-current="true"{% endif %}>Published <span class="filter-count">{{ status_counts.published }}</span></a>
+                <a class="filter-chip{% if status_filter == 'closed' %} is-active{% endif %}" href="?status=closed"{% if status_filter == 'closed' %} aria-current="true"{% endif %}>Closed <span class="filter-count">{{ status_counts.closed }}</span></a>
+            </nav>
+
+            {% if owned_surveys %}
+                <div class="survey-grid" data-survey-grid data-view="card">
+                    {% for survey in owned_surveys %}
+                        {% include 'surveys/partials/survey_card.html' with survey=survey %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="filter-empty">No surveys with that status.</p>
+            {% endif %}
+        {% elif not shared_surveys %}
             <div class="panel empty-state page-empty-state">
                 <span class="empty-icon" aria-hidden="true">✦</span>
                 <h2>Create your first research survey</h2>
@@ -84,6 +59,17 @@
                     {% csrf_token %}
                     <button class="button button-primary" type="submit">{% include 'partials/icon.html' with name='plus' size='16' %} Create survey</button>
                 </form>
+            </div>
+        {% endif %}
+
+        {% if shared_surveys %}
+            <div class="shared-section">
+                <h2 class="section-heading">{% include 'partials/icon.html' with name='share' size='16' %} Shared with me</h2>
+                <div class="survey-grid" data-view="card">
+                    {% for survey in shared_surveys %}
+                        {% include 'surveys/partials/survey_card.html' with survey=survey %}
+                    {% endfor %}
+                </div>
             </div>
         {% endif %}
 
@@ -103,7 +89,7 @@
                                     <button class="button button-secondary button-small" type="submit">Restore</button>
                                 </form>
                                 {% if not survey.has_response_history %}
-                                    <form method="post" action="{% url 'survey_purge' survey.id %}" onsubmit="return confirm('Delete “{{ survey.title|escapejs }}” forever? This cannot be undone.')">
+                                    <form method="post" action="{% url 'survey_purge' survey.id %}" data-confirm="Delete “{{ survey.title|escapejs }}” forever? This cannot be undone." data-confirm-ok="Delete forever">
                                         {% csrf_token %}
                                         <button class="button button-quiet button-small trash-purge" type="submit">Delete forever</button>
                                     </form>

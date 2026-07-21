@@ -1,0 +1,229 @@
+/* Authenticated overview (personal home across creator + respondent roles).
+   The heading reuses the shared `.page-heading` component. */
+
+.account-chip {
+    max-width: 20rem;
+    overflow: hidden;
+    color: white;
+    background: rgba(255, 255, 255, 0.12);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.overview-content {
+    min-height: 34rem;
+    padding-bottom: 5rem;
+    background: var(--surface-muted);
+}
+
+/* Four role-grouped metric cards straddling the hero edge. */
+.overview-content .metric-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.overview-grid {
+    display: grid;
+    gap: 1rem;
+    align-items: start;
+    grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.8fr);
+}
+
+.overview-main,
+.overview-side {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+}
+
+/* When the side column has no content (profile complete, no badges), let the
+   main column use the full width. */
+.overview-grid:not(:has(.overview-side)) {
+    grid-template-columns: 1fr;
+}
+
+.points-total {
+    padding: 0.3rem 0.7rem;
+    color: var(--teal-700);
+    background: var(--teal-50);
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Status breakdown chips */
+.status-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.25rem 0;
+}
+
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    color: var(--ink-800);
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 650;
+}
+
+.status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--ink-600);
+}
+
+.status-dot-draft { background: var(--ink-400, #9ca3af); }
+.status-dot-published { background: var(--teal-500); }
+.status-dot-closed { background: var(--indigo-500); }
+
+/* "Jump back in" resume card */
+.resume-card {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+    padding: 0.9rem 1rem;
+    color: var(--ink-950);
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.resume-card:hover {
+    background: var(--indigo-50);
+    border-color: var(--indigo-300);
+}
+
+.resume-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--indigo-700);
+    background: var(--indigo-50);
+    border-radius: 0.65rem;
+}
+
+.resume-text {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+}
+
+.resume-text small {
+    color: var(--ink-600);
+    font-size: 0.72rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.resume-text strong {
+    overflow: hidden;
+    font-size: 0.95rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Contributing panel */
+.points-balance {
+    margin: 0.75rem 0 1rem;
+    color: var(--ink-600);
+    font-size: 0.9rem;
+}
+
+.points-balance strong {
+    color: var(--teal-700);
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.ledger-list {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0 0 1.25rem;
+    padding: 0;
+    list-style: none;
+}
+
+.ledger-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 0.6rem;
+    align-items: baseline;
+    padding: 0.55rem 0.7rem;
+    background: var(--surface-muted);
+    border-radius: var(--radius-sm);
+}
+
+.ledger-reason {
+    overflow: hidden;
+    color: var(--ink-800);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ledger-amount {
+    color: var(--teal-700);
+    font-size: 0.85rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.ledger-list li small {
+    grid-column: 1 / -1;
+    color: var(--ink-600);
+    font-size: 0.7rem;
+}
+
+.overview-muted {
+    margin: 0.75rem 0 1.25rem;
+    color: var(--ink-600);
+    font-size: 0.86rem;
+}
+
+.progress-panel .progress-ring {
+    margin-block: 1rem;
+}
+
+.progress-panel .button,
+.contributing-panel .button {
+    margin-top: 0.5rem;
+}
+
+.badge-panel .badge-summary {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+@media (max-width: 1080px) {
+    .overview-content .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 860px) {
+    .overview-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 560px) {
+    .overview-content .metric-grid {
+        grid-template-columns: 1fr;
+    }
+}

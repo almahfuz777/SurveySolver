@@ -73,7 +73,7 @@ class AuthenticationFlowTests(TestCase):
             {'login': user.email, 'password': self.password},
         )
 
-        self.assertRedirects(response, reverse('dashboard'))
+        self.assertRedirects(response, reverse('overview'))
         self.assertEqual(self.client.session['_auth_user_id'], str(user.pk))
 
     def test_signup_does_not_duplicate_existing_email(self):

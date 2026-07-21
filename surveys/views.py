@@ -1,11 +1,13 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from responses.models import Submission
 from sharing.permissions import EDIT_ROLES, OWNER_ROLES, VIEW_ROLES, accessible_surveys, get_accessible_survey
 
 from . import services
@@ -23,12 +25,50 @@ from .models import BranchRule, Question, Section, Survey, SurveyVersion
 
 @login_required
 def survey_list(request):
-    surveys = accessible_surveys(request.user, VIEW_ROLES).prefetch_related('topics')
+    accessible = list(accessible_surveys(request.user, VIEW_ROLES).prefetch_related('topics'))
+
+    # Completed-response counts for every accessible survey, in one query.
+    response_counts = dict(
+        Submission.objects.filter(
+            survey__in=accessible,
+            status=Submission.Status.COMPLETED,
+        )
+        .values_list('survey')
+        .annotate(total=Count('id'))
+    )
+    for survey in accessible:
+        survey.response_count = response_counts.get(survey.id, 0)
+
+    owned_all = [s for s in accessible if s.owner_id == request.user.id]
+    shared_surveys = [s for s in accessible if s.owner_id != request.user.id]
+
+    status_counts = {
+        'all': len(owned_all),
+        'draft': sum(1 for s in owned_all if s.status == Survey.Status.DRAFT),
+        'published': sum(1 for s in owned_all if s.status == Survey.Status.PUBLISHED),
+        'closed': sum(1 for s in owned_all if s.status == Survey.Status.CLOSED),
+    }
+
+    status_filter = request.GET.get('status')
+    if status_filter not in {'draft', 'published', 'closed'}:
+        status_filter = 'all'
+    owned_surveys = (
+        owned_all if status_filter == 'all'
+        else [s for s in owned_all if s.status == status_filter]
+    )
+
     deleted_surveys = Survey.objects.filter(owner=request.user, deleted_at__isnull=False).order_by('-deleted_at')
     return render(
         request,
         'surveys/survey_list.html',
-        {'surveys': surveys, 'deleted_surveys': deleted_surveys},
+        {
+            'owned_surveys': owned_surveys,
+            'shared_surveys': shared_surveys,
+            'status_counts': status_counts,
+            'status_filter': status_filter,
+            'has_owned': bool(owned_all),
+            'deleted_surveys': deleted_surveys,
+        },
     )
 
 

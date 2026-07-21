@@ -20,6 +20,7 @@
 .survey-card-summary-placeholder { display: none; }
 .survey-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; color: var(--ink-600); font-size: 0.78rem; }
 .survey-card-meta svg { vertical-align: -0.15rem; }
+.survey-card-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.55rem; }
 .survey-card-dates { margin: 0.5rem 0 0; color: var(--ink-600); font-size: 0.74rem; }
 .survey-card-actions { display: flex; gap: 0.25rem; padding: 0.6rem 1rem; border-top: 1px solid var(--border); }
 .survey-card-actions a,
@@ -40,9 +41,24 @@
 .survey-grid[data-view="compact"] .survey-card-summary-placeholder { display: -webkit-box; }
 .survey-grid[data-view="compact"] .survey-card-meta { gap: 0.45rem; font-size: 0.7rem; }
 .survey-grid[data-view="compact"] .survey-card-dates { margin-top: 0.3rem; font-size: 0.66rem; }
+.survey-grid[data-view="compact"] .survey-card-tags { margin-top: 0.35rem; }
 .survey-grid[data-view="compact"] .survey-card-actions { align-items: center; align-self: stretch; padding: 0.45rem 0.6rem; border-top: 0; border-left: 1px solid var(--border); }
 .survey-grid[data-view="compact"] .survey-card-actions a,
 .survey-grid[data-view="compact"] .survey-card-actions .card-action-danger { width: 2rem; height: 2rem; }
+
+/* Status filter chips */
+.status-filter { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+.filter-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.85rem; color: var(--ink-700); background: var(--surface-raised); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: 0.8rem; font-weight: 700; text-decoration: none; transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease; }
+.filter-chip:hover { color: var(--indigo-700); border-color: var(--indigo-300); }
+.filter-chip.is-active { color: white; background: var(--indigo-700); border-color: var(--indigo-700); }
+.filter-count { padding: 0.05rem 0.4rem; background: var(--surface-muted); border-radius: 999px; color: var(--ink-600); font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.filter-chip.is-active .filter-count { color: white; background: rgba(255, 255, 255, 0.22); }
+.filter-empty { margin: 0.5rem 0 0; padding: 1.5rem; color: var(--ink-600); text-align: center; }
+
+/* Shared-with-me section */
+.shared-section { margin-top: 2.25rem; }
+.section-heading { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 1rem; font-size: 1.05rem; }
+.section-heading svg { color: var(--ink-600); vertical-align: -0.18rem; }
 
 .trash-section { margin-top: 2rem; }
 .trash-section summary { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.5rem 0.9rem; color: var(--ink-600); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: 0.85rem; font-weight: 700; list-style: none; }

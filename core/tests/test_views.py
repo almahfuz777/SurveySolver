@@ -18,22 +18,33 @@ class CorePageTests(TestCase):
         self.assertContains(response, 'Privacy policy')
         self.assertContains(response, 'href="#"', count=4)
 
-    def test_dashboard_requires_authentication(self):
-        response = self.client.get(reverse('dashboard'))
+    def test_overview_requires_authentication(self):
+        response = self.client.get(reverse('overview'))
 
         self.assertRedirects(
             response,
-            f"{reverse('account_login')}?next={reverse('dashboard')}",
+            f"{reverse('account_login')}?next={reverse('overview')}",
         )
 
-    def test_authenticated_user_can_open_dashboard(self):
+    def test_authenticated_user_can_open_overview(self):
         user = get_user_model().objects.create_user(
             email='researcher@example.com',
             password='safe-test-password',
         )
         self.client.force_login(user)
 
-        response = self.client.get(reverse('dashboard'))
+        response = self.client.get(reverse('overview'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Welcome to your research workspace')
+        # Both roles are represented on the overview.
+        self.assertContains(response, 'Surveys completed')
+        self.assertContains(response, 'Reward points')
+        for key in (
+            'surveys_completed_count',
+            'points_balance',
+            'recent_earnings',
+            'survey_status_counts',
+        ):
+            self.assertIn(key, response.context)
+        # The duplicated owned-survey list is gone.
+        self.assertNotIn('recent_surveys', response.context)

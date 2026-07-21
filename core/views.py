@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
 from django.shortcuts import render
 
 from responses.models import Submission
@@ -60,23 +61,44 @@ def discover(request):
 
 
 @login_required
-def dashboard(request):
-    owned_surveys = Survey.objects.owned_by(request.user).prefetch_related('topics')
+def overview(request):
+    user = request.user
+    owned_surveys = Survey.objects.owned_by(user).filter(deleted_at__isnull=True)
+
+    # Per-status breakdown of the user's own (non-deleted) surveys.
+    status_rows = owned_surveys.values('status').annotate(count=Count('id'))
+    counts_by_status = {row['status']: row['count'] for row in status_rows}
+    survey_status_counts = {
+        'draft': counts_by_status.get(Survey.Status.DRAFT, 0),
+        'published': counts_by_status.get(Survey.Status.PUBLISHED, 0),
+        'closed': counts_by_status.get(Survey.Status.CLOSED, 0),
+    }
+    active_survey_count = sum(survey_status_counts.values())
+
+    # Responses this user has *received* on surveys they own.
     total_responses = Submission.objects.filter(
-        survey__owner=request.user,
+        survey__owner=user,
         status=Submission.Status.COMPLETED,
     ).count()
+
+    # Respondent side: surveys this user has *completed* for points.
+    surveys_completed_count = Submission.objects.filter(
+        respondent=user,
+        status=Submission.Status.COMPLETED,
+    ).count()
+
     return render(
         request,
-        'core/dashboard.html',
+        'core/overview.html',
         {
-            'profile': request.user.profile,
-            'points_balance': PointTransaction.objects.balance_for(request.user),
-            'active_survey_count': owned_surveys.exclude(
-                status=Survey.Status.ARCHIVED,
-            ).count(),
+            'profile': user.profile,
+            'points_balance': PointTransaction.objects.balance_for(user),
+            'active_survey_count': active_survey_count,
+            'survey_status_counts': survey_status_counts,
             'total_response_count': total_responses,
-            'recent_surveys': owned_surveys[:4],
-            'badge_awards': BadgeAward.objects.filter(user=request.user).select_related('badge')[:4],
+            'surveys_completed_count': surveys_completed_count,
+            'latest_survey': owned_surveys.first(),
+            'recent_earnings': PointTransaction.objects.filter(user=user).select_related('survey')[:5],
+            'badge_awards': BadgeAward.objects.filter(user=user).select_related('badge')[:4],
         },
     )

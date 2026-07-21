@@ -172,7 +172,7 @@ class GuestRewardClaimTests(TestCase):
             {'login': user.email, 'password': 'correct-horse-battery-staple'},
         )
 
-        self.assertRedirects(response, reverse('dashboard'))
+        self.assertRedirects(response, reverse('overview'))
         claim.refresh_from_db()
         submission.refresh_from_db()
         self.assertEqual(claim.claimed_by, user)

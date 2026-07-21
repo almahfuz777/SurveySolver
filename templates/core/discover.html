@@ -6,10 +6,12 @@
 {% block extra_scripts %}<script src="{% static 'js/pages/discover.js' %}" defer></script>{% endblock %}
 
 {% block content %}
-<section class="page-heading page-heading-discover">
+<section class="page-heading">
     <div class="shell page-heading-inner">
         <div>
+            <span class="eyebrow">Discover</span>
             <h1>{% if user.is_authenticated %}Surveys matched to you{% else %}Available studies{% endif %}</h1>
+            <p>{% if user.is_authenticated %}Studies that fit your research profile — complete them to earn points.{% else %}Browse open studies. Sign in to see surveys matched to you and earn points.{% endif %}</p>
         </div>
     </div>
 </section>

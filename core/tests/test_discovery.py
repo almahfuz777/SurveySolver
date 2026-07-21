@@ -237,7 +237,7 @@ class DashboardMetricTests(TestCase):
         )
         self.client.force_login(user)
 
-        response = self.client.get(reverse('dashboard'))
+        response = self.client.get(reverse('overview'))
 
         self.assertEqual(response.context['active_survey_count'], 1)
         self.assertEqual(response.context['total_response_count'], 1)

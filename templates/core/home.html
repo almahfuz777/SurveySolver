@@ -15,7 +15,7 @@
             </p>
             <div class="hero-actions">
                 {% if user.is_authenticated %}
-                    <a class="button button-primary" href="{% url 'dashboard' %}">Open your dashboard</a>
+                    <a class="button button-primary" href="{% url 'survey_list' %}">Create New Survey</a>
                 {% else %}
                     <a class="button button-primary" href="{% url 'account_signup' %}">Join SurveySolver</a>
                 {% endif %}

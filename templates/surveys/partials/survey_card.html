@@ -1,0 +1,43 @@
+{% load static %}
+<article class="survey-management-card" data-status="{{ survey.status }}">
+    <a
+        class="survey-card-visual"
+        href="{% url 'survey_detail' survey.id %}"
+        {% if survey.banner %}style="background-image: linear-gradient(135deg, rgba(49,46,129,.78), rgba(20,184,166,.48)), url('{{ survey.banner.url }}')"{% endif %}
+        aria-label="Open {{ survey.title }}"
+    >
+        <span class="status-label status-{{ survey.status }}">{{ survey.get_status_display }}</span>
+    </a>
+    <div class="survey-card-body">
+        <h2><a href="{% url 'survey_detail' survey.id %}">{{ survey.title }}</a></h2>
+        {% if survey.summary %}
+            <p class="survey-card-summary">{{ survey.summary }}</p>
+        {% else %}
+            <p class="survey-card-summary survey-card-summary-placeholder" aria-hidden="true">&nbsp;</p>
+        {% endif %}
+        <div class="survey-card-meta">
+            <span>{% include 'partials/icon.html' with name='clock' size='14' %} {{ survey.estimated_minutes }} min</span>
+            <span>{% include 'partials/icon.html' with name='responses' size='14' %} {{ survey.response_count }} response{{ survey.response_count|pluralize }}</span>
+            <span>{{ survey.get_visibility_display }}</span>
+        </div>
+        {% if survey.topics.all %}
+            <div class="survey-card-tags">
+                {% for topic in survey.topics.all|slice:':3' %}<span class="tag">{{ topic.name }}</span>{% endfor %}
+            </div>
+        {% endif %}
+        <p class="survey-card-dates">Edited {{ survey.updated_at|date:'M j, Y' }} · Created {{ survey.created_at|date:'M j, Y' }}</p>
+    </div>
+    <div class="survey-card-actions" aria-label="Survey actions">
+        <a href="{% url 'survey_builder' survey.id %}" title="Edit questions" aria-label="Edit {{ survey.title }}">{% include 'partials/icon.html' with name='edit' %}</a>
+        <a href="{% url 'creator_response_list' survey.id %}" title="Responses" aria-label="Responses for {{ survey.title }}">{% include 'partials/icon.html' with name='responses' %}</a>
+        <a href="{% url 'survey_analytics' survey.id %}" title="Analytics" aria-label="Analytics for {{ survey.title }}">{% include 'partials/icon.html' with name='analytics' %}</a>
+        <a href="{% url 'sharing_settings' survey.id %}" title="Share access" aria-label="Share {{ survey.title }}">{% include 'partials/icon.html' with name='share' %}</a>
+        <a href="{% url 'survey_edit' survey.id %}" title="Settings" aria-label="Settings for {{ survey.title }}">{% include 'partials/icon.html' with name='settings' %}</a>
+        {% if survey.owner_id == request.user.id %}
+            <form class="card-action-form" method="post" action="{% url 'survey_delete' survey.id %}" data-confirm="Move “{{ survey.title|escapejs }}” to recently deleted?" data-confirm-ok="Delete">
+                {% csrf_token %}
+                <button class="card-action-danger" type="submit" title="Delete" aria-label="Delete {{ survey.title }}">{% include 'partials/icon.html' with name='trash' %}</button>
+            </form>
+        {% endif %}
+    </div>
+</article>

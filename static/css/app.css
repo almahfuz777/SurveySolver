@@ -449,14 +449,35 @@ a {
 }
 
 .message-stack {
-    padding-top: 1rem;
+    display: grid;
+    gap: 0.75rem;
+    padding-block: 1rem;
 }
 
 .message {
     padding: 0.85rem 1rem;
-    border: 1px solid var(--border);
+    color: var(--indigo-700);
+    border: 1px solid var(--indigo-100);
     background: var(--info-soft);
     border-radius: var(--radius-sm);
+}
+
+.message-success {
+    color: var(--teal-700);
+    background: var(--teal-50);
+    border-color: var(--teal-200);
+}
+
+.message-warning {
+    color: var(--warn-text);
+    background: var(--warn-soft);
+    border-color: var(--warn-border);
+}
+
+.message-error {
+    color: var(--danger);
+    background: var(--danger-soft);
+    border-color: var(--danger-border);
 }
 
 .eyebrow,
