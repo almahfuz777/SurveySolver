@@ -38,10 +38,18 @@
                 <div><dt>Birth date</dt><dd>{{ user.profile.birth_date|default:'Not provided' }}</dd></div>
                 <div><dt>Gender</dt><dd>{{ user.profile.get_gender_display|default:'Not provided' }}</dd></div>
                 <div><dt>Country</dt><dd>{{ user.profile.country.name|default:'Not provided' }}</dd></div>
+                <div><dt>Region</dt><dd>{{ user.profile.region_display|default:'Not provided' }}</dd></div>
+                <div class="detail-wide"><dt>Languages</dt><dd>{{ user.profile.languages_display|default:'Not provided' }}</dd></div>
                 <div><dt>Education</dt><dd>{{ user.profile.get_education_level_display|default:'Not provided' }}</dd></div>
-                <div><dt>Field of study</dt><dd>{{ user.profile.field_of_study|default:'Not provided' }}</dd></div>
+                <div><dt>Field of study</dt><dd>{{ user.profile.get_field_of_study_display|default:'Not provided' }}</dd></div>
                 <div><dt>Employment</dt><dd>{{ user.profile.get_employment_status_display|default:'Not provided' }}</dd></div>
-                <div class="detail-wide"><dt>Research interests</dt><dd>{{ user.profile.research_interests|default:'Not provided' }}</dd></div>
+                <div><dt>Industry</dt><dd>{{ user.profile.get_industry_display|default:'Not provided' }}</dd></div>
+                <div><dt>Occupation</dt><dd>{{ user.profile.get_occupation_display|default:'Not provided' }}</dd></div>
+                <div><dt>Institution</dt><dd>{{ user.profile.institution|default:'Not provided' }}</dd></div>
+                <div><dt>Income</dt><dd>{{ user.profile.get_income_bracket_display|default:'Not provided' }}</dd></div>
+                <div><dt>Religion</dt><dd>{{ user.profile.get_religion_display|default:'Not provided' }}</dd></div>
+                <div><dt>Ethnicity</dt><dd>{{ user.profile.get_ethnicity_display|default:'Not provided' }}</dd></div>
+                <div class="detail-wide"><dt>Research interests</dt><dd>{{ user.profile.research_interests_display|default:'Not provided' }}</dd></div>
             </dl>
         </section>
     </div>

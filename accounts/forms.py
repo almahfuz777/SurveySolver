@@ -49,6 +49,15 @@ class UserNameForm(forms.ModelForm):
         fields = ('first_name', 'last_name')
 
 
+class PillCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
+    template_name = 'surveys/widgets/pill_select.html'
+
+
+def _topic_choices():
+    from surveys.models import Topic
+    return list(Topic.objects.filter(is_active=True).values_list('slug', 'name'))
+
+
 class ResearchProfileForm(forms.ModelForm):
     region = forms.ChoiceField(
         required=False,
@@ -59,8 +68,14 @@ class ResearchProfileForm(forms.ModelForm):
     languages = forms.MultipleChoiceField(
         required=False,
         choices=demographics.LANGUAGE_CHOICES,
-        widget=forms.CheckboxSelectMultiple(),
+        widget=PillCheckboxSelectMultiple(),
         help_text='Select every language you can respond to a survey in.',
+    )
+    research_interests = forms.MultipleChoiceField(
+        required=False,
+        choices=_topic_choices,
+        widget=PillCheckboxSelectMultiple(),
+        help_text='Pick the subjects you would like to be surveyed about.',
     )
 
     class Meta:
@@ -85,12 +100,12 @@ class ResearchProfileForm(forms.ModelForm):
             'research_interests',
         )
         widgets = {
+            'avatar': forms.ClearableFileInput(attrs={'data-avatar-input': '', 'accept': 'image/*'}),
             'birth_date': forms.DateInput(attrs={'type': 'date'}),
+            'gender': forms.Select(attrs={'data-gender-select': ''}),
             'country': forms.Select(attrs={'data-region-country': ''}),
-            'research_interests': forms.Textarea(attrs={'rows': 4}),
         }
         help_texts = {
-            'research_interests': 'Describe the topics you are interested in responding to.',
             'gender_self_description': 'Complete only when you selected “Prefer to self-describe”.',
             'income_bracket': 'Approximate personal income, kept private.',
         }

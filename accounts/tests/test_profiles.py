@@ -38,11 +38,11 @@ class ProfileTests(TestCase):
             'gender_self_description': '',
             'country': 'BD',
             'education_level': 'postgraduate',
-            'field_of_study': 'Computer Science',
+            'field_of_study': 'computer_science',
             'employment_status': 'student',
             'occupation': '',
             'institution': 'Example University',
-            'research_interests': 'Human-computer interaction and mental health',
+            'research_interests': ['mental-health', 'computer-science'],
         }
 
         first_response = self.client.post(reverse('profile_edit'), data)

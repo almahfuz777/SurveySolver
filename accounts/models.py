@@ -101,7 +101,11 @@ class Profile(models.Model):
         choices=EducationLevel.choices,
         blank=True,
     )
-    field_of_study = models.CharField(max_length=120, blank=True)
+    field_of_study = models.CharField(
+        max_length=40,
+        choices=demographics.FIELD_OF_STUDY_CHOICES,
+        blank=True,
+    )
     employment_status = models.CharField(
         max_length=24,
         choices=EmploymentStatus.choices,
@@ -128,9 +132,13 @@ class Profile(models.Model):
         blank=True,
     )
     languages = models.JSONField(default=list, blank=True)
-    occupation = models.CharField(max_length=120, blank=True)
+    occupation = models.CharField(
+        max_length=40,
+        choices=demographics.OCCUPATION_CHOICES,
+        blank=True,
+    )
     institution = models.CharField(max_length=160, blank=True)
-    research_interests = models.CharField(max_length=500, blank=True)
+    research_interests = models.JSONField(default=list, blank=True)
     avatar = models.ImageField(
         upload_to=profile_avatar_path,
         blank=True,
@@ -173,6 +181,31 @@ class Profile(models.Model):
     @property
     def is_complete(self):
         return self.completion_percentage == 100
+
+    @property
+    def region_display(self):
+        if not self.region:
+            return ''
+        import pycountry
+        subdivision = pycountry.subdivisions.get(code=self.region)
+        return subdivision.name if subdivision else self.region
+
+    @property
+    def languages_display(self):
+        if not self.languages:
+            return ''
+        labels = dict(demographics.LANGUAGE_CHOICES)
+        return ', '.join(labels.get(code, code) for code in self.languages)
+
+    @property
+    def research_interests_display(self):
+        if not self.research_interests:
+            return ''
+        from surveys.models import Topic
+        names = dict(
+            Topic.objects.filter(slug__in=self.research_interests).values_list('slug', 'name')
+        )
+        return ', '.join(names.get(slug, slug) for slug in self.research_interests)
 
     def __str__(self):
         return f'Profile for {self.user.email}'

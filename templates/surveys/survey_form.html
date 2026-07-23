@@ -51,6 +51,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const empty = wrapper.querySelector('[data-country-empty]');
     const boxes = Array.from(dropdown.querySelectorAll('input[type="checkbox"]'));
     const noun = wrapper.dataset.noun || 'countries';
+    // Optional parent filter: only show options whose value is prefixed with a
+    // country code selected in the linked source (e.g. regions ↔ countries).
+    const source = wrapper.dataset.regionSource
+      ? document.querySelector(wrapper.dataset.regionSource)
+      : null;
+    const allowedPrefixes = () => source
+      ? new Set(Array.from(source.querySelectorAll('input:checked')).map((box) => box.value))
+      : null;
 
     const close = () => {
       wrapper.classList.remove('is-open');
@@ -91,14 +99,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const filter = () => {
       const query = search.value.trim().toLowerCase();
+      const allowed = allowedPrefixes();
       let matches = 0;
       boxes.forEach((box) => {
         const label = box.closest('label');
-        const match = !query || label.textContent.trim().toLowerCase().includes(query);
-        label.hidden = !match;
-        if (match) matches += 1;
+        const prefixOk = !allowed || allowed.has(box.value.split('-')[0]);
+        const textOk = !query || label.textContent.trim().toLowerCase().includes(query);
+        const show = prefixOk && textOk;
+        label.hidden = !show;
+        if (show) matches += 1;
       });
-      empty.hidden = matches !== 0;
+      if (empty) {
+        empty.textContent = allowed && allowed.size === 0
+          ? 'Select a country above first.'
+          : `No ${noun} found.`;
+        empty.hidden = matches !== 0;
+      }
     };
 
     search.addEventListener('focus', open);
@@ -119,6 +135,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (event) => {
       if (!wrapper.contains(event.target)) close();
     });
+
+    if (source) {
+      // When the parent country selection changes, drop any now-invalid
+      // options and re-filter the visible list.
+      source.addEventListener('change', () => {
+        const allowed = allowedPrefixes();
+        let changed = false;
+        boxes.forEach((box) => {
+          if (box.checked && allowed && !allowed.has(box.value.split('-')[0])) {
+            box.checked = false;
+            changed = true;
+          }
+        });
+        if (changed) renderTags();
+        filter();
+      });
+    }
 
     renderTags();
     filter();
@@ -532,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </label>
                             <div id="region-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_regions.value %} hidden{% endif %}>
                                 <label class="country-search-label" for="region-search-input">Find regions</label>
-                                <div class="country-select" data-country-select data-noun="regions">
+                                <div class="country-select" data-country-select data-noun="regions" data-region-source="#country-options">
                                     <div class="country-tags" data-country-tags></div>
                                     <div class="country-toolbar">
                                         <span id="region-selected-count" data-country-count>No regions selected</span>

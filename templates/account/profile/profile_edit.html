@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}Edit research profile | SurveySolver{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/account/profile/profile.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/eligibility.css' %}"><link rel="stylesheet" href="{% static 'css/account/profile/profile.css' %}"><link rel="stylesheet" href="{% static 'css/account/profile/profile-edit.css' %}">{% endblock %}
 
 {% block content %}
 <section class="page-heading">
@@ -10,7 +10,7 @@
         <div>
             <span class="eyebrow">Profile matching</span>
             <h1>Tell us about yourself</h1>
-            <p>SurveySolver uses these details privately to match you with eligible research.</p>
+            <p>SurveySolver uses these details privately to match you with eligible research. Every field is optional.</p>
         </div>
         <span class="account-chip profile-chip">{{ user.profile.completion_percentage }}% complete</span>
     </div>
@@ -18,41 +18,143 @@
 
 <section class="page-content">
     <div class="shell form-shell">
-        <form class="panel profile-form" method="post" enctype="multipart/form-data" novalidate>
+        <form class="panel profile-edit" method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             {% if user_form.non_field_errors or profile_form.non_field_errors %}
                 {{ user_form.non_field_errors }}
                 {{ profile_form.non_field_errors }}
             {% endif %}
 
+            {# --- Avatar uploader --- #}
+            <div class="avatar-uploader">
+                <label class="avatar-drop" for="{{ profile_form.avatar.id_for_label }}" title="Upload a photo">
+                    <span class="avatar-figure">
+                        <img class="avatar-img" data-avatar-img{% if not user.profile.avatar_url %} hidden{% endif %}{% if user.profile.avatar_url %} src="{{ user.profile.avatar_url }}"{% endif %} alt="Profile photo">
+                        <span data-avatar-initials{% if user.profile.avatar_url %} hidden{% endif %}>{{ user.first_name|first|upper }}{{ user.last_name|first|upper|default:'' }}{% if not user.first_name %}{{ user.email|first|upper }}{% endif %}</span>
+                    </span>
+                    <span class="avatar-cam" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </span>
+                </label>
+                <div class="avatar-meta">
+                    <strong>{{ user.get_full_name|default:user.email }}</strong>
+                    <p>JPG, PNG or WEBP. Square images look best.</p>
+                    <div class="avatar-actions">
+                        <label class="button button-quiet" for="{{ profile_form.avatar.id_for_label }}">Upload photo</label>
+                        <button type="button" class="avatar-remove" data-avatar-remove{% if not user.profile.avatar_url %} hidden{% endif %}>Remove</button>
+                    </div>
+                    <div class="avatar-native">{{ profile_form.avatar }}</div>
+                    {{ profile_form.avatar.errors }}
+                </div>
+            </div>
+
+            {# --- Identity --- #}
             <fieldset>
                 <legend>Identity</legend>
                 <div class="form-grid">
                     {% for field in user_form %}
                         <div class="field-group">
-                            {{ field.label_tag }}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                             {{ field }}
                             {{ field.errors }}
                         </div>
                     {% endfor %}
+                    <div class="field-group">
+                        <label for="{{ profile_form.birth_date.id_for_label }}">{{ profile_form.birth_date.label }}</label>
+                        {{ profile_form.birth_date }}
+                        {{ profile_form.birth_date.errors }}
+                    </div>
+                    <div class="field-group">
+                        <label for="{{ profile_form.gender.id_for_label }}">{{ profile_form.gender.label }}</label>
+                        {{ profile_form.gender }}
+                        {{ profile_form.gender.errors }}
+                    </div>
+                    <div class="field-group field-wide" data-selfdescribe-field{% if profile_form.gender.value != 'self_describe' %} hidden{% endif %}>
+                        <label for="{{ profile_form.gender_self_description.id_for_label }}">{{ profile_form.gender_self_description.label }}</label>
+                        {{ profile_form.gender_self_description }}
+                        {% if profile_form.gender_self_description.help_text %}<small class="helptext">{{ profile_form.gender_self_description.help_text }}</small>{% endif %}
+                        {{ profile_form.gender_self_description.errors }}
+                    </div>
                 </div>
             </fieldset>
 
+            {# --- Location & languages --- #}
             <fieldset>
-                <legend>Research demographics</legend>
+                <legend>Location &amp; languages</legend>
+                <p class="section-hint">Used to match region- and language-specific studies.</p>
                 <div class="form-grid">
-                    {% for field in profile_form %}
-                        <div class="field-group{% if field.name == 'research_interests' %} field-wide{% endif %}">
-                            {{ field.label_tag }}
-                            {{ field }}
-                            {% if field.help_text %}<small class="helptext">{{ field.help_text }}</small>{% endif %}
-                            {{ field.errors }}
+                    <div class="field-group">
+                        <label for="{{ profile_form.country.id_for_label }}">{{ profile_form.country.label }}</label>
+                        {{ profile_form.country }}
+                        {{ profile_form.country.errors }}
+                    </div>
+                    <div class="field-group">
+                        <label for="{{ profile_form.region.id_for_label }}">{{ profile_form.region.label }}</label>
+                        {{ profile_form.region }}
+                        {% if profile_form.region.help_text %}<small class="helptext">{{ profile_form.region.help_text }}</small>{% endif %}
+                        {{ profile_form.region.errors }}
+                    </div>
+                    <div class="field-group field-wide language-field">
+                        <label>{{ profile_form.languages.label }}</label>
+                        <div class="country-select" data-country-select data-noun="languages">
+                            <div class="country-tags" data-country-tags></div>
+                            <div class="country-toolbar">
+                                <span data-country-count>No languages selected</span>
+                                <button type="button" data-country-clear hidden>Clear selected</button>
+                            </div>
+                            <input type="text" class="country-search-input" placeholder="Search languages…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" data-country-search aria-label="Search languages">
+                            <div class="country-dropdown" data-country-dropdown hidden>
+                                <p class="country-empty" data-country-empty hidden>No languages found.</p>
+                                {{ profile_form.languages }}
+                            </div>
                         </div>
-                    {% endfor %}
+                        {% if profile_form.languages.help_text %}<small class="helptext">{{ profile_form.languages.help_text }}</small>{% endif %}
+                        {{ profile_form.languages.errors }}
+                    </div>
                 </div>
             </fieldset>
 
-            <div class="form-actions">
+            {# --- Education & work --- #}
+            <fieldset>
+                <legend>Education &amp; work</legend>
+                <div class="form-grid">
+                    {% with edu=profile_form.education_level fos=profile_form.field_of_study emp=profile_form.employment_status ind=profile_form.industry occ=profile_form.occupation inst=profile_form.institution %}
+                    <div class="field-group"><label for="{{ edu.id_for_label }}">{{ edu.label }}</label>{{ edu }}{{ edu.errors }}</div>
+                    <div class="field-group"><label for="{{ fos.id_for_label }}">{{ fos.label }}</label>{{ fos }}{{ fos.errors }}</div>
+                    <div class="field-group"><label for="{{ emp.id_for_label }}">{{ emp.label }}</label>{{ emp }}{{ emp.errors }}</div>
+                    <div class="field-group"><label for="{{ ind.id_for_label }}">{{ ind.label }}</label>{{ ind }}{{ ind.errors }}</div>
+                    <div class="field-group"><label for="{{ occ.id_for_label }}">{{ occ.label }}</label>{{ occ }}{{ occ.errors }}</div>
+                    <div class="field-group"><label for="{{ inst.id_for_label }}">{{ inst.label }}</label>{{ inst }}{{ inst.errors }}</div>
+                    {% endwith %}
+                </div>
+            </fieldset>
+
+            {# --- Background (sensitive, optional) --- #}
+            <fieldset>
+                <legend>Background</legend>
+                <p class="section-hint">Optional and private — used only to match studies that request these groups. Choose “Prefer not to say” to skip.</p>
+                <div class="form-grid">
+                    {% with inc=profile_form.income_bracket rel=profile_form.religion eth=profile_form.ethnicity %}
+                    <div class="field-group"><label for="{{ inc.id_for_label }}">{{ inc.label }}</label>{{ inc }}{% if inc.help_text %}<small class="helptext">{{ inc.help_text }}</small>{% endif %}{{ inc.errors }}</div>
+                    <div class="field-group"><label for="{{ rel.id_for_label }}">{{ rel.label }}</label>{{ rel }}{{ rel.errors }}</div>
+                    <div class="field-group"><label for="{{ eth.id_for_label }}">{{ eth.label }}</label>{{ eth }}{{ eth.errors }}</div>
+                    {% endwith %}
+                </div>
+            </fieldset>
+
+            {# --- Research interests --- #}
+            <fieldset>
+                <legend>Research interests</legend>
+                <p class="section-hint">Pick the subjects you would like to be surveyed about.</p>
+                <div class="form-grid">
+                    <div class="field-group field-wide">
+                        {{ profile_form.research_interests }}
+                        {{ profile_form.research_interests.errors }}
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="profile-actions">
                 <a class="button button-quiet" href="{% url 'profile_detail' %}">Cancel</a>
                 <button class="button button-primary" type="submit">Save profile</button>
             </div>
@@ -62,31 +164,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
-(function () {
-    const country = document.querySelector('[data-region-country]');
-    const region = document.querySelector('[data-region-select]');
-    if (!country || !region) return;
-    const options = Array.from(region.options);
-
-    const syncRegions = () => {
-        const code = country.value;
-        let selectedStillValid = false;
-        options.forEach((option) => {
-            const match = option.value === '' || (code && option.value.startsWith(code + '-'));
-            option.hidden = !match;
-            option.disabled = !match && option.value !== '';
-            if (match && option.value === region.value) selectedStillValid = true;
-        });
-        if (!selectedStillValid) region.value = '';
-        const placeholder = options[0];
-        if (placeholder && placeholder.value === '') {
-            placeholder.textContent = code ? 'Select your region' : 'Select your country first';
-        }
-    };
-
-    country.addEventListener('change', syncRegions);
-    syncRegions();
-})();
-</script>
+<script src="{% static 'js/pages/profile-edit.js' %}" defer></script>
 {% endblock %}
