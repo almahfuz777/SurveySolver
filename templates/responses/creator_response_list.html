@@ -4,6 +4,8 @@
 {% block title %}Responses · {{ survey.title }} | SurveySolver{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/responses/creator-responses.css' %}">{% endblock %}
 
+{% block extra_scripts %}<script src="{% static 'js/pages/creator-responses.js' %}" defer></script>{% endblock %}
+
 {% block content %}
 <section class="page-heading">
     <div class="shell page-heading-inner">
@@ -13,44 +15,21 @@
 </section>
 <section class="page-content">
     <div class="shell creator-responses">
-        <details class="panel response-filters"{% if request.GET %} open{% endif %}>
-            <summary>Filter and customize responses</summary>
-            <form method="get">
-                <div class="response-filter-grid">
-                    <label>Search answers or shared identity{{ filter_form.search }}</label>
-                    <label>Version{{ filter_form.version }}</label>
-                    <label>Completion{{ filter_form.completion }}</label>
-                    <label>Source{{ filter_form.source }}</label>
-                    <label>Eligibility{{ filter_form.eligibility }}</label>
-                    <label>Analytics status{{ filter_form.exclusion }}</label>
-                    <label>Started from{{ filter_form.date_from }}</label>
-                    <label>Started through{{ filter_form.date_to }}</label>
-                </div>
-                <fieldset class="column-selector"><legend>Visible columns</legend>{{ filter_form.columns }}</fieldset>
-                {% if filter_form.errors %}<div class="message message-error" role="alert">Review the invalid filters and try again.</div>{% endif %}
-                <div class="filter-actions"><button class="button button-primary" type="submit">Apply</button><a class="button button-quiet" href="{% url 'creator_response_list' survey.id %}">Reset</a></div>
-            </form>
-        </details>
         <div class="metric-grid response-metrics" aria-label="Response summary">
             <article class="metric-card"><span>Starts</span><strong>{{ metrics.starts }}</strong><small>All response sessions</small></article>
             <article class="metric-card"><span>Completed</span><strong>{{ metrics.completions }}</strong><small>{{ metrics.completion_rate }}% completion rate</small></article>
-            <article class="metric-card"><span>Median duration</span><strong>{% if metrics.median_duration_seconds != None %}{{ metrics.median_duration_seconds }}s{% else %}—{% endif %}</strong><small>Completed responses</small></article>
+            <article class="metric-card"><span>Median duration</span><strong>{{ metrics.median_duration_display|default:'—' }}</strong><small>Completed responses</small></article>
         </div>
-        <div class="export-actions" aria-label="Export filtered responses"><span>Export this filtered result set</span><a class="button button-secondary button-small" href="{% url 'response_export_csv' survey.id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">CSV</a><a class="button button-secondary button-small" href="{% url 'response_export_json' survey.id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">JSON</a><a class="button button-secondary button-small" href="{% url 'response_export_excel' survey.id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}">Excel</a></div>
-        <section class="panel response-table-panel" aria-labelledby="response-table-heading">
-            <div class="panel-heading"><div><span class="panel-kicker">Version-aware records</span><h2 id="response-table-heading">Responses</h2></div><span class="table-count">{{ page_obj.paginator.count }} total</span></div>
-            {% if page_obj.object_list %}
-                <div class="table-scroll" tabindex="0">
-                    <table class="response-table">
-                        <thead><tr>{% if 'started' in selected_columns %}<th scope="col">Started</th>{% endif %}{% if 'status' in selected_columns %}<th scope="col">Status</th>{% endif %}{% if 'version' in selected_columns %}<th scope="col">Version</th>{% endif %}{% if 'source' in selected_columns %}<th scope="col">Source</th>{% endif %}{% if 'duration' in selected_columns %}<th scope="col">Duration</th>{% endif %}{% if 'respondent' in selected_columns %}<th scope="col">Respondent</th>{% endif %}<th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
-                        <tbody>{% for submission in page_obj %}<tr class="{% if submission.is_excluded %}response-row-excluded{% endif %}">{% if 'started' in selected_columns %}<td>{{ submission.started_at|date:'M j, Y H:i' }}</td>{% endif %}{% if 'status' in selected_columns %}<td><span class="status-label status-{{ submission.status }}">{{ submission.get_status_display }}</span>{% if submission.is_excluded %}<small>Excluded from analytics</small>{% endif %}</td>{% endif %}{% if 'version' in selected_columns %}<td>v{{ submission.version.number }}</td>{% endif %}{% if 'source' in selected_columns %}<td>{{ submission.get_source_display }}</td>{% endif %}{% if 'duration' in selected_columns %}<td>{{ submission.duration_display }}</td>{% endif %}{% if 'respondent' in selected_columns %}<td>{% if submission.creator_identity %}{{ submission.creator_identity.name }}<small>{{ submission.creator_identity.email }}</small>{% elif submission.status == 'completed' %}Anonymous{% else %}Not submitted{% endif %}</td>{% endif %}<td>{% if submission.status == 'completed' %}<a class="button button-quiet button-small" href="{% url 'creator_response_detail' survey.id submission.id %}">View</a>{% else %}<span aria-label="No submitted answers">—</span>{% endif %}</td></tr>{% endfor %}</tbody>
-                    </table>
-                </div>
-                {% if page_obj.paginator.num_pages > 1 %}<nav class="pagination" aria-label="Response pages">{% if page_obj.has_previous %}<a class="button button-secondary button-small" href="?{% if query_parameters %}{{ query_parameters }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="button button-secondary button-small" href="?{% if query_parameters %}{{ query_parameters }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
-            {% else %}
-                <div class="empty-state"><span class="empty-icon" aria-hidden="true">⌁</span><h3>No response activity yet</h3><p>Share the respondent link to begin collecting responses.</p></div>
-            {% endif %}
-        </section>
+        <div class="response-view-tabs" role="tablist" aria-label="Response dashboard view">
+            <button id="metadata-tab" type="button" role="tab" aria-selected="true" aria-controls="metadata-view" data-view="metadata" class="active">Collection activity</button>
+            <button id="responses-tab" type="button" role="tab" aria-selected="false" aria-controls="responses-view" data-view="responses" tabindex="-1">Response sheet</button>
+        </div>
+        <div id="metadata-view" class="response-view-panel active" role="tabpanel" aria-labelledby="metadata-tab">
+            {% include 'responses/partials/response_activity.html' %}
+        </div>
+        <div id="responses-view" class="response-view-panel" role="tabpanel" aria-labelledby="responses-tab" hidden>
+            {% include 'responses/partials/response_sheet.html' %}
+        </div>
     </div>
 </section>
 {% endblock %}

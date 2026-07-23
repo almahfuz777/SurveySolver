@@ -1,7 +1,15 @@
 /* Creator response list, detail, filtering, and deletion */
 
-.creator-responses { display: grid; gap: 1.25rem; }
-.response-table-panel { overflow: hidden; padding: 0; }
+.creator-responses { display: grid; gap: 1.25rem; min-width: 0; }
+.creator-responses > * { min-width: 0; }
+.response-view-tabs { align-items: center; background: var(--surface-warm); border: 1px solid var(--border); border-radius: var(--radius); display: inline-flex; justify-self: start; padding: 0.25rem; }
+.response-view-tabs button { background: transparent; border: 0; border-radius: calc(var(--radius) - 0.2rem); color: var(--text-muted); cursor: pointer; font-size: 0.86rem; font-weight: 750; min-height: 2.5rem; padding: 0.55rem 1rem; }
+.response-view-tabs button.active { background: var(--surface); box-shadow: var(--shadow-sm); color: var(--indigo-600); }
+.response-view-tabs button:hover:not(.active) { color: var(--text); }
+.response-view-panel[hidden] { display: none; }
+.response-view-panel:not([hidden]) { display: grid; gap: 1rem; min-width: 0; }
+.response-view-panel[aria-busy="true"] { opacity: 0.68; }
+.response-table-panel { min-width: 0; overflow: hidden; padding: 0; }
 .response-table-panel .panel-heading { padding: 1.25rem 1.5rem; }
 .table-count { color: var(--text-muted); font-size: 0.85rem; }
 
@@ -10,6 +18,38 @@
 .response-table th { background: var(--surface-warm); color: var(--text-muted); font-size: 0.74rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .response-table td { font-size: 0.88rem; }
 .response-table td small { color: var(--text-muted); display: block; }
+.response-sheet-scroll { max-width: 100%; overscroll-behavior-inline: contain; scrollbar-gutter: stable; width: 100%; }
+.response-sheet-table { min-width: 100%; width: max-content; }
+.response-sheet-table th:not(.response-timestamp):not(.response-row-action),
+.response-sheet-table td:not(.response-timestamp):not(.response-row-action) { max-width: 22rem; min-width: 15rem; overflow-wrap: anywhere; vertical-align: top; white-space: normal; }
+.response-sheet-table thead th { vertical-align: top; }
+.response-sheet-table .response-timestamp { background: var(--surface); border-right: 1px solid var(--border); left: 0; min-width: 12.5rem; position: sticky; white-space: nowrap; z-index: 1; }
+.response-sheet-table th.response-timestamp { background: var(--surface-warm); z-index: 2; }
+.response-sheet-table .response-row-action { background: var(--surface); border-left: 1px solid var(--border); min-width: 3.5rem; padding-inline: 0.65rem; position: sticky; right: 0; text-align: center; width: 3.5rem; z-index: 1; }
+.response-sheet-table th.response-row-action { background: var(--surface-warm); z-index: 2; }
+.response-sheet-table tbody tr:hover td { background: var(--indigo-50); }
+.response-open-link { align-items: center; border-radius: 999px; color: var(--text-muted); display: inline-flex; height: 2rem; justify-content: center; transition: background-color 150ms ease, color 150ms ease, transform 150ms ease; width: 2rem; }
+.response-open-link:hover { background: var(--surface); color: var(--indigo-600); transform: translateX(2px); }
+.sheet-column-heading { align-items: start; display: grid; gap: 0.45rem; grid-template-columns: minmax(0, 1fr) auto; }
+.sheet-sort-link { align-items: flex-start; color: inherit; display: inline-flex; gap: 0.35rem; line-height: 1.35; text-decoration: none; }
+.sheet-sort-link:hover, .sheet-sort-link.is-sorted { color: var(--indigo-600); }
+.sort-indicator { flex: none; font-size: 0.9rem; line-height: 1.05; }
+.column-filter { display: contents; }
+.column-filter summary { align-items: center; border: 1px solid transparent; border-radius: 0.35rem; color: var(--text-muted); cursor: pointer; display: flex; grid-column: 2; grid-row: 1; height: 1.75rem; justify-content: center; list-style: none; position: relative; width: 1.75rem; }
+.column-filter summary::-webkit-details-marker { display: none; }
+.column-filter summary:hover, .column-filter[open] summary { background: var(--surface); border-color: var(--border); color: var(--indigo-600); }
+.column-filter.has-filter summary { background: var(--indigo-50); color: var(--indigo-600); }
+.column-filter.has-filter summary::after { background: var(--teal-600); border: 2px solid var(--surface-warm); border-radius: 999px; content: ""; height: 0.45rem; position: absolute; transform: translate(0.55rem, -0.55rem); width: 0.45rem; }
+.column-filter-panel { color: var(--text); display: grid; font-size: 0.76rem; font-weight: 650; gap: 0.45rem; grid-column: 1 / -1; grid-row: 2; letter-spacing: normal; margin-top: 0.05rem; min-width: 0; text-transform: none; width: 100%; }
+.column-filter-panel label { display: grid; gap: 0.25rem; }
+.column-filter-panel input[type="search"],
+.column-filter-panel input[type="date"],
+.column-filter-panel select { background: var(--surface); border: 1px solid var(--border); border-radius: 0.4rem; color: var(--text); font: inherit; height: 2.25rem; min-width: 0; padding: 0.35rem 0.5rem; width: 100%; }
+.column-date-filter { min-width: 11rem; }
+.column-filter-clear { background: transparent; border: 0; color: var(--indigo-600); cursor: pointer; font-size: 0.75rem; font-weight: 750; justify-self: start; padding: 0.15rem 0; }
+.column-filter-clear:hover { text-decoration: underline; }
+.sheet-empty-row { color: var(--text-muted); padding: 2rem !important; text-align: center !important; }
+.cell-empty { color: var(--text-muted); }
 .pagination { align-items: center; border-top: 1px solid var(--border); display: flex; gap: 1rem; justify-content: flex-end; padding: 1rem 1.5rem; }
 .pagination span { color: var(--text-muted); font-size: 0.85rem; }
 .response-detail-layout { align-items: start; display: grid; gap: 1.25rem; grid-template-columns: minmax(14rem, .55fr) minmax(0, 1.45fr); }
@@ -26,8 +66,9 @@
 .response-answer dl div { display: flex; gap: 1rem; justify-content: space-between; }
 .response-answer dt { color: var(--text-muted); }
 .response-answer dd { font-weight: 700; margin: 0; }
-.response-filters { padding: 1.25rem 1.5rem; }
-.response-filters summary { cursor: pointer; font-size: 1rem; font-weight: 800; }
+.response-filters { padding: 1.1rem 1.25rem; }
+.response-filters summary { align-items: baseline; cursor: pointer; display: flex; flex-wrap: wrap; font-size: 1rem; font-weight: 800; gap: 0.4rem 0.75rem; }
+.response-filters summary small { color: var(--text-muted); font-size: 0.78rem; font-weight: 500; }
 .response-filters form { margin-top: 1.25rem; }
 .response-filter-grid { display: grid; gap: 0.8rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .response-filter-grid label { color: var(--text-muted); display: grid; font-size: 0.78rem; font-weight: 700; gap: 0.3rem; }
@@ -39,12 +80,16 @@
 .filter-actions { display: flex; gap: 0.65rem; }
 .export-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .55rem; justify-content: flex-end; }
 .export-actions span { color: var(--text-muted); font-size: .82rem; margin-right: .25rem; }
+.response-sheet-heading { gap: 1rem; }
+.response-sheet-heading h2 { margin-bottom: 0.15rem; }
+.sheet-heading-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: flex-end; }
+.sheet-filter-error { margin: 0 1.25rem 1rem; }
+.sheet-filter-submit { margin: 1rem; }
 .response-row-excluded { background: var(--warn-soft); opacity: 0.82; }
 .response-management { border-top: 1px solid var(--border); display: grid; gap: 0.7rem; margin-top: 1.2rem; padding-top: 1rem; }
 .response-management h3 { font-size: 0.9rem; margin: 0; }
 .response-management form { display: grid; gap: 0.55rem; }
 .response-management label { color: var(--text-muted); font-size: 0.78rem; font-weight: 700; }
-
 .destructive-confirmation { max-width: 42rem; padding: clamp(1.5rem, 5vw, 3rem); }
 .destructive-confirmation > p { color: var(--text-muted); }
 .destructive-confirmation dl { border-block: 1px solid var(--border); margin: 1.25rem 0; padding: 1rem 0; }
@@ -59,6 +104,12 @@
 }
 
 @media (max-width: 760px) {
+    .response-view-tabs {
+        display: grid;
+        justify-self: stretch;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .response-detail-layout {
         grid-template-columns: 1fr;
     }
@@ -69,5 +120,19 @@
 
     .response-filter-grid {
         grid-template-columns: 1fr;
+    }
+
+    .response-sheet-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .export-actions {
+        justify-content: flex-start;
+    }
+
+    .sheet-heading-actions {
+        align-items: flex-start;
+        justify-content: flex-start;
     }
 }

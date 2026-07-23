@@ -71,7 +71,7 @@ class ResponseExportTests(TestCase):
 
         response = self.client.get(
             reverse('response_export_csv', args=[self.survey.id]),
-            {'completion': Submission.Status.COMPLETED, 'exclusion': 'included'},
+            {f'answer_{self.question.id}': 'response'},
         )
 
         rows = list(
@@ -79,7 +79,10 @@ class ResponseExportTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(rows), 2)
-        self.assertIn(str(completed.id), rows[1])
+        self.assertEqual(rows[0][0], 'Submitted at')
+        self.assertIn('Describe your experience', rows[0][1])
+        self.assertEqual(len(rows[1]), 2)
+        self.assertEqual(rows[1][0], completed.completed_at.isoformat())
         self.assertIn("'=1+1\nবাংলা response", rows[1])
         self.assertNotIn(self.respondent.email, rows[1])
 
@@ -91,12 +94,16 @@ class ResponseExportTests(TestCase):
         payload = json.loads(self.body(response))
 
         self.assertEqual(payload['survey']['id'], str(self.survey.id))
-        self.assertEqual(payload['responses'][0]['response_id'], str(submission.id))
         self.assertEqual(
-            payload['responses'][0]['answers'][0]['value'],
+            payload['responses'][0]['submitted_at'],
+            submission.completed_at.isoformat(),
+        )
+        self.assertEqual(
+            payload['responses'][0]['answers'][str(self.question.id)],
             '=1+1\nবাংলা response',
         )
-        self.assertIsNone(payload['responses'][0]['identity_email'])
+        self.assertNotIn('identity_email', payload['responses'][0])
+        self.assertNotIn('response_id', payload['responses'][0])
         self.assertNotIn(self.respondent.email, self.body(response).decode())
 
     def test_viewer_can_export_but_outsider_cannot(self):
@@ -119,7 +126,7 @@ class ResponseExportTests(TestCase):
 
         response = self.client.get(
             reverse('response_export_excel', args=[self.survey.id]),
-            {'completion': Submission.Status.COMPLETED, 'exclusion': 'included'},
+            {f'answer_{self.question.id}': 'response'},
         )
         workbook = load_workbook(io.BytesIO(self.body(response)), read_only=True)
         rows = list(workbook['Responses'].iter_rows(values_only=False))
@@ -127,7 +134,10 @@ class ResponseExportTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(rows), 2)
-        self.assertIn(str(submission.id), values)
+        self.assertEqual(rows[0][0].value, 'Submitted at')
+        self.assertIn('Describe your experience', rows[0][1].value)
+        self.assertEqual(len(values), 2)
+        self.assertEqual(values[0], submission.completed_at.isoformat())
         self.assertIn("'=1+1\nবাংলা response", values)
         formula_safe_cell = next(cell for cell in rows[1] if cell.value == "'=1+1\nবাংলা response")
         self.assertEqual(formula_safe_cell.data_type, 's')
@@ -139,7 +149,7 @@ class ResponseExportTests(TestCase):
 
         response = self.client.get(
             reverse('response_export_csv', args=[self.survey.id]),
-            {'date_from': '2026-02-02', 'date_to': '2026-01-01'},
+            {'submitted_from': '2026-02-02', 'submitted_to': '2026-01-01'},
         )
 
         self.assertEqual(response.status_code, 400)

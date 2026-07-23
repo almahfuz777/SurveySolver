@@ -1,0 +1,68 @@
+<section class="panel response-table-panel" aria-labelledby="responses-heading">
+    <div class="panel-heading response-sheet-heading">
+        <div><span class="panel-kicker">One submitted response per row</span><h2 id="responses-heading">Response sheet</h2><span class="table-count">{{ responses_page.paginator.count }} responses</span></div>
+        <div class="sheet-heading-actions">
+            {% if sheet_state_active %}<a class="button button-quiet button-small" data-ajax-page="sheet" href="{% url 'creator_response_list' survey.id %}{% if sheet_reset_query %}?{{ sheet_reset_query }}{% endif %}">Clear sorting and filters</a>{% endif %}
+            <div class="export-actions" aria-label="Export this response sheet"><span>Export this view</span><a class="button button-secondary button-small" href="{% url 'response_export_csv' survey.id %}{% if sheet_export_query %}?{{ sheet_export_query }}{% endif %}">CSV</a><a class="button button-secondary button-small" href="{% url 'response_export_json' survey.id %}{% if sheet_export_query %}?{{ sheet_export_query }}{% endif %}">JSON</a><a class="button button-secondary button-small" href="{% url 'response_export_excel' survey.id %}{% if sheet_export_query %}?{{ sheet_export_query }}{% endif %}">Excel</a></div>
+        </div>
+    </div>
+    <p class="filter-status sr-only" role="status" aria-live="polite" data-filter-status="sheet"></p>
+    {% if sheet_filter_form.errors %}<div class="message message-error sheet-filter-error" role="alert">One or more column filters are invalid.</div>{% endif %}
+    <form method="get" action="{% url 'creator_response_list' survey.id %}" data-ajax-filter="sheet">
+        <input type="hidden" name="sheet_sort" value="{{ sheet_sort }}">
+        <input type="hidden" name="sheet_direction" value="{{ sheet_direction }}">
+        <div class="table-scroll response-sheet-scroll" tabindex="0" aria-label="Response sheet; scroll horizontally to see every question">
+            <table class="response-table response-sheet-table">
+                <thead>
+                    <tr>
+                            <th class="response-timestamp" scope="col" aria-sort="{% if sheet_sort == 'timestamp' %}{{ sheet_direction }}ending{% else %}none{% endif %}">
+                                <div class="sheet-column-heading">
+                                    <a class="sheet-sort-link{% if sheet_sort == 'timestamp' %} is-sorted{% endif %}" data-sheet-sort href="?{{ timestamp_sort_query }}">Submitted at <span class="sort-indicator" aria-hidden="true">{% if sheet_sort == 'timestamp' %}{% if sheet_direction == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span></a>
+                                    <details class="column-filter{% if submitted_from or submitted_to %} has-filter{% endif %}">
+                                        <summary aria-label="Filter Submitted at">{% include 'partials/icon.html' with name='filter' size='15' %}</summary>
+                                        <div class="column-filter-panel column-date-filter">
+                                            <label>From<input type="date" name="submitted_from" value="{{ submitted_from|date:'Y-m-d' }}" data-auto-filter></label>
+                                            <label>To<input type="date" name="submitted_to" value="{{ submitted_to|date:'Y-m-d' }}" data-auto-filter></label>
+                                            <button type="button" class="column-filter-clear" data-clear-filter="submitted_from,submitted_to">Clear</button>
+                                        </div>
+                                    </details>
+                                </div>
+                            </th>
+                            {% for question in sheet_questions %}
+                                <th scope="col" aria-sort="{% if question.is_sorted %}{{ question.sort_direction }}ending{% else %}none{% endif %}">
+                                    <div class="sheet-column-heading">
+                                        <a class="sheet-sort-link{% if question.is_sorted %} is-sorted{% endif %}" data-sheet-sort href="?{{ question.sort_query }}">{{ question.sheet_label }} <span class="sort-indicator" aria-hidden="true">{% if question.is_sorted %}{% if question.sort_direction == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span></a>
+                                        <details class="column-filter{% if question.is_filtered %} has-filter{% endif %}">
+                                            <summary aria-label="Filter {{ question.sheet_label }}">{% include 'partials/icon.html' with name='filter' size='15' %}</summary>
+                                            <div class="column-filter-panel">
+                                                {% if question.filter_options %}
+                                                    <label>Value<select name="{{ question.filter_name }}" data-auto-filter><option value="">All values</option>{% for option in question.filter_options %}<option value="{{ option }}"{% if option == question.filter_value %} selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+                                                {% else %}
+                                                    <label>Filter values<input type="search" name="{{ question.filter_name }}" value="{{ question.filter_value }}" placeholder="Contains…" autocomplete="off" data-auto-filter></label>
+                                                {% endif %}
+                                                <button type="button" class="column-filter-clear" data-clear-filter="{{ question.filter_name }}">Clear</button>
+                                            </div>
+                                        </details>
+                                    </div>
+                                </th>
+                            {% endfor %}
+                            <th class="response-row-action" scope="col"><span class="sr-only">Open response</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for submission in responses_page %}
+                        <tr>
+                            <td class="response-timestamp"><time datetime="{{ submission.completed_at|date:'c' }}">{{ submission.completed_at|date:'M j, Y · H:i' }}</time></td>
+                            {% for cell in submission.sheet_cells %}<td>{% if cell != None %}{{ cell }}{% else %}<span class="cell-empty" aria-label="Not answered">—</span>{% endif %}</td>{% endfor %}
+                            <td class="response-row-action"><a class="response-open-link" href="{% url 'creator_response_detail' survey.id submission.id %}" aria-label="Open full response submitted {{ submission.completed_at|date:'M j, Y H:i' }}">{% include 'partials/icon.html' with name='arrow-right' size='17' %}</a></td>
+                        </tr>
+                    {% empty %}
+                        <tr><td class="sheet-empty-row" colspan="{{ sheet_column_count }}">No submitted responses match these column filters.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if responses_page.paginator.num_pages > 1 %}<nav class="pagination" aria-label="Response sheet pages">{% if responses_page.has_previous %}<a class="button button-secondary button-small" data-ajax-page="sheet" href="?{% if sheet_query_parameters %}{{ sheet_query_parameters }}&amp;{% endif %}response_page={{ responses_page.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ responses_page.number }} of {{ responses_page.paginator.num_pages }}</span>{% if responses_page.has_next %}<a class="button button-secondary button-small" data-ajax-page="sheet" href="?{% if sheet_query_parameters %}{{ sheet_query_parameters }}&amp;{% endif %}response_page={{ responses_page.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
+        <noscript><button class="button button-primary sheet-filter-submit" type="submit">Apply column filters</button></noscript>
+    </form>
+</section>

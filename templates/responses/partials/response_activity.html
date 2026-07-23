@@ -1,0 +1,37 @@
+<details class="panel response-filters"{% if activity_filters_active or filter_form.errors %} open{% endif %}>
+    <summary><span>Filter activity metadata</span><small>Updates automatically</small></summary>
+    <form method="get" action="{% url 'creator_response_list' survey.id %}" data-ajax-filter="activity">
+        <div class="response-filter-grid">
+            <label>Search answers or shared identity{{ filter_form.search }}</label>
+            <label>Version{{ filter_form.version }}</label>
+            <label>Completion{{ filter_form.completion }}</label>
+            <label>Sort by{{ filter_form.sort }}</label>
+            <label>Source{{ filter_form.source }}</label>
+            <label>Eligibility{{ filter_form.eligibility }}</label>
+            <label>Analytics status{{ filter_form.exclusion }}</label>
+            <label>Started from{{ filter_form.date_from }}</label>
+            <label>Started through{{ filter_form.date_to }}</label>
+        </div>
+        <fieldset class="column-selector"><legend>Visible activity columns</legend>{{ filter_form.columns }}</fieldset>
+        {% if filter_form.errors %}<div class="message message-error" role="alert">Review the invalid filters and try again.</div>{% endif %}
+        <div class="filter-actions">
+            <a class="button button-quiet button-small" data-ajax-page="activity" href="{% url 'creator_response_list' survey.id %}{% if activity_reset_query %}?{{ activity_reset_query }}{% endif %}">Reset activity filters</a>
+            <noscript><button class="button button-primary button-small" type="submit">Apply filters</button></noscript>
+        </div>
+    </form>
+</details>
+<p class="filter-status sr-only" role="status" aria-live="polite" data-filter-status="activity"></p>
+<section class="panel response-table-panel" aria-labelledby="response-table-heading">
+    <div class="panel-heading"><div><span class="panel-kicker">Version-aware records</span><h2 id="response-table-heading">Response activity</h2></div><span class="table-count">{{ page_obj.paginator.count }} total</span></div>
+    {% if page_obj.object_list %}
+        <div class="table-scroll" tabindex="0">
+            <table class="response-table">
+                <thead><tr>{% if 'started' in selected_columns %}<th scope="col">Started</th>{% endif %}{% if 'status' in selected_columns %}<th scope="col">Status</th>{% endif %}{% if 'version' in selected_columns %}<th scope="col">Version</th>{% endif %}{% if 'source' in selected_columns %}<th scope="col">Source</th>{% endif %}{% if 'duration' in selected_columns %}<th scope="col">Duration</th>{% endif %}{% if 'respondent' in selected_columns %}<th scope="col">Respondent</th>{% endif %}<th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+                <tbody>{% for submission in page_obj %}<tr class="{% if submission.is_excluded %}response-row-excluded{% endif %}">{% if 'started' in selected_columns %}<td>{{ submission.started_at|date:'M j, Y H:i' }}</td>{% endif %}{% if 'status' in selected_columns %}<td><span class="status-label status-{{ submission.status }}">{{ submission.get_status_display }}</span>{% if submission.is_excluded %}<small>Excluded from analytics</small>{% endif %}</td>{% endif %}{% if 'version' in selected_columns %}<td>v{{ submission.version.number }}</td>{% endif %}{% if 'source' in selected_columns %}<td>{{ submission.get_source_display }}</td>{% endif %}{% if 'duration' in selected_columns %}<td>{{ submission.duration_display }}</td>{% endif %}{% if 'respondent' in selected_columns %}<td>{% if submission.creator_identity %}{{ submission.creator_identity.name }}<small>{{ submission.creator_identity.email }}</small>{% elif submission.status == 'completed' %}Anonymous{% else %}Not submitted{% endif %}</td>{% endif %}<td>{% if submission.status == 'completed' %}<a class="button button-quiet button-small" href="{% url 'creator_response_detail' survey.id submission.id %}">View</a>{% else %}<span aria-label="No submitted answers">—</span>{% endif %}</td></tr>{% endfor %}</tbody>
+            </table>
+        </div>
+        {% if page_obj.paginator.num_pages > 1 %}<nav class="pagination" aria-label="Activity pages">{% if page_obj.has_previous %}<a class="button button-secondary button-small" data-ajax-page="activity" href="?{% if activity_query_parameters %}{{ activity_query_parameters }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="button button-secondary button-small" data-ajax-page="activity" href="?{% if activity_query_parameters %}{{ activity_query_parameters }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
+    {% else %}
+        <div class="empty-state"><span class="empty-icon" aria-hidden="true">⌁</span><h3>No activity matches</h3><p>Reset the metadata filters or share the survey to collect responses.</p></div>
+    {% endif %}
+</section>

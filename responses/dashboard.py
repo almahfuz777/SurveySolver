@@ -2,9 +2,21 @@ from collections import Counter
 from statistics import median
 from uuid import UUID
 
-from django.db.models import Exists, OuterRef, Q, TextField
+from django.db.models import (
+    Exists,
+    F,
+    FloatField,
+    OuterRef,
+    Q,
+    Subquery,
+    TextField,
+)
+from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast
 
+from surveys.models import Question
+
+from .durations import duration_seconds, format_duration_seconds
 from .models import Answer, Submission
 
 
@@ -16,20 +28,22 @@ def response_metrics(submissions):
         completed_queryset.values_list('started_at', 'completed_at')
     )
     durations = [
-        (completed_at - started_at).total_seconds()
+        duration
         for started_at, completed_at in completed_timestamps
-        if completed_at
+        if (duration := duration_seconds(started_at, completed_at)) is not None
     ]
     trend = Counter(
         completed_at.date()
         for _, completed_at in completed_timestamps
         if completed_at
     )
+    median_duration_seconds = round(median(durations)) if durations else None
     return {
         'starts': starts,
         'completions': completions,
         'completion_rate': round(completions / starts * 100, 1) if starts else 0,
-        'median_duration_seconds': round(median(durations)) if durations else None,
+        'median_duration_seconds': median_duration_seconds,
+        'median_duration_display': format_duration_seconds(median_duration_seconds),
         'completion_trend': sorted(trend.items()),
     }
 
@@ -74,7 +88,116 @@ def filter_submissions(queryset, filters, survey):
         except ValueError:
             pass
         queryset = queryset.filter(search_query)
-    return queryset
+    ordering = 'started_at' if filters.get('sort') == 'oldest' else '-started_at'
+    return queryset.order_by(ordering)
+
+
+def filter_response_sheet(queryset, filters, questions):
+    if filters.get('submitted_from'):
+        queryset = queryset.filter(
+            completed_at__date__gte=filters['submitted_from'],
+        )
+    if filters.get('submitted_to'):
+        queryset = queryset.filter(
+            completed_at__date__lte=filters['submitted_to'],
+        )
+
+    questions_by_id = {str(question.id): question for question in questions}
+    for question_id, question in questions_by_id.items():
+        value = filters.get(f'answer_{question_id}', '').strip()
+        if not value:
+            continue
+        matching_answers = Answer.objects.filter(
+            submission_id=OuterRef('pk'),
+            question_id=question.id,
+        )
+        if question.type in {
+            Question.Type.SINGLE_CHOICE,
+            Question.Type.DROPDOWN,
+        }:
+            matching_answers = matching_answers.filter(
+                value__label__iexact=value,
+            )
+        elif question.type in {
+            Question.Type.SCALE,
+            Question.Type.NUMBER,
+        }:
+            try:
+                numeric_value = float(value)
+            except ValueError:
+                matching_answers = matching_answers.none()
+            else:
+                matching_answers = matching_answers.filter(value=numeric_value)
+        else:
+            matching_answers = (
+                matching_answers.annotate(answer_text=Cast('value', TextField()))
+                .filter(answer_text__icontains=value)
+            )
+        queryset = queryset.annotate(
+            **{f'matches_{question.id.hex}': Exists(matching_answers)}
+        ).filter(**{f'matches_{question.id.hex}': True})
+
+    sort_key = filters.get('sheet_sort') or 'timestamp'
+    direction = filters.get('sheet_direction') or 'desc'
+    descending = direction == 'desc'
+    if sort_key == 'timestamp':
+        ordering = F('completed_at')
+    else:
+        question = questions_by_id.get(sort_key)
+        if question is None:
+            ordering = F('completed_at')
+            descending = True
+        else:
+            answer_sort = Answer.objects.filter(
+                submission_id=OuterRef('pk'),
+                question_id=question.id,
+            )
+            if question.type in {
+                Question.Type.SINGLE_CHOICE,
+                Question.Type.DROPDOWN,
+            }:
+                output_field = TextField()
+                answer_sort = answer_sort.annotate(
+                    sort_value=KeyTextTransform('label', 'value'),
+                )
+            elif question.type in {
+                Question.Type.SCALE,
+                Question.Type.NUMBER,
+            }:
+                output_field = FloatField()
+                answer_sort = answer_sort.annotate(
+                    sort_value=Cast('value', FloatField()),
+                )
+            elif question.type in {
+                Question.Type.MULTIPLE_CHOICE,
+                Question.Type.RANKING,
+            }:
+                output_field = TextField()
+                answer_sort = answer_sort.annotate(
+                    sort_value=KeyTextTransform(
+                        'label',
+                        KeyTextTransform('0', 'value'),
+                    ),
+                )
+            else:
+                output_field = TextField()
+                answer_sort = answer_sort.annotate(
+                    sort_value=Cast('value', TextField()),
+                )
+            queryset = queryset.annotate(
+                sheet_sort_value=Subquery(
+                    answer_sort.values('sort_value')[:1],
+                    output_field=output_field,
+                ),
+            )
+            ordering = F('sheet_sort_value')
+
+    ordering = (
+        ordering.desc(nulls_last=True)
+        if descending
+        else ordering.asc(nulls_last=True)
+    )
+    return queryset.order_by(ordering, '-completed_at', 'id')
 
 
 def creator_identity(submission):
@@ -87,11 +210,8 @@ def creator_identity(submission):
 
 
 def format_duration(submission):
-    if not submission.completed_at:
-        return '—'
-    seconds = max(0, round((submission.completed_at - submission.started_at).total_seconds()))
-    minutes, seconds = divmod(seconds, 60)
-    return f'{minutes}m {seconds}s' if minutes else f'{seconds}s'
+    seconds = duration_seconds(submission.started_at, submission.completed_at)
+    return format_duration_seconds(seconds) or '—'
 
 
 def format_answer(answer):
@@ -111,4 +231,15 @@ def format_answer(answer):
             (row_value['row_label'], row_value['choice_label'])
             for row_value in value.values()
         ]
+    return value
+
+
+def format_answer_cell(answer):
+    value = format_answer(answer)
+    if isinstance(value, list):
+        if value and isinstance(value[0], tuple):
+            return '; '.join(f'{row}: {choice}' for row, choice in value)
+        return ', '.join(str(item) for item in value)
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
     return value

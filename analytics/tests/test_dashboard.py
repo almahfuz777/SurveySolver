@@ -99,7 +99,7 @@ class SurveyAnalyticsDashboardTests(TestCase):
         self.assertContains(response, '50.0% completion rate')
         self.assertContains(response, 'Preferred study setting?')
         self.assertContains(response, 'Library')
-        self.assertContains(response, '90s')
+        self.assertContains(response, '1m 30s')
 
     def test_version_filter_keeps_question_summaries_separate(self):
         self.create_submission()

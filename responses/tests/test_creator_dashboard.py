@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -7,7 +9,7 @@ from rewards.models import PointTransaction
 from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 
-from responses.models import ResponseAuditEvent, Submission
+from responses.models import Answer, ResponseAuditEvent, Submission
 
 
 class CreatorResponseDashboardTests(TestCase):
@@ -50,6 +52,27 @@ class CreatorResponseDashboardTests(TestCase):
         submission.refresh_from_db()
         return submission
 
+    def completed_response_with_answer(self, value, *, session_character='z'):
+        submission = Submission.objects.create(
+            survey=self.survey,
+            version=self.version,
+            session_key_hash=session_character * 64,
+            presentation={'sections': []},
+            eligibility_data={'targeted': False},
+        )
+        Answer.objects.create(
+            submission=submission,
+            question=self.question,
+            value=value,
+        )
+        completed_at = timezone.now()
+        Submission.objects.filter(pk=submission.pk).update(
+            status=Submission.Status.COMPLETED,
+            started_at=completed_at - timedelta(minutes=2),
+            completed_at=completed_at,
+        )
+        return Submission.objects.get(pk=submission.pk)
+
     def test_owner_sees_response_metrics_and_answer_detail(self):
         submission = self.complete_response()
         self.client.force_login(self.owner)
@@ -64,6 +87,18 @@ class CreatorResponseDashboardTests(TestCase):
         self.assertEqual(response.context['metrics']['completion_rate'], 100)
         self.assertContains(detail, 'Describe your experience')
         self.assertContains(detail, 'A detailed response')
+
+    def test_invalid_negative_duration_is_not_reported(self):
+        submission = self.complete_response()
+        Submission.objects.filter(pk=submission.pk).update(
+            started_at=submission.completed_at + timedelta(minutes=5),
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse('creator_response_list', args=[self.survey.id]))
+
+        self.assertIsNone(response.context['metrics']['median_duration_seconds'])
+        self.assertEqual(response.context['page_obj'].object_list[0].duration_display, '—')
 
     def test_anonymous_mode_never_exposes_platform_account_identity(self):
         submission = self.complete_response()
@@ -147,15 +182,15 @@ class CreatorResponseDashboardTests(TestCase):
         response = self.client.get(
             reverse('creator_response_list', args=[self.survey.id]),
             {
-                'version': str(self.version.id),
-                'date_from': timezone.localdate().isoformat(),
-                'date_to': timezone.localdate().isoformat(),
-                'completion': Submission.Status.COMPLETED,
-                'source': Submission.Source.DIRECT,
-                'eligibility': 'eligible',
-                'exclusion': 'included',
-                'search': 'detailed response',
-                'columns': ['status', 'duration'],
+                'activity-version': str(self.version.id),
+                'activity-date_from': timezone.localdate().isoformat(),
+                'activity-date_to': timezone.localdate().isoformat(),
+                'activity-completion': Submission.Status.COMPLETED,
+                'activity-source': Submission.Source.DIRECT,
+                'activity-eligibility': 'eligible',
+                'activity-exclusion': 'included',
+                'activity-search': 'detailed response',
+                'activity-columns': ['status', 'duration'],
             },
         )
 
@@ -163,6 +198,46 @@ class CreatorResponseDashboardTests(TestCase):
         self.assertEqual(response.context['page_obj'].object_list[0].id, submission.id)
         self.assertEqual(response.context['selected_columns'], ['status', 'duration'])
         self.assertNotContains(response, '<th scope="col">Version</th>', html=True)
+
+    def test_response_sheet_filters_and_sorts_answer_columns(self):
+        first = self.complete_response()
+        second = self.completed_response_with_answer('Zebra response')
+        self.client.force_login(self.owner)
+        url = reverse('creator_response_list', args=[self.survey.id])
+
+        filtered = self.client.get(
+            url,
+            {
+                f'answer_{self.question.id}': 'zebra',
+                'dashboard_view': 'sheet',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        sorted_response = self.client.get(
+            url,
+            {
+                'sheet_sort': str(self.question.id),
+                'sheet_direction': 'desc',
+            },
+        )
+
+        self.assertTemplateUsed(
+            filtered,
+            'responses/partials/response_sheet.html',
+        )
+        self.assertEqual(filtered.context['responses_page'].paginator.count, 1)
+        self.assertEqual(filtered.context['responses_page'].object_list[0].id, second.id)
+        self.assertContains(
+            filtered,
+            reverse(
+                'creator_response_detail',
+                args=[self.survey.id, second.id],
+            ),
+        )
+        self.assertEqual(
+            [submission.id for submission in sorted_response.context['responses_page']],
+            [second.id, first.id],
+        )
 
     def test_exclude_and_include_actions_are_audited(self):
         submission = self.complete_response()
@@ -190,7 +265,7 @@ class CreatorResponseDashboardTests(TestCase):
         default_list = self.client.get(reverse('creator_response_list', args=[self.survey.id]))
         excluded_list = self.client.get(
             reverse('creator_response_list', args=[self.survey.id]),
-            {'exclusion': 'excluded'},
+            {'activity-exclusion': 'excluded'},
         )
         self.assertEqual(default_list.context['page_obj'].paginator.count, 0)
         self.assertEqual(excluded_list.context['page_obj'].paginator.count, 1)

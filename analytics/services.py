@@ -4,6 +4,7 @@ from statistics import median
 from accounts.models import Profile
 from django_countries import countries
 
+from responses.durations import duration_seconds, format_duration_seconds
 from responses.models import Answer, Submission
 
 
@@ -20,21 +21,23 @@ def overview_metrics(submissions):
     )
     completions = len(completed)
     durations = [
-        (completed_at - started_at).total_seconds()
+        duration
         for started_at, completed_at in completed
-        if completed_at
+        if (duration := duration_seconds(started_at, completed_at)) is not None
     ]
     starts_by_day = Counter(started.date() for started in submissions.values_list('started_at', flat=True))
     completions_by_day = Counter(
         completed_at.date() for _, completed_at in completed if completed_at
     )
     trend_dates = sorted(set(starts_by_day) | set(completions_by_day))
+    median_duration_seconds = round(median(durations)) if durations else None
     return {
         'starts': starts,
         'completions': completions,
         'abandonments': starts - completions,
         'completion_rate': round(completions / starts * 100, 1) if starts else 0,
-        'median_duration_seconds': round(median(durations)) if durations else None,
+        'median_duration_seconds': median_duration_seconds,
+        'median_duration_display': format_duration_seconds(median_duration_seconds),
         'trend': [
             {
                 'date': date,

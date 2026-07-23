@@ -1,5 +1,4 @@
 import csv
-import json
 from tempfile import SpooledTemporaryFile
 
 from django.core.serializers.json import DjangoJSONEncoder
@@ -11,23 +10,12 @@ from openpyxl.styles import Font, PatternFill
 
 from surveys.models import Question, SurveyVersion
 
-from .dashboard import creator_identity, filter_submissions
-from .forms import ResponseFilterForm
+from .dashboard import filter_response_sheet, format_answer_cell
+from .forms import ResponseSheetFilterForm
+from .models import Submission
 
 
-FIXED_COLUMNS = (
-    'response_id',
-    'version',
-    'started_at',
-    'completed_at',
-    'status',
-    'source',
-    'is_eligible',
-    'is_excluded',
-    'duration_seconds',
-    'identity_name',
-    'identity_email',
-)
+TIMESTAMP_COLUMN = 'Submitted at'
 
 
 class Echo:
@@ -36,34 +24,48 @@ class Echo:
 
 
 def filtered_export_data(query_parameters, survey):
-    form = ResponseFilterForm(query_parameters, survey=survey)
+    questions = response_sheet_questions(survey)
+    form = ResponseSheetFilterForm(
+        query_parameters,
+        questions=questions,
+    )
     if not form.is_valid():
         return form, None, None
-    submissions = filter_submissions(
-        survey.submissions.select_related('version').prefetch_related(
+    submissions = filter_response_sheet(
+        survey.submissions.filter(
+            status=Submission.Status.COMPLETED,
+            is_excluded=False,
+        ).select_related('version').prefetch_related(
             'answers__question__section',
         ),
         form.cleaned_data,
-        survey,
-    ).order_by('-started_at')
+        questions,
+    )
+    return form, submissions, questions
+
+
+def response_sheet_questions(survey, *, version_id=None):
     questions = Question.objects.filter(
         section__version__survey=survey,
         section__version__status__in=(
             SurveyVersion.Status.PUBLISHED,
             SurveyVersion.Status.RETIRED,
         ),
-    ).select_related('section__version')
-    if form.cleaned_data.get('version'):
-        questions = questions.filter(section__version_id=form.cleaned_data['version'])
-    return form, submissions, list(
+    ).select_related('section__version').prefetch_related('choices')
+    if version_id:
+        questions = questions.filter(section__version_id=version_id)
+    questions = list(
         questions.order_by('section__version__number', 'section__order', 'order')
     )
-
-
-def _serialized_value(value):
-    if isinstance(value, (dict, list)):
-        return json.dumps(value, ensure_ascii=False, cls=DjangoJSONEncoder)
-    return value
+    include_version = len(
+        {question.section.version_id for question in questions}
+    ) > 1
+    for question in questions:
+        question.sheet_label = question_column(
+            question,
+            include_version=include_version,
+        )
+    return questions
 
 
 def _csv_safe(value):
@@ -82,66 +84,59 @@ def _excel_safe(value):
     return value
 
 
-def response_record(submission):
-    identity = creator_identity(submission) or {}
-    duration = None
-    if submission.completed_at:
-        duration = max(
-            0,
-            round((submission.completed_at - submission.started_at).total_seconds()),
-        )
+def _blank_if_none(value):
+    return '' if value is None else value
+
+
+def response_sheet_record(submission, questions):
+    answer_by_question = {
+        answer.question_id: format_answer_cell(answer)
+        for answer in submission.answers.all()
+    }
     return {
-        'response_id': str(submission.id),
-        'version': submission.version.number,
-        'started_at': submission.started_at.isoformat(),
-        'completed_at': submission.completed_at.isoformat() if submission.completed_at else None,
-        'status': submission.status,
-        'source': submission.source,
-        'is_eligible': submission.is_eligible,
-        'is_excluded': submission.is_excluded,
-        'duration_seconds': duration,
-        'identity_name': identity.get('name'),
-        'identity_email': identity.get('email'),
-        'answers': [
-            {
-                'question_id': str(answer.question_id),
-                'version': answer.question.section.version.number,
-                'section': answer.question.section.title,
-                'prompt': answer.question.prompt,
-                'type': answer.question.type,
-                'value': answer.value,
-            }
-            for answer in submission.answers.all()
-        ],
+        'submitted_at': submission.completed_at.isoformat(),
+        'answers': {
+            str(question.id): answer_by_question.get(question.id)
+            for question in questions
+        },
     }
 
 
-def question_column(question):
-    return f'v{question.section.version.number} · {question.prompt} [{question.id}]'
+def question_column(question, *, include_version=True):
+    if include_version:
+        return f'v{question.section.version.number} · {question.prompt}'
+    return question.prompt
 
 
 def iter_csv(submissions, questions):
     writer = csv.writer(Echo())
     yield '\ufeff' + writer.writerow(
-        (*FIXED_COLUMNS, *(_csv_safe(question_column(question)) for question in questions))
+        (TIMESTAMP_COLUMN, *(_csv_safe(question.sheet_label) for question in questions))
     )
-    question_ids = [str(question.id) for question in questions]
     for submission in submissions.iterator(chunk_size=500):
-        record = response_record(submission)
-        answer_values = {
-            answer['question_id']: _serialized_value(answer['value'])
-            for answer in record.pop('answers')
-        }
+        record = response_sheet_record(submission, questions)
         yield writer.writerow(
-            [_csv_safe(record[column]) for column in FIXED_COLUMNS]
-            + [_csv_safe(answer_values.get(question_id, '')) for question_id in question_ids]
+            [_csv_safe(record['submitted_at'])]
+            + [
+                _csv_safe(
+                    _blank_if_none(record['answers'].get(str(question.id)))
+                )
+                for question in questions
+            ]
         )
 
 
-def iter_json(survey, submissions):
+def iter_json(survey, submissions, questions):
     encoder = DjangoJSONEncoder(ensure_ascii=False, separators=(',', ':'))
     yield '{"survey":'
     yield encoder.encode({'id': str(survey.id), 'title': survey.title})
+    yield ',"questions":'
+    yield encoder.encode(
+        [
+            {'id': str(question.id), 'label': question.sheet_label}
+            for question in questions
+        ]
+    )
     yield ',"generated_at":'
     yield encoder.encode(timezone.now().isoformat())
     yield ',"responses":['
@@ -149,7 +144,7 @@ def iter_json(survey, submissions):
     for submission in submissions.iterator(chunk_size=500):
         if not first:
             yield ','
-        yield encoder.encode(response_record(submission))
+        yield encoder.encode(response_sheet_record(submission, questions))
         first = False
     yield ']}'
 
@@ -159,7 +154,7 @@ def build_excel(survey, submissions, questions):
     workbook = Workbook(write_only=True)
     worksheet = workbook.create_sheet('Responses')
     worksheet.freeze_panes = 'A2'
-    headers = (*FIXED_COLUMNS, *(question_column(question) for question in questions))
+    headers = (TIMESTAMP_COLUMN, *(question.sheet_label for question in questions))
     header_cells = []
     for header in headers:
         cell = WriteOnlyCell(worksheet, value=_excel_safe(header))
@@ -167,16 +162,16 @@ def build_excel(survey, submissions, questions):
         cell.fill = PatternFill('solid', fgColor='312E81')
         header_cells.append(cell)
     worksheet.append(header_cells)
-    question_ids = [str(question.id) for question in questions]
     for submission in submissions.iterator(chunk_size=500):
-        record = response_record(submission)
-        answer_values = {
-            answer['question_id']: _serialized_value(answer['value'])
-            for answer in record.pop('answers')
-        }
+        record = response_sheet_record(submission, questions)
         worksheet.append(
-            [_excel_safe(record[column]) for column in FIXED_COLUMNS]
-            + [_excel_safe(answer_values.get(question_id, '')) for question_id in question_ids]
+            [_excel_safe(record['submitted_at'])]
+            + [
+                _excel_safe(
+                    _blank_if_none(record['answers'].get(str(question.id)))
+                )
+                for question in questions
+            ]
         )
     metadata = workbook.create_sheet('About')
     metadata.append(('Survey', _excel_safe(survey.title)))
