@@ -49,7 +49,6 @@ class SurveyAnalyticsDashboardTests(TestCase):
         self,
         *,
         completed=True,
-        excluded=False,
         country='BD',
         question=None,
         choice=None,
@@ -76,27 +75,35 @@ class SurveyAnalyticsDashboardTests(TestCase):
                 status=Submission.Status.COMPLETED,
                 started_at=completed_at - timedelta(seconds=90),
                 completed_at=completed_at,
-                is_excluded=excluded,
             )
         return Submission.objects.get(pk=submission.pk)
 
     def test_owner_and_viewer_can_access_but_outsider_cannot(self):
-        url = reverse('survey_analytics', args=[self.survey.id])
+        url = reverse('analytics_dashboard') + f'?survey={self.survey.id}'
         self.client.force_login(self.viewer)
         self.assertEqual(self.client.get(url).status_code, 200)
         self.client.force_login(self.outsider)
-        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(
+            self.client.get(
+                reverse('survey_analytics', args=[self.survey.id]),
+            ).status_code,
+            404,
+        )
 
-    def test_metrics_question_distribution_and_exclusions(self):
+    def test_metrics_and_question_distribution_include_all_sessions(self):
         self.create_submission()
         self.create_submission(completed=False)
-        self.create_submission(excluded=True)
+        self.create_submission()
         self.client.force_login(self.owner)
 
-        response = self.client.get(reverse('survey_analytics', args=[self.survey.id]))
+        response = self.client.get(
+            reverse('analytics_dashboard'),
+            {'survey': self.survey.id, 'version': self.version.id},
+        )
 
-        self.assertContains(response, '<strong>2</strong>', html=True)
-        self.assertContains(response, '50.0% completion rate')
+        self.assertEqual(response.context['metrics']['starts'], 3)
+        self.assertEqual(response.context['metrics']['completions'], 2)
+        self.assertContains(response, '66.7% completion rate')
         self.assertContains(response, 'Preferred study setting?')
         self.assertContains(response, 'Library')
         self.assertContains(response, '1m 30s')
@@ -104,6 +111,9 @@ class SurveyAnalyticsDashboardTests(TestCase):
     def test_version_filter_keeps_question_summaries_separate(self):
         self.create_submission()
         second_draft = self.survey.draft_version
+        second_question = second_draft.sections.get().questions.get()
+        second_question.prompt = 'Preferred study setting now?'
+        second_question.save(update_fields=('prompt',))
         second_version, _ = publish_survey(
             self.survey.id,
             self.owner,
@@ -115,8 +125,8 @@ class SurveyAnalyticsDashboardTests(TestCase):
         self.client.force_login(self.owner)
 
         response = self.client.get(
-            reverse('survey_analytics', args=[self.survey.id]),
-            {'version': second_version.id},
+            reverse('analytics_dashboard'),
+            {'survey': self.survey.id, 'version': second_version.id},
         )
 
         self.assertContains(response, 'Version 2')
@@ -128,7 +138,7 @@ class SurveyAnalyticsDashboardTests(TestCase):
             self.create_submission(country='BD')
         self.create_submission(country='US')
         self.client.force_login(self.owner)
-        url = reverse('survey_analytics', args=[self.survey.id])
+        url = reverse('analytics_dashboard') + f'?survey={self.survey.id}&version={self.version.id}'
 
         suppressed = self.client.get(url)
 

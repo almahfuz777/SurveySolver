@@ -9,31 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const bannerEditBtn = document.querySelector('[data-banner-edit]');
   const bannerFileInput = document.getElementById('banner-file-input');
   const bannerUploadForm = document.getElementById('banner-upload-form');
-  const headerForm = document.getElementById('header-edit-form');
 
   if (bannerEditBtn && bannerFileInput) {
     bannerEditBtn.addEventListener('click', () => bannerFileInput.click());
     bannerFileInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0 && bannerUploadForm) {
         bannerUploadForm.submit();
-      }
-    });
-  }
-
-  if (headerForm) {
-    const titleInput = headerForm.querySelector('[name="title"]');
-    const summaryInput = headerForm.querySelector('[name="summary"]');
-    const autoSaveFields = [titleInput, summaryInput];
-    let autoSaveTimer;
-
-    autoSaveFields.forEach(field => {
-      if (field) {
-        field.addEventListener('input', () => {
-          clearTimeout(autoSaveTimer);
-          autoSaveTimer = setTimeout(() => {
-            headerForm.submit();
-          }, 1500);
-        });
       }
     });
   }
@@ -81,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </form>
     </aside>
 
-    <main class="studio-canvas" aria-label="Survey questionnaire">
+    <main class="studio-canvas" aria-label="Survey questionnaire" data-canvas-deselect data-deselect-url="{% url 'survey_builder' survey.id %}?question=none">
         <div class="canvas-inner">
             <div class="survey-banner-section">
                 <div class="survey-banner-placeholder" id="banner-upload-zone">
@@ -92,9 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             {% include 'partials/icon.html' with name='image' size='32' %}
                         </div>
                     {% endif %}
-                    <form id="banner-upload-form" method="post" action="{% url 'survey_edit' survey.id %}" enctype="multipart/form-data" style="display: none;">
+                    <form id="banner-upload-form" method="post" action="{% url 'survey_banner_update' survey.id %}" enctype="multipart/form-data" style="display: none;">
                         {% csrf_token %}
-                        <input type="hidden" name="action" value="metadata">
                         <input type="file" id="banner-file-input" name="banner" accept="image/jpeg,image/png,image/webp" class="sr-only">
                     </form>
                     <button type="button" class="banner-edit-btn" data-banner-edit title="Edit banner image">
@@ -104,21 +84,22 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <div class="survey-header-edit">
-                <form method="post" action="{% url 'survey_edit' survey.id %}" class="survey-header-form" enctype="multipart/form-data" id="header-edit-form">
+                <form method="post" action="{% url 'survey_builder_header_update' survey.id %}" class="autosave-form survey-header-form" id="header-edit-form">
                     {% csrf_token %}
-                    <input type="hidden" name="action" value="metadata">
                     <div class="header-input-group">
                         <input type="text" name="title" value="{{ survey.title }}" class="survey-title-input" placeholder="Survey title" maxlength="160" data-autosave>
+                        <div class="field-errors" data-errors-for="title"></div>
                     </div>
                     <div class="header-input-group">
                         <textarea name="summary" class="survey-summary-input" placeholder="Short description (shown on discovery cards)" maxlength="320" data-autosave>{{ survey.summary }}</textarea>
+                        <div class="field-errors" data-errors-for="summary"></div>
                     </div>
                 </form>
             </div>
 
             <div class="rv-head">
                 <span class="rv-eyebrow">{% include 'partials/icon.html' with name='preview' size='13' %} Responder view</span>
-                <span class="rv-hint">Click any question to edit it</span>
+                <span class="rv-hint">Click any question to edit it · click empty space to deselect</span>
             </div>
 
             <div class="rv-card">
@@ -142,7 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         {% for question in section.questions.all %}
                             {% if selected_question.id == question.id %}
-                                <div class="rv-q is-editing" id="question-{{ question.id }}" data-selected-card>
+                                <div class="rv-q is-editing{% if question.change_status %} is-{{ question.change_status }}{% endif %}" id="question-{{ question.id }}" data-selected-card{% if question.change_status %} data-change="{{ question.change_status }}"{% endif %}>
+                                    {% if question.change_status %}<span class="rv-change-bar" aria-hidden="true"></span><span class="sr-only">{% if question.change_status == 'added' %}Added since the last publication.{% else %}Edited since the last publication.{% endif %}</span>{% endif %}
                                     <span class="editing-chip">{% include 'partials/icon.html' with name='edit' size='11' %} Editing</span>
                                     <button type="button" class="rv-open-inspector" data-inspector-open aria-label="Open question settings">{% include 'partials/icon.html' with name='settings' size='13' %} Settings</button>
                                     {% include 'surveys/partials/question_view.html' with editable=True %}
@@ -174,7 +156,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                 </div>
                             {% else %}
-                                <a class="rv-q" id="question-{{ question.id }}" href="{% url 'survey_builder' survey.id %}?question={{ question.id }}#question-{{ question.id }}" data-select aria-label="Edit question {{ question.number }}: {{ question.prompt }}">
+                                <a class="rv-q{% if question.change_status %} is-{{ question.change_status }}{% endif %}" id="question-{{ question.id }}" href="{% url 'survey_builder' survey.id %}?question={{ question.id }}#question-{{ question.id }}" data-select{% if question.change_status %} data-change="{{ question.change_status }}"{% endif %} aria-label="Edit question {{ question.number }}: {{ question.prompt }}{% if question.change_status %} ({% if question.change_status == 'added' %}added{% else %}edited{% endif %} since the last publication){% endif %}">
+                                    {% if question.change_status %}<span class="rv-change-bar" aria-hidden="true"></span>{% endif %}
                                     {% include 'surveys/partials/question_view.html' %}
                                 </a>
                             {% endif %}
@@ -221,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="insp-type-badge">{% include 'surveys/partials/type_icon.html' with type=selected_question.type size='16' %}</span>
                     <div class="insp-headings">
                         <strong>Question {{ selected_question.number }}</strong>
-                        <small>{{ selected_question.section.title }}</small>
+                        <small>{{ selected_question.section_label }}</small>
                     </div>
                     <div class="insp-head-actions">
                         <label class="insp-required insp-required-compact" title="Respondents must answer this question">
@@ -255,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <label class="insp-label" for="{{ editor_form.choices_text.id_for_label }}" data-choice-label data-label-default="Options" data-label-likert="Columns (answer scale)">Options</label>
                     <div class="choice-editor" data-choice-editor data-item-name="option">
                         {{ editor_form.choices_text }}
+                        {{ editor_form.choice_identities_text }}
                     </div>
                     <div class="field-errors" data-errors-for="choices_text">{{ editor_form.choices_text.errors }}</div>
                 </div>
@@ -266,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <label class="insp-label" for="{{ editor_form.rows_text.id_for_label }}">Rows (statements)</label>
                     <div class="choice-editor" data-choice-editor data-item-name="statement">
                         {{ editor_form.rows_text }}
+                        {{ editor_form.row_identities_text }}
                     </div>
                     <div class="field-errors" data-errors-for="rows_text">{{ editor_form.rows_text.errors }}</div>
                 </div>
@@ -334,8 +319,12 @@ document.addEventListener('DOMContentLoaded', () => {
         {% else %}
             <div class="insp-empty">
                 <span class="insp-empty-icon" aria-hidden="true">{% include 'partials/icon.html' with name='edit' size='20' %}</span>
-                <h2>Nothing selected</h2>
-                <p>Add a question from the toolbar, then click it in the responder view to configure it here.</p>
+                <h2>Select a question to edit</h2>
+                {% if question_total %}
+                    <p>Click any question in the responder view to configure it here.</p>
+                {% else %}
+                    <p>Add a question from the toolbar, then click it in the responder view to configure it here.</p>
+                {% endif %}
             </div>
         {% endif %}
     </aside>

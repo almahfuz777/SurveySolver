@@ -1,12 +1,14 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import models
 from django.http import FileResponse, HttpResponseBadRequest, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
-from sharing.permissions import EDIT_ROLES, OWNER_ROLES, VIEW_ROLES, get_accessible_survey
+from sharing.permissions import OWNER_ROLES, VIEW_ROLES, get_accessible_survey
+from surveys.models import SurveyVersion
 
 from .dashboard import (
     creator_identity,
@@ -25,17 +27,44 @@ from .exports import (
     response_sheet_questions,
 )
 from .forms import ResponseFilterForm, ResponseSheetFilterForm
-from .management import permanently_delete_submission, set_analytics_exclusion
+from .management import permanently_delete_submission
 from .models import Submission
 
 
 @login_required
 def response_list(request, survey_id):
     survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
+    versions = list(
+        survey.versions.exclude(status=SurveyVersion.Status.DRAFT)
+        .annotate(
+            completed_count=models.Count(
+                'submissions',
+                filter=models.Q(submissions__status=Submission.Status.COMPLETED),
+            ),
+            start_count=models.Count('submissions'),
+        )
+        .order_by('-number')
+    )
+    active_version = next(
+        (version for version in versions if version.status == SurveyVersion.Status.PUBLISHED),
+        None,
+    )
+    selected_version_id = request.GET.get('sheet_version')
+    selected_version = next(
+        (version for version in versions if str(version.id) == selected_version_id),
+        None,
+    )
+    if selected_version is None:
+        selected_version = active_version or (versions[0] if versions else None)
     base_queryset = survey.submissions.select_related('version').prefetch_related(
         'answers__question',
     )
-    metrics = response_metrics(base_queryset.filter(is_excluded=False))
+    selected_queryset = (
+        base_queryset.filter(version=selected_version)
+        if selected_version is not None
+        else base_queryset.none()
+    )
+    metrics = response_metrics(selected_queryset)
 
     activity_data = request.GET.copy()
     for parameter in list(activity_data):
@@ -50,7 +79,6 @@ def response_list(request, survey_id):
         activity_filters = filter_form.cleaned_data
     else:
         activity_filters = {
-            'exclusion': 'included',
             'sort': 'newest',
             'columns': [choice[0] for choice in ResponseFilterForm.COLUMN_CHOICES],
         }
@@ -61,7 +89,10 @@ def response_list(request, survey_id):
     )
     page = Paginator(activity_queryset, 25).get_page(request.GET.get('page'))
 
-    sheet_questions = response_sheet_questions(survey)
+    sheet_questions = response_sheet_questions(
+        survey,
+        version_id=selected_version.id if selected_version else None,
+    )
     sheet_data = request.GET.copy()
     for parameter in list(sheet_data):
         if not (
@@ -82,9 +113,8 @@ def response_list(request, survey_id):
             'sheet_direction': 'desc',
         }
     sheet_queryset = filter_response_sheet(
-        base_queryset.filter(
+        selected_queryset.filter(
             status=Submission.Status.COMPLETED,
-            is_excluded=False,
         ),
         sheet_filters,
         sheet_questions,
@@ -134,8 +164,10 @@ def response_list(request, survey_id):
     sheet_reset_query.pop('dashboard_view', None)
     sheet_export_query = request.GET.copy()
     for field_name in list(sheet_export_query):
-        if field_name not in sheet_field_names:
+        if field_name not in sheet_field_names and field_name != 'sheet_version':
             sheet_export_query.pop(field_name, None)
+    if selected_version:
+        sheet_export_query['sheet_version'] = str(selected_version.id)
 
     sheet_sort = sheet_filters.get('sheet_sort') or 'timestamp'
     sheet_direction = sheet_filters.get('sheet_direction') or 'desc'
@@ -197,6 +229,9 @@ def response_list(request, survey_id):
 
     context = {
         'survey': survey,
+        'versions': versions,
+        'selected_version': selected_version,
+        'active_version': active_version,
         'metrics': metrics,
         'page_obj': page,
         'responses_page': responses_page,
@@ -225,7 +260,7 @@ def response_list(request, survey_id):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         partial = {
             'activity': 'responses/partials/response_activity.html',
-            'sheet': 'responses/partials/response_sheet.html',
+            'sheet': 'responses/partials/response_sheet_versions.html',
         }.get(request.GET.get('dashboard_view'))
         if partial:
             return render(request, partial, context)
@@ -248,16 +283,29 @@ def response_detail(request, survey_id, submission_id):
         survey=survey,
         status=Submission.Status.COMPLETED,
     )
+    section_map = {
+        str(section.id): section
+        for section in submission.version.sections.all()
+    }
+    answers = {
+        str(answer.question_id): answer
+        for answer in submission.answers.all()
+    }
     sections = []
-    answers_by_section = {}
-    for answer in submission.answers.all():
-        section = answer.question.section
-        answers_by_section.setdefault(section.id, {'section': section, 'answers': []})[
-            'answers'
-        ].append({'question': answer.question, 'value': format_answer(answer)})
-    for section in submission.version.sections.order_by('order'):
-        if section.id in answers_by_section:
-            sections.append(answers_by_section[section.id])
+    for section_data in submission.presentation.get('sections', []):
+        section_answers = []
+        for question_data in section_data.get('questions', []):
+            answer = answers.get(question_data['id'])
+            if answer is not None:
+                section_answers.append(
+                    {
+                        'question': answer.question,
+                        'value': format_answer(answer),
+                    }
+                )
+        section = section_map.get(section_data['id'])
+        if section is not None and section_answers:
+            sections.append({'section': section, 'answers': section_answers})
     return render(
         request,
         'responses/creator_response_detail.html',
@@ -271,34 +319,8 @@ def response_detail(request, survey_id, submission_id):
     )
 
 
+@login_required
 @require_POST
-@login_required
-def response_exclusion(request, survey_id, submission_id):
-    get_accessible_survey(request.user, survey_id, EDIT_ROLES)
-    get_object_or_404(Submission, id=submission_id, survey_id=survey_id)
-    action = request.POST.get('action')
-    if action not in {'exclude', 'include'}:
-        messages.error(request, 'Select a valid analytics action.')
-        return redirect('creator_response_detail', survey_id=survey_id, submission_id=submission_id)
-    excluded = action == 'exclude'
-    try:
-        set_analytics_exclusion(
-            submission_id,
-            request.user,
-            excluded=excluded,
-            reason=request.POST.get('reason', ''),
-        )
-    except (Submission.DoesNotExist, ValidationError) as error:
-        messages.error(request, '; '.join(error.messages) if isinstance(error, ValidationError) else 'Only completed responses can be changed.')
-    else:
-        messages.success(
-            request,
-            'Response excluded from analytics.' if excluded else 'Response included in analytics.',
-        )
-    return redirect('creator_response_detail', survey_id=survey_id, submission_id=submission_id)
-
-
-@login_required
 def response_delete(request, survey_id, submission_id):
     survey = get_accessible_survey(request.user, survey_id, OWNER_ROLES)
     submission = get_object_or_404(
@@ -307,64 +329,69 @@ def response_delete(request, survey_id, submission_id):
         survey=survey,
         status=Submission.Status.COMPLETED,
     )
-    if request.method == 'POST':
-        if request.POST.get('confirmation') != 'DELETE':
-            messages.error(request, 'Type DELETE exactly to confirm permanent deletion.')
-        else:
-            permanently_delete_submission(submission.id, request.user)
-            messages.success(request, 'Response permanently deleted. The audit record was retained.')
-            return redirect('creator_response_list', survey_id=survey.id)
-    return render(
-        request,
-        'responses/creator_response_delete.html',
-        {'survey': survey, 'submission': submission},
-    )
+    permanently_delete_submission(submission.id, request.user)
+    messages.success(request, 'Response permanently deleted.')
+    return redirect('creator_response_list', survey_id=survey.id)
 
 
 def _export_data(request, survey):
-    form, submissions, questions = filtered_export_data(request.GET, survey)
+    form, submissions, questions, version = filtered_export_data(request.GET, survey)
     if not form.is_valid():
-        return None, None, HttpResponseBadRequest('One or more export filters are invalid.')
-    return submissions, questions, None
+        return None, None, None, HttpResponseBadRequest('One or more export filters are invalid.')
+    return submissions, questions, version, None
+
+
+def _export_basename(survey, version):
+    # Carry the exact version number and its publication-time title snapshot in
+    # the filename so downloads from different versions stay distinct and
+    # self-identifying; the CSV table itself stays metadata-free.
+    if version is not None:
+        title = slugify(version.title_snapshot or survey.title) or 'survey'
+        return f'{title}-v{version.number}-responses'
+    return f'{survey.slug}-responses'
 
 
 @login_required
 def response_export_csv(request, survey_id):
     survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
-    submissions, questions, error = _export_data(request, survey)
+    submissions, questions, version, error = _export_data(request, survey)
     if error:
         return error
     response = StreamingHttpResponse(
         iter_csv(submissions, questions),
         content_type='text/csv; charset=utf-8',
     )
-    response['Content-Disposition'] = f'attachment; filename="{survey.slug}-responses.csv"'
+    response['Content-Disposition'] = (
+        f'attachment; filename="{_export_basename(survey, version)}.csv"'
+    )
     return response
 
 
 @login_required
 def response_export_json(request, survey_id):
     survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
-    submissions, questions, error = _export_data(request, survey)
+    submissions, questions, version, error = _export_data(request, survey)
     if error:
         return error
     response = StreamingHttpResponse(
-        iter_json(survey, submissions, questions),
+        iter_json(survey, submissions, questions, version),
         content_type='application/json; charset=utf-8',
     )
-    response['Content-Disposition'] = f'attachment; filename="{survey.slug}-responses.json"'
+    response['Content-Disposition'] = (
+        f'attachment; filename="{_export_basename(survey, version)}.json"'
+    )
     return response
 
 
 @login_required
 def response_export_excel(request, survey_id):
     survey = get_accessible_survey(request.user, survey_id, VIEW_ROLES)
-    submissions, questions, error = _export_data(request, survey)
+    submissions, questions, version, error = _export_data(request, survey)
     if error:
         return error
     return FileResponse(
-        build_excel(survey, submissions, questions),
+        build_excel(survey, submissions, questions, version),
         as_attachment=True,
-        filename=f'{survey.slug}-responses.xlsx',
+        filename=f'{_export_basename(survey, version)}.xlsx',
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )

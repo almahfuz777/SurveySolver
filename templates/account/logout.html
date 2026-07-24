@@ -5,12 +5,23 @@
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/account/account-states.css' %}">{% endblock %}
 
 {% block content %}
-<section aria-labelledby="sign-out-heading">
-    <h1 id="sign-out-heading">Sign out</h1>
-    <p>Are you sure you want to end your session?</p>
-    <form method="post" action="{% url 'account_logout' %}">
-        {% csrf_token %}
-        <button type="submit">Sign out</button>
-    </form>
+<section class="sign-out-page" aria-labelledby="sign-out-heading">
+    <article class="sign-out-card">
+        <span class="sign-out-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 17l5-5-5-5"/>
+                <path d="M15 12H3"/>
+                <path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/>
+            </svg>
+        </span>
+        <span class="eyebrow">Account session</span>
+        <h1 id="sign-out-heading">Sign out?</h1>
+        <p>You’ll leave your current session. Your surveys, responses, and account data stay exactly as they are.</p>
+        <form method="post" action="{% url 'account_logout' %}">
+            {% csrf_token %}
+            <a class="button button-secondary" href="{% url 'overview' %}">Stay signed in</a>
+            <button class="button button-primary" type="submit">Sign out</button>
+        </form>
+    </article>
 </section>
 {% endblock %}

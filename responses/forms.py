@@ -1,4 +1,5 @@
 from django import forms
+from surveys.models import SurveyVersion
 
 from .models import Submission
 
@@ -8,11 +9,6 @@ class ResponseFilterForm(forms.Form):
         ('all', 'All activity'),
         (Submission.Status.COMPLETED, 'Completed'),
         (Submission.Status.IN_PROGRESS, 'In progress'),
-    )
-    EXCLUSION_CHOICES = (
-        ('included', 'Included only'),
-        ('all', 'Included and excluded'),
-        ('excluded', 'Excluded only'),
     )
     COLUMN_CHOICES = (
         ('started', 'Started'),
@@ -45,7 +41,6 @@ class ResponseFilterForm(forms.Form):
         choices=(('all', 'All eligibility'), ('eligible', 'Eligible'), ('ineligible', 'Ineligible')),
         required=False,
     )
-    exclusion = forms.ChoiceField(choices=EXCLUSION_CHOICES, required=False)
     sort = forms.ChoiceField(choices=SORT_CHOICES, required=False)
     search = forms.CharField(
         required=False,
@@ -62,14 +57,15 @@ class ResponseFilterForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields['version'].choices = [('', 'All versions')] + [
             (str(version.id), f'Version {version.number}')
-            for version in survey.versions.order_by('-number')
+            for version in survey.versions.exclude(
+                status=SurveyVersion.Status.DRAFT,
+            ).order_by('-number')
         ]
         if not self.is_bound:
             self.initial.update(
                 {
                     'completion': 'all',
                     'eligibility': 'all',
-                    'exclusion': 'included',
                     'sort': 'newest',
                     'columns': [choice[0] for choice in self.COLUMN_CHOICES],
                 }

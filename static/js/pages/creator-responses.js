@@ -136,6 +136,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('click', (event) => {
+        const versionLink = event.target.closest('[data-sheet-version]');
+        if (versionLink) {
+            event.preventDefault();
+            localStorage.setItem('responseViewPreference', 'responses');
+            window.location.assign(versionLink.href);
+            return;
+        }
         const sortLink = event.target.closest('[data-sheet-sort]');
         if (sortLink) {
             event.preventDefault();

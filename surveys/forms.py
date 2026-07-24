@@ -46,6 +46,24 @@ class SurveyMetadataForm(forms.ModelForm):
         return topics
 
 
+class SurveyBuilderHeaderForm(forms.ModelForm):
+    """Survey-level copy edited from the questionnaire canvas."""
+
+    summary = forms.CharField(required=False, max_length=320)
+
+    class Meta:
+        model = Survey
+        fields = ('title', 'summary')
+
+
+class SurveyBannerForm(forms.ModelForm):
+    """Cover image edited independently from the full settings form."""
+
+    class Meta:
+        model = Survey
+        fields = ('banner',)
+
+
 class SectionForm(forms.ModelForm):
     class Meta:
         model = Section
@@ -60,6 +78,8 @@ class QuestionEditorForm(forms.ModelForm):
         help_text='Enter one choice per line.',
     )
     rows_text = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 4}), help_text='Enter one matrix statement per line.')
+    choice_identities_text = forms.CharField(required=False, widget=forms.HiddenInput())
+    row_identities_text = forms.CharField(required=False, widget=forms.HiddenInput())
     min_value = forms.DecimalField(required=False)
     max_value = forms.DecimalField(required=False)
     min_length = forms.IntegerField(required=False, min_value=0)
@@ -93,9 +113,17 @@ class QuestionEditorForm(forms.ModelForm):
             ):
                 self.fields[field_name].initial = config.get(field_name)
             self.fields['choices_text'].initial = '\n'.join(
-                self.instance.choices.values_list('label', flat=True)
+                choice.label for choice in self.instance.choices.all()
             )
-            self.fields['rows_text'].initial = '\n'.join(self.instance.matrix_rows.values_list('label', flat=True))
+            self.fields['choice_identities_text'].initial = '\n'.join(
+                str(choice.identity_id) for choice in self.instance.choices.all()
+            )
+            self.fields['rows_text'].initial = '\n'.join(
+                row.label for row in self.instance.matrix_rows.all()
+            )
+            self.fields['row_identities_text'].initial = '\n'.join(
+                str(row.identity_id) for row in self.instance.matrix_rows.all()
+            )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -118,8 +146,13 @@ class QuestionEditorForm(forms.ModelForm):
             if len({choice.casefold() for choice in choices}) != len(choices):
                 self.add_error('choices_text', 'Choices must be unique.')
             cleaned_data['choice_labels'] = choices
+            cleaned_data['choice_identity_ids'] = [
+                line.strip()
+                for line in cleaned_data.get('choice_identities_text', '').splitlines()
+            ][:len(choices)]
         else:
             cleaned_data['choice_labels'] = []
+            cleaned_data['choice_identity_ids'] = []
             cleaned_data['randomize_choices'] = False
 
         rows = [line.strip() for line in cleaned_data.get('rows_text', '').splitlines() if line.strip()]
@@ -128,6 +161,14 @@ class QuestionEditorForm(forms.ModelForm):
         if len({row.casefold() for row in rows}) != len(rows):
             self.add_error('rows_text', 'Matrix statements must be unique.')
         cleaned_data['row_labels'] = rows if question_type == Question.Type.LIKERT_MATRIX else []
+        cleaned_data['row_identity_ids'] = (
+            [
+                line.strip()
+                for line in cleaned_data.get('row_identities_text', '').splitlines()
+            ][:len(rows)]
+            if question_type == Question.Type.LIKERT_MATRIX
+            else []
+        )
 
         minimum = cleaned_data.get('min_value')
         maximum = cleaned_data.get('max_value')
@@ -218,7 +259,7 @@ class QuestionBranchForm(forms.ModelForm):
             Question.Type.LIKERT_MATRIX,
         }
         if value_from_choices:
-            labels = list(question.choices.values_list('label', flat=True))
+            labels = [choice.label for choice in question.choices.all()]
             self.fields['compare_value'] = forms.ChoiceField(
                 required=False,
                 choices=[('', 'Choose an option…')] + [(label, label) for label in labels],

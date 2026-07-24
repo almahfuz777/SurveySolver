@@ -1,9 +1,10 @@
 /* Survey analytics dashboard */
 
 .analytics-layout { display: grid; gap: 1.25rem; }
-.analytics-filter { align-items: end; display: flex; gap: .7rem; padding: 1rem 1.25rem; }
-.analytics-filter label { color: var(--text-muted); display: grid; flex: 1; font-size: .78rem; font-weight: 700; gap: .3rem; max-width: 22rem; }
-.analytics-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.analytics-filter { align-items: end; display: grid; gap: .7rem; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) auto; padding: 1rem 1.25rem; }
+.analytics-filter label { color: var(--text-muted); display: grid; font-size: .78rem; font-weight: 700; gap: .35rem; margin: 0; min-width: 0; }
+.analytics-filter select { min-width: 0; }
+.analytics-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); top: 0; }
 .analytics-section { overflow: hidden; padding: 0; }
 .analytics-section .panel-heading { padding: 1.25rem 1.5rem; }
 .analytics-table { border-collapse: collapse; width: 100%; }
@@ -23,7 +24,7 @@
 @media (max-width: 760px) {
     .analytics-filter {
         align-items: stretch;
-        flex-direction: column;
+        grid-template-columns: 1fr;
     }
 
     .analytics-filter label,

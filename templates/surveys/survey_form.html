@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             {% if version %}
                 <div>
-                    <div class="settings-rail-stat-value is-teal">{{ version.response_limit|default_if_none:"No limit" }}</div>
+                    <div class="settings-rail-stat-value is-teal">{{ survey.response_limit|default_if_none:"No limit" }}</div>
                     <div class="settings-rail-stat-label">Response limit</div>
                 </div>
             {% endif %}
@@ -657,12 +657,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div id="response-limit-fields" class="response-limit-fields"{% if not response_limit_form.enabled.value %} hidden{% endif %}>
                         <label for="{{ response_limit_form.response_limit.id_for_label }}">Maximum completed responses</label>
                         {{ response_limit_form.response_limit }}
-                        <small>The limit takes effect when these draft settings are published.</small>
+                        <small>The limit applies immediately to the survey across questionnaire versions.</small>
                         {{ response_limit_form.response_limit.errors }}
                     </div>
                     <div class="settings-autosave-error" data-autosave-error aria-live="polite"></div>
                 </form>
             </section>
+
+            {% if survey.access_role == 'owner' and historical_versions %}
+            <section id="version-history" class="settings-card" aria-labelledby="version-history-heading">
+                <h2 id="version-history-heading">Questionnaire version history</h2>
+                <p class="settings-panel-hint">Versions and their response data stay separate. Restoring copies historical content into the draft without changing live order, logic, eligibility, or other survey settings.</p>
+                <div class="version-history-list">
+                    {% for historical_version in historical_versions %}
+                    <article class="setting-toggle-row">
+                        <span><strong>Version {{ historical_version.number }}</strong><small>{{ historical_version.title_snapshot|default:survey.title }} · Published {{ historical_version.published_at|date:'M j, Y' }}</small></span>
+                        <span class="hero-actions">
+                            <form method="post" action="{% url 'survey_version_restore' survey.id historical_version.id %}" data-confirm="Replace the current draft content with version {{ historical_version.number }}? Live presentation and survey settings will stay unchanged." data-confirm-ok="Restore as draft">
+                                {% csrf_token %}
+                                <input type="hidden" name="revision" value="{{ version.revision }}">
+                                <button class="button button-secondary button-small" type="submit">Restore as draft</button>
+                            </form>
+                            <a class="button button-danger button-small" href="{% url 'survey_version_delete' survey.id historical_version.id %}">Delete version</a>
+                        </span>
+                    </article>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
         {% endif %}
     </div>
 </div>

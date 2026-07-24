@@ -1,54 +1,509 @@
-/* Survey response form */
+/* Live survey response — visually aligned with the builder responder preview. */
 
-.response-heading .page-heading-inner { align-items: end; }
-.response-time { background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 999px; color: white; padding: 0.55rem 0.9rem; white-space: nowrap; }
-.response-form { display: grid; gap: 1.25rem; max-width: 56rem; }
-.response-section { overflow: hidden; padding: 0; }
-.response-section-heading { background: var(--surface-warm); border-bottom: 1px solid var(--border); padding: 1.5rem clamp(1rem, 4vw, 2rem); }
-.response-section-heading h2 { margin: 0.25rem 0; }
-.response-section-heading p { color: var(--text-muted); margin: 0; }
+.response-page {
+    min-height: calc(100vh - 4.5rem);
+    padding: clamp(1.25rem, 4vw, 2.5rem) 0 3rem;
+    background: var(--surface-sunken);
+}
 
-.response-question { border: 0; border-bottom: 1px solid var(--border); margin: 0; padding: 1.75rem clamp(1rem, 4vw, 2rem); }
-.response-question:last-child { border-bottom: 0; }
-.response-question.has-error { background: var(--danger-soft); box-shadow: inset 3px 0 var(--danger); }
-.response-question legend { color: var(--text); font-size: 1.02rem; font-weight: 700; padding: 0; width: 100%; }
-.question-number { align-items: center; background: var(--indigo-50); border-radius: 50%; color: var(--indigo-700); display: inline-flex; font-size: 0.76rem; height: 1.65rem; justify-content: center; margin-right: 0.4rem; width: 1.65rem; }
+.response-shell {
+    width: min(calc(100% - 2rem), 48rem);
+}
 
-.response-question > input:not([type='radio']):not([type='checkbox']), .response-question > select, .response-question > textarea { margin-top: 1rem; max-width: 36rem; width: 100%; }
-.response-options { display: grid; gap: 0.65rem; margin-top: 1rem; }
-.response-option { align-items: center; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; display: flex; gap: 0.7rem; max-width: 36rem; padding: 0.8rem 1rem; }
-.response-option:hover { border-color: var(--indigo-300); background: var(--indigo-50); }
-.response-option input { accent-color: var(--indigo-600); }
-.ranking-inputs { display: grid; gap: 0.65rem; margin-top: 1rem; max-width: 36rem; }
-.ranking-inputs label { align-items: center; display: grid; gap: 0.7rem; grid-template-columns: 2rem 1fr; }
-.ranking-inputs label > span { align-items: center; background: var(--indigo-50); border-radius: 50%; color: var(--indigo-700); display: flex; font-weight: 800; height: 2rem; justify-content: center; }
-.scale-options { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
-.scale-options label input { position: absolute; opacity: 0; }
-.scale-options label span { align-items: center; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; display: flex; height: 2.8rem; justify-content: center; min-width: 2.8rem; }
-.scale-options input:checked + span { background: var(--brand-strong); border-color: var(--brand-strong); color: white; }
-.scale-options input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
-.scale-labels { color: var(--text-muted); display: flex; font-size: 0.8rem; justify-content: space-between; max-width: 30rem; }
-.matrix-scroll { margin-top: 1rem; overflow-x: auto; }
-.response-matrix { border-collapse: collapse; min-width: 36rem; width: 100%; }
-.response-matrix th, .response-matrix td { border-bottom: 1px solid var(--border); padding: 0.75rem; text-align: center; }
-.response-matrix th:first-child { text-align: left; }
-.response-matrix tbody th { font-weight: 500; }
-.response-matrix input { accent-color: var(--indigo-600); }
-.response-submit { align-items: center; display: flex; gap: 1rem; justify-content: space-between; padding: 1.4rem 1.7rem; }
-.response-submit p { color: var(--text-muted); margin: 0.2rem 0 0; }
-.response-submit-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: flex-end; }
+.response-intro {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-inline: 0.25rem;
+}
 
-@media (max-width: 760px) {
+.response-intro h1 {
+    margin: 0.3rem 0 0.25rem;
+    color: var(--ink-950);
+    font-size: clamp(1.65rem, 4vw, 2.15rem);
+    letter-spacing: -0.025em;
+}
+
+.response-intro p {
+    max-width: 40rem;
+    margin: 0;
+    color: var(--ink-600);
+    font-size: 0.92rem;
+}
+
+.response-eyebrow,
+.response-section-label {
+    color: var(--teal-700);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.response-time {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.8rem;
+    color: var(--indigo-700);
+    background: var(--indigo-50);
+    border: 1px solid var(--indigo-100);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.response-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.response-card {
+    padding: 1.75rem 1.85rem 1.5rem;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.response-section {
+    margin-bottom: 1.5rem;
+}
+
+.response-section:last-child {
+    margin-bottom: 0;
+}
+
+.response-section + .response-section {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+}
+
+.response-section-heading h2 {
+    margin: 0.35rem 0 0.15rem;
+    color: var(--ink-950);
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.response-section-heading p {
+    margin: 0 0 0.75rem;
+    color: var(--ink-600);
+    font-size: 0.88rem;
+}
+
+.response-question {
+    min-width: 0;
+    margin: 0 -1rem 0.25rem;
+    padding: 0.9rem 1rem;
+    border: 1.5px solid transparent;
+    border-radius: 0.9rem;
+}
+
+.response-question.has-error {
+    background: var(--danger-soft);
+    border-color: var(--danger-border);
+    box-shadow: inset 3px 0 var(--danger);
+}
+
+.response-prompt {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    width: 100%;
+    margin-bottom: 0.65rem;
+    padding: 0;
+    color: var(--ink-950);
+    font-size: 0.98rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.response-question-number {
+    flex: 0 0 auto;
+    color: var(--ink-600);
+    font-weight: 650;
+}
+
+.required-mark,
+.field-error {
+    color: var(--danger);
+}
+
+.response-help,
+.response-note {
+    color: var(--ink-600);
+    font-size: 0.82rem;
+}
+
+.response-help {
+    margin: -0.35rem 0 0.65rem;
+}
+
+.response-note {
+    margin: -0.25rem 0 0.6rem;
+}
+
+.field-error {
+    margin: -0.25rem 0 0.65rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.response-options {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.response-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.8rem;
+    color: var(--ink-800);
+    border: 1px solid var(--border);
+    border-radius: 0.65rem;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+    transition: background 140ms ease, border-color 140ms ease;
+}
+
+.response-option:hover {
+    background: var(--indigo-50);
+    border-color: var(--indigo-300);
+}
+
+.response-option input,
+.response-scale input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.response-glyph {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 1.05rem;
+    height: 1.05rem;
+    border: 2px solid var(--border-strong);
+}
+
+.response-glyph-radio {
+    border-radius: 50%;
+}
+
+.response-glyph-check {
+    border-radius: 0.3rem;
+}
+
+.response-option input:checked + .response-glyph {
+    background: var(--indigo-700);
+    border-color: var(--indigo-700);
+    box-shadow: inset 0 0 0 3px var(--surface-raised);
+}
+
+.response-option input[type='checkbox']:checked + .response-glyph {
+    background: var(--indigo-700);
+    box-shadow: inset 0 0 0 2px var(--surface-raised);
+}
+
+.response-option:has(input:checked) {
+    background: var(--indigo-50);
+    border-color: var(--indigo-300);
+}
+
+.response-option:has(input:focus-visible),
+.response-scale label:has(input:focus-visible) {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.response-question .response-control,
+.response-ranking select {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.65rem 0.8rem;
+    color: var(--ink-950);
+    background: var(--surface-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: 0.65rem;
+    font: inherit;
+    font-size: 0.88rem;
+}
+
+.response-question .response-control {
+    max-width: 26rem;
+}
+
+.response-question .response-textarea {
+    max-width: none;
+    min-height: 5rem;
+    resize: vertical;
+}
+
+.response-question .response-number,
+.response-question .response-date {
+    max-width: 14rem;
+}
+
+.response-question .response-control:focus-visible,
+.response-ranking select:focus-visible {
+    border-color: var(--indigo-500);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
+    outline: none;
+}
+
+.response-ranking {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.response-rank-row {
+    display: grid;
+    align-items: center;
+    grid-template-columns: 1.75rem minmax(0, 1fr);
+    gap: 0.6rem;
+    max-width: 30rem;
+}
+
+.response-ranking.is-draggable {
+    max-width: 34rem;
+}
+
+.response-ranking.is-draggable .response-rank-item {
+    grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+    min-height: 3.15rem;
+    padding: 0.45rem 0.55rem;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    cursor: grab;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.response-ranking.is-draggable .response-rank-item:hover {
+    border-color: var(--indigo-300);
+    box-shadow: 0 4px 12px rgba(49, 46, 129, 0.08);
+}
+
+.response-ranking.is-draggable .response-rank-item.is-dragging {
+    opacity: 0.55;
+    border-color: var(--indigo-500);
+    box-shadow: 0 8px 20px rgba(49, 46, 129, 0.16);
+    cursor: grabbing;
+}
+
+.response-rank-label {
+    min-width: 0;
+    color: var(--ink-950);
+    font-size: 0.88rem;
+    font-weight: 650;
+}
+
+.response-rank-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    color: var(--ink-500);
+}
+
+.response-rank-grip {
+    display: inline-flex;
+    padding: 0.3rem;
+}
+
+.response-rank-move {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    min-height: 0;
+    padding: 0;
+    color: var(--ink-600);
+    background: var(--surface-muted);
+    border: 1px solid transparent;
+    border-radius: 0.45rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.response-rank-move:hover:not(:disabled) {
+    color: var(--indigo-700);
+    background: var(--indigo-50);
+    border-color: var(--indigo-200);
+}
+
+.response-rank-move:disabled {
+    opacity: 0.32;
+    cursor: default;
+}
+
+.response-rank-move:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.response-rank-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    color: var(--indigo-700);
+    background: var(--indigo-50);
+    border-radius: 0.4rem;
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+
+.response-scale {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.3rem;
+    max-width: 30rem;
+    margin-bottom: 0.5rem;
+}
+
+.response-scale label {
+    position: relative;
+}
+
+.response-scale label span {
+    display: block;
+    padding: 0.6rem 0;
+    color: var(--ink-600);
+    background: var(--surface-muted);
+    border: 1px solid transparent;
+    border-radius: 0.45rem;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.response-scale label:hover span {
+    border-color: var(--indigo-300);
+}
+
+.response-scale input:checked + span {
+    color: white;
+    background: var(--indigo-700);
+    border-color: var(--indigo-700);
+}
+
+.response-scale-labels {
+    display: flex;
+    justify-content: space-between;
+    max-width: 30rem;
+    color: var(--ink-600);
+    font-size: 0.72rem;
+}
+
+.response-matrix-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+}
+
+.response-matrix {
+    min-width: 36rem;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.response-matrix th,
+.response-matrix td {
+    padding: 0.7rem 0.75rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+}
+
+.response-matrix thead th {
+    color: var(--ink-600);
+    background: var(--surface-muted);
+    border-top: 0;
+    font-size: 0.68rem;
+}
+
+.response-matrix th:first-child {
+    min-width: 8rem;
+    text-align: left;
+}
+
+.response-matrix tbody th {
+    color: var(--ink-800);
+    font-weight: 500;
+}
+
+.response-matrix input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--indigo-700);
+}
+
+.response-submit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem 1.35rem;
+}
+
+.response-submit p {
+    margin: 0.2rem 0 0;
+    color: var(--ink-600);
+    font-size: 0.82rem;
+}
+
+.response-submit-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.65rem;
+}
+
+@media (max-width: 640px) {
+    .response-page {
+        padding-top: 1rem;
+    }
+
+    .response-intro {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .response-card {
+        padding: 1.25rem 1rem 1.1rem;
+    }
+
+    .response-question {
+        margin-inline: -0.5rem;
+        padding-inline: 0.6rem;
+    }
+
     .response-submit {
         align-items: stretch;
         flex-direction: column;
     }
 
-    .response-submit .button {
+    .response-submit-actions {
+        display: grid;
         width: 100%;
     }
 
-    .response-submit-actions {
+    .response-submit .button {
         width: 100%;
     }
 }

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Delete {{ survey.title }} forever | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/survey-list.css' %}">{% endblock %}
+
+{% block content %}
+<section class="completion-page">
+    <div class="shell completion-shell">
+        <article class="panel completion-card survey-purge-card">
+            <span class="eyebrow">Owner-only destructive action</span>
+            <h1>Delete “{{ survey.title }}” forever?</h1>
+            <p>This permanently removes the survey, its questionnaire versions, collected responses, and collaborator access.</p>
+            <div class="survey-purge-warning" id="survey-purge-warning">
+                <strong>This cannot be undone.</strong>
+                <span>Export anything you need before continuing. Existing survey links and invitations will stop working.</span>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <label for="survey-purge-confirmation">Type <strong>{{ confirmation }}</strong> to continue</label>
+                <input
+                    id="survey-purge-confirmation"
+                    name="confirmation"
+                    autocomplete="off"
+                    aria-describedby="survey-purge-warning"
+                    required
+                >
+                <div class="form-actions">
+                    <a class="button button-secondary" href="{% url 'survey_list' %}">Cancel</a>
+                    <button class="button button-danger" type="submit">Delete survey forever</button>
+                </div>
+            </form>
+        </article>
+    </div>
+</section>
+{% endblock %}

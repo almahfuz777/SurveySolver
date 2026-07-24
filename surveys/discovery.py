@@ -1,7 +1,7 @@
 from django.db.models import Prefetch, Q
 from django.utils import timezone
 
-from .models import EligibilityCriteria, Survey, SurveyVersion
+from .models import Survey, SurveyEligibilityCriteria, SurveyVersion
 
 
 def _age_on(birth_date):
@@ -49,9 +49,10 @@ def profile_matches(criteria, profile):
 def discover_surveys(user=None, topic=None, duration=None, identity_mode=None):
     published_versions = SurveyVersion.objects.filter(
         status=SurveyVersion.Status.PUBLISHED,
-    ).select_related('eligibility_criteria')
+    )
     queryset = (
         Survey.objects.discoverable()
+        .select_related('eligibility_criteria')
         .prefetch_related('topics', Prefetch('versions', published_versions, to_attr='live_versions'))
         .order_by('-published_at')
     )
@@ -75,8 +76,8 @@ def discover_surveys(user=None, topic=None, duration=None, identity_mode=None):
             continue
         survey.published_version = survey.live_versions[0]
         try:
-            criteria = survey.published_version.eligibility_criteria
-        except EligibilityCriteria.DoesNotExist:
+            criteria = survey.eligibility_criteria
+        except SurveyEligibilityCriteria.DoesNotExist:
             criteria = None
         if user and user.is_authenticated and not profile_matches(criteria, user.profile):
             continue

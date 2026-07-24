@@ -3,10 +3,12 @@ from django.db.models import Count
 from django.shortcuts import render
 
 from responses.models import Submission
+from responses.services import resumable_submissions
 from rewards.models import BadgeAward, PointTransaction
 from rewards.claims import BASE_COMPLETION_POINTS
 from surveys.discovery import discover_surveys
 from surveys.models import Survey, Topic
+from surveys.presentation import presented_question_ids
 from surveys.services import discard_empty_drafts
 
 
@@ -41,6 +43,34 @@ def discover(request):
     )
     if minimum_points and BASE_COMPLETION_POINTS < minimum_points:
         discovery_surveys = []
+    ongoing_submissions = list(
+        resumable_submissions(
+            request.user,
+            request.session.session_key,
+        )
+    )
+    ongoing_survey_ids = {
+        submission.survey_id
+        for submission in ongoing_submissions
+    }
+    discovery_surveys = [
+        survey
+        for survey in discovery_surveys
+        if survey.id not in ongoing_survey_ids
+    ]
+    for submission in ongoing_submissions:
+        submission.question_count = len(
+            presented_question_ids(submission.presentation)
+        )
+        submission.progress_percent = (
+            round(
+                submission.saved_answer_count
+                / submission.question_count
+                * 100
+            )
+            if submission.question_count
+            else 0
+        )
     template_name = (
         'core/partials/discovery_results.html'
         if request.headers.get('x-requested-with') == 'XMLHttpRequest'
@@ -51,6 +81,7 @@ def discover(request):
         template_name,
         {
             'discovery_surveys': discovery_surveys,
+            'ongoing_submissions': ongoing_submissions,
             'topics': Topic.objects.filter(is_active=True),
             'selected_topic': topic,
             'selected_duration': duration,

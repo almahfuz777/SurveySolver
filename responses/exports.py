@@ -9,6 +9,7 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Font, PatternFill
 
 from surveys.models import Question, SurveyVersion
+from surveys.presentation import resolved_version
 
 from .dashboard import filter_response_sheet, format_answer_cell
 from .forms import ResponseSheetFilterForm
@@ -24,47 +25,53 @@ class Echo:
 
 
 def filtered_export_data(query_parameters, survey):
-    questions = response_sheet_questions(survey)
+    versions = survey.versions.exclude(status=SurveyVersion.Status.DRAFT)
+    version_id = query_parameters.get('sheet_version')
+    if version_id:
+        version = versions.filter(pk=version_id).first()
+    else:
+        version = versions.filter(status=SurveyVersion.Status.PUBLISHED).first()
+        if version is None:
+            version = versions.order_by('-number').first()
+    if version is None:
+        return ResponseSheetFilterForm(query_parameters, questions=[]), None, None, None
+    questions = response_sheet_questions(survey, version_id=version.id)
     form = ResponseSheetFilterForm(
         query_parameters,
         questions=questions,
     )
     if not form.is_valid():
-        return form, None, None
+        return form, None, None, version
     submissions = filter_response_sheet(
         survey.submissions.filter(
+            version=version,
             status=Submission.Status.COMPLETED,
-            is_excluded=False,
         ).select_related('version').prefetch_related(
             'answers__question__section',
         ),
         form.cleaned_data,
         questions,
     )
-    return form, submissions, questions
+    return form, submissions, questions, version
 
 
 def response_sheet_questions(survey, *, version_id=None):
-    questions = Question.objects.filter(
-        section__version__survey=survey,
-        section__version__status__in=(
-            SurveyVersion.Status.PUBLISHED,
-            SurveyVersion.Status.RETIRED,
-        ),
-    ).select_related('section__version').prefetch_related('choices')
-    if version_id:
-        questions = questions.filter(section__version_id=version_id)
-    questions = list(
-        questions.order_by('section__version__number', 'section__order', 'order')
+    version = (
+        survey.versions.exclude(status=SurveyVersion.Status.DRAFT)
+        .filter(pk=version_id)
+        .first()
+        if version_id
+        else survey.versions.filter(status=SurveyVersion.Status.PUBLISHED).first()
     )
-    include_version = len(
-        {question.section.version_id for question in questions}
-    ) > 1
+    if version is None:
+        return []
+    questions = [
+        question
+        for section in resolved_version(version)
+        for question in section.questions.all()
+    ]
     for question in questions:
-        question.sheet_label = question_column(
-            question,
-            include_version=include_version,
-        )
+        question.sheet_label = question_column(question)
     return questions
 
 
@@ -102,13 +109,14 @@ def response_sheet_record(submission, questions):
     }
 
 
-def question_column(question, *, include_version=True):
-    if include_version:
-        return f'v{question.section.version.number} · {question.prompt}'
+def question_column(question):
     return question.prompt
 
 
 def iter_csv(submissions, questions):
+    # Keep the CSV a single clean table (header + rows) so it imports directly
+    # into spreadsheets and pandas. Version metadata lives in the JSON/Excel
+    # exports, which have somewhere structured to put it.
     writer = csv.writer(Echo())
     yield '\ufeff' + writer.writerow(
         (TIMESTAMP_COLUMN, *(_csv_safe(question.sheet_label) for question in questions))
@@ -126,10 +134,17 @@ def iter_csv(submissions, questions):
         )
 
 
-def iter_json(survey, submissions, questions):
+def iter_json(survey, submissions, questions, version):
     encoder = DjangoJSONEncoder(ensure_ascii=False, separators=(',', ':'))
     yield '{"survey":'
-    yield encoder.encode({'id': str(survey.id), 'title': survey.title})
+    yield encoder.encode(
+        {
+            'id': str(survey.id),
+            'current_title': survey.title,
+            'version': version.number,
+            'title_snapshot': version.title_snapshot or survey.title,
+        }
+    )
     yield ',"questions":'
     yield encoder.encode(
         [
@@ -149,7 +164,7 @@ def iter_json(survey, submissions, questions):
     yield ']}'
 
 
-def build_excel(survey, submissions, questions):
+def build_excel(survey, submissions, questions, version):
     output = SpooledTemporaryFile(max_size=5 * 1024 * 1024, mode='w+b')
     workbook = Workbook(write_only=True)
     worksheet = workbook.create_sheet('Responses')
@@ -174,7 +189,11 @@ def build_excel(survey, submissions, questions):
             ]
         )
     metadata = workbook.create_sheet('About')
-    metadata.append(('Survey', _excel_safe(survey.title)))
+    metadata.append(('Current survey title', _excel_safe(survey.title)))
+    metadata.append(
+        ('Publication title', _excel_safe(version.title_snapshot or survey.title))
+    )
+    metadata.append(('Version', version.number))
     metadata.append(('Survey ID', str(survey.id)))
     metadata.append(('Generated at', timezone.now().isoformat()))
     workbook.save(output)

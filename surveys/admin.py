@@ -1,6 +1,7 @@
 from django.contrib import admin
+from django.db import transaction
 
-from .models import BranchRule, EligibilityCriteria, MatrixRow, Question, QuestionChoice, Quota, Section, Survey, SurveyVersion, Topic
+from .models import MatrixRow, Question, QuestionChoice, Section, Survey, SurveyVersion, Topic
 
 
 @admin.register(Topic)
@@ -19,11 +20,22 @@ class SurveyAdmin(admin.ModelAdmin):
     readonly_fields = ('id', 'slug', 'created_at', 'updated_at', 'published_at', 'closed_at')
     filter_horizontal = ('topics',)
 
+    def delete_queryset(self, request, queryset):
+        # Route bulk deletion through Survey.delete() so the PROTECTed identity
+        # hierarchy is torn down in order; the default collector batch fails.
+        # One transaction over the whole selection: if any survey is protected,
+        # none are deleted.
+        with transaction.atomic():
+            for survey in queryset:
+                survey.delete()
+
 
 class SectionInline(admin.TabularInline):
     model = Section
     extra = 0
-    fields = ('title', 'order')
+    # `order` is a legacy snapshot field; live ordering lives on SectionIdentity
+    # and is resolved at read time, so editing it here has no effect.
+    fields = ('title',)
 
 
 @admin.register(SurveyVersion)
@@ -47,12 +59,17 @@ class MatrixRowInline(admin.TabularInline):
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ('prompt', 'type', 'section', 'order', 'required')
-    list_filter = ('type', 'required')
+    # `order`/`required` are legacy snapshot fields; the live values live on
+    # QuestionIdentity and are resolved at read time. Keep them out of the
+    # editable admin surface so it can't imply an effect they no longer have.
+    list_display = ('prompt', 'type', 'section')
+    list_filter = ('type',)
     search_fields = ('prompt', 'section__version__survey__title')
     inlines = (QuestionChoiceInline, MatrixRowInline)
 
 
-admin.site.register(BranchRule)
-admin.site.register(Quota)
-admin.site.register(EligibilityCriteria)
+# BranchRule, Quota and the version-scoped EligibilityCriteria are legacy tables
+# that runtime code no longer writes (live branching, response limits and
+# targeting moved to survey-level SurveyBranchRule / Survey.response_limit /
+# SurveyEligibilityCriteria). They are intentionally left unregistered so admin
+# edits can't imply an effect they no longer have.

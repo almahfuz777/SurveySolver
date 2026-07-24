@@ -9,6 +9,7 @@
     <p class="filter-status sr-only" role="status" aria-live="polite" data-filter-status="sheet"></p>
     {% if sheet_filter_form.errors %}<div class="message message-error sheet-filter-error" role="alert">One or more column filters are invalid.</div>{% endif %}
     <form method="get" action="{% url 'creator_response_list' survey.id %}" data-ajax-filter="sheet">
+        {% if selected_version %}<input type="hidden" name="sheet_version" value="{{ selected_version.id }}">{% endif %}
         <input type="hidden" name="sheet_sort" value="{{ sheet_sort }}">
         <input type="hidden" name="sheet_direction" value="{{ sheet_direction }}">
         <div class="table-scroll response-sheet-scroll" tabindex="0" aria-label="Response sheet; scroll horizontally to see every question">
@@ -54,7 +55,7 @@
                         <tr>
                             <td class="response-timestamp"><time datetime="{{ submission.completed_at|date:'c' }}">{{ submission.completed_at|date:'M j, Y · H:i' }}</time></td>
                             {% for cell in submission.sheet_cells %}<td>{% if cell != None %}{{ cell }}{% else %}<span class="cell-empty" aria-label="Not answered">—</span>{% endif %}</td>{% endfor %}
-                            <td class="response-row-action"><a class="response-open-link" href="{% url 'creator_response_detail' survey.id submission.id %}" aria-label="Open full response submitted {{ submission.completed_at|date:'M j, Y H:i' }}">{% include 'partials/icon.html' with name='arrow-right' size='17' %}</a></td>
+                            <td class="response-row-action"><a class="response-open-link" href="{% url 'creator_response_detail' survey.id submission.id %}" aria-label="Open full response submitted {{ submission.completed_at|date:'M j, Y H:i' }}">{% include 'partials/icon.html' with name='arrow-up-right' size='17' %}</a></td>
                         </tr>
                     {% empty %}
                         <tr><td class="sheet-empty-row" colspan="{{ sheet_column_count }}">No submitted responses match these column filters.</td></tr>

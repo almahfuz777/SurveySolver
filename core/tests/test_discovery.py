@@ -5,7 +5,8 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from responses.models import Submission
+from responses.models import Answer, Submission
+from responses.services import start_submission
 from rewards.models import PointTransaction
 from surveys import services
 from surveys.models import Question, Survey, Topic
@@ -215,6 +216,85 @@ class SurveyDiscoveryTests(TestCase):
 
         self.assertNotContains(response, completed_survey.title)
         self.assertNotContains(response, owned.title)
+
+    def test_guest_saved_response_is_pinned_with_progress_and_not_duplicated(self):
+        survey, version = self.publish_survey('Resume this study')
+        session = self.client.session
+        session.save()
+        submission = start_submission(
+            survey,
+            None,
+            session.session_key,
+        )
+        question = version.sections.get().questions.get()
+        Answer.objects.create(
+            submission=submission,
+            question=question,
+            value='Saved answer',
+        )
+
+        response = self.client.get(reverse('discover'))
+
+        self.assertContains(response, 'Continue where you left off')
+        self.assertContains(response, survey.title)
+        self.assertNotContains(response, 'resume-version')
+        self.assertContains(response, '1 of 1 answered')
+        self.assertContains(response, 'aria-valuenow="100"')
+        self.assertContains(
+            response,
+            reverse('response_form', args=[submission.id]),
+        )
+        self.assertContains(
+            response,
+            reverse('response_discard', args=[submission.id]),
+        )
+        self.assertEqual(
+            list(response.context['ongoing_submissions']),
+            [submission],
+        )
+        self.assertNotIn(survey, response.context['discovery_surveys'])
+
+        other_browser = self.client_class()
+        self.assertNotContains(
+            other_browser.get(reverse('discover')),
+            'Continue where you left off',
+        )
+
+    def test_authenticated_saved_response_is_resumable_across_browsers(self):
+        survey, _ = self.publish_survey('Cross-browser draft')
+        respondent = get_user_model().objects.create_user(
+            email='resume@example.com',
+        )
+        first_browser = self.client_class()
+        first_browser.force_login(respondent)
+        submission = start_submission(
+            survey,
+            respondent,
+            first_browser.session.session_key,
+        )
+        self.client.force_login(respondent)
+
+        response = self.client.get(reverse('discover'))
+
+        self.assertContains(response, survey.title)
+        self.assertContains(
+            response,
+            reverse('response_form', args=[submission.id]),
+        )
+
+    def test_live_filter_response_does_not_repeat_pinned_section(self):
+        survey, _ = self.publish_survey('Pinned outside filters')
+        session = self.client.session
+        session.save()
+        start_submission(survey, None, session.session_key)
+
+        response = self.client.get(
+            reverse('discover'),
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertNotContains(response, 'Continue where you left off')
+        self.assertNotContains(response, survey.title)
 
     def test_topic_and_duration_filters_are_applied_together(self):
         short, _ = self.publish_survey('Short learning study', minutes=5)

@@ -1,0 +1,60 @@
+{% if ongoing_submissions %}
+<section class="resume-section" aria-labelledby="resume-heading">
+    <div class="shell">
+        <div class="resume-section-heading">
+            <div>
+                <span class="eyebrow">Saved responses</span>
+                <h2 id="resume-heading">Continue where you left off</h2>
+            </div>
+            <span class="resume-count">{{ ongoing_submissions|length }} in progress</span>
+        </div>
+        <div class="resume-grid">
+            {% for submission in ongoing_submissions %}
+                <article class="resume-card">
+                    <div
+                        class="resume-card-visual"
+                        {% if submission.survey.banner %}style="background-image: linear-gradient(135deg, rgba(49,46,129,.82), rgba(20,184,166,.56)), url('{{ submission.survey.banner.url }}')"{% endif %}
+                    >
+                        <span class="resume-status">In progress</span>
+                    </div>
+                    <div class="resume-card-content">
+                        <div class="resume-card-copy">
+                            <span class="resume-updated">Last active {{ submission.updated_at|date:'M j, Y · H:i' }}</span>
+                            <h3>{{ submission.survey.title }}</h3>
+                            {% if submission.survey.summary %}<p>{{ submission.survey.summary }}</p>{% endif %}
+                        </div>
+                        <div class="resume-progress">
+                            <div class="resume-progress-label">
+                                <span>{{ submission.saved_answer_count }} of {{ submission.question_count }} answered</span>
+                                <strong>{{ submission.progress_percent }}%</strong>
+                            </div>
+                            <div
+                                class="resume-progress-track"
+                                role="progressbar"
+                                aria-label="{{ submission.survey.title }} response progress"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-valuenow="{{ submission.progress_percent }}"
+                            >
+                                <span style="width: {{ submission.progress_percent }}%"></span>
+                            </div>
+                        </div>
+                        <div class="resume-actions">
+                            <a class="button button-primary" href="{% url 'response_form' submission.id %}">Continue survey</a>
+                            <form
+                                method="post"
+                                action="{% url 'response_discard' submission.id %}"
+                                data-confirm="Discard your saved response to “{{ submission.survey.title|escapejs }}”? Your saved answers will be deleted and cannot be recovered."
+                                data-confirm-ok="Discard saved response"
+                            >
+                                {% csrf_token %}
+                                <button class="button resume-discard" type="submit">Discard</button>
+                            </form>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}

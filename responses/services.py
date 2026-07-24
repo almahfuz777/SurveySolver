@@ -1,18 +1,28 @@
-import random
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.signing import salted_hmac
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.core.validators import validate_email
 
 from accounts.models import Profile
 from django_countries import countries
 
-from surveys.models import BranchRule, EligibilityCriteria, Question, Survey, SurveyVersion
+from surveys.models import (
+    BranchRule,
+    Question,
+    Survey,
+    SurveyEligibilityCriteria,
+    SurveyVersion,
+)
+from surveys.presentation import (
+    build_submission_presentation,
+    presentation_question,
+    presented_question_ids,
+)
 
 from .models import Answer, Submission
 
@@ -61,26 +71,7 @@ def current_published_version(survey, invitation_access=False):
 
 
 def build_presentation(version):
-    generator = random.SystemRandom()
-    sections = []
-    for section in version.sections.prefetch_related('questions__choices', 'questions__matrix_rows'):
-        questions = list(section.questions.all())
-        if section.randomize_questions:
-            generator.shuffle(questions)
-        question_data = []
-        for question in questions:
-            choices = list(question.choices.all())
-            if question.randomize_choices:
-                generator.shuffle(choices)
-            question_data.append(
-                {
-                    'id': str(question.id),
-                    'choices': [str(choice.id) for choice in choices],
-                    'rows': [str(row.id) for row in question.matrix_rows.all()],
-                }
-            )
-        sections.append({'id': str(section.id), 'questions': question_data})
-    return {'sections': sections}
+    return build_submission_presentation(version)
 
 
 def _validated_identity(survey, consent, identity_data):
@@ -162,10 +153,10 @@ def _eligibility_values(criteria, user, screener_data):
     return values
 
 
-def _validated_eligibility(version, user, screener_data):
+def _validated_eligibility(survey, user, screener_data):
     try:
-        criteria = version.eligibility_criteria
-    except EligibilityCriteria.DoesNotExist:
+        criteria = survey.eligibility_criteria
+    except SurveyEligibilityCriteria.DoesNotExist:
         return {'targeted': False}, timezone.now()
     if not criteria.is_targeted:
         return {'targeted': False}, timezone.now()
@@ -192,11 +183,11 @@ def _validated_eligibility(version, user, screener_data):
     return snapshot, timezone.now()
 
 
-def _ensure_quota_available(version):
-    if version.response_limit is None:
+def _ensure_quota_available(survey, version):
+    if survey.response_limit is None:
         return
-    completed = version.submissions.filter(status=Submission.Status.COMPLETED).count()
-    if completed >= version.response_limit:
+    completed = survey.submissions.filter(status=Submission.Status.COMPLETED).count()
+    if completed >= survey.response_limit:
         raise QuotaReached('This survey has reached its response limit.')
 
 
@@ -257,9 +248,9 @@ def start_submission(
     ).first()
     if completed:
         return completed
-    _ensure_quota_available(version)
+    _ensure_quota_available(survey, version)
     eligibility_data, eligibility_checked_at = _validated_eligibility(
-        version,
+        survey,
         respondent,
         screener_data,
     )
@@ -275,11 +266,15 @@ def start_submission(
         session_key_hash=session_hash,
         source=(Submission.Source.INVITATION if invitation else source),
         presentation=build_presentation(version),
+        identity_mode_snapshot=survey.identity_mode,
         identity_data=identity_data,
         identity_consent_at=identity_consent_at,
         is_eligible=True,
         eligibility_data=eligibility_data,
         eligibility_checked_at=eligibility_checked_at,
+    )
+    SurveyVersion.objects.filter(pk=version.pk, has_response_history=False).update(
+        has_response_history=True,
     )
     if invitation:
         bind_respondent_invitation(invitation, submission)
@@ -297,35 +292,100 @@ def can_access_submission(submission, user, session_key):
     )
 
 
+def resumable_submissions(user, session_key):
+    access_filters = []
+    if session_key:
+        access_filters.append(
+            Q(session_key_hash=hash_session_key(session_key)),
+        )
+    if user and user.is_authenticated:
+        access_filters.append(Q(respondent=user))
+    if not access_filters:
+        return Submission.objects.none()
+
+    access_filter = access_filters[0]
+    for condition in access_filters[1:]:
+        access_filter |= condition
+    return (
+        Submission.objects.filter(
+            access_filter,
+            status=Submission.Status.IN_PROGRESS,
+            survey__deleted_at__isnull=True,
+        )
+        .select_related('survey', 'version')
+        .prefetch_related('survey__topics')
+        .annotate(saved_answer_count=Count('answers', distinct=True))
+        .order_by('-updated_at')
+        .distinct()
+    )
+
+
+@transaction.atomic
+def discard_in_progress_submission(submission_id, user, session_key):
+    submission = (
+        Submission.objects.select_for_update()
+        .select_related('survey')
+        .get(
+            pk=submission_id,
+            status=Submission.Status.IN_PROGRESS,
+        )
+    )
+    if not can_access_submission(submission, user, session_key):
+        raise PermissionDenied
+    survey_title = submission.survey.title
+    submission.delete()
+    return survey_title
+
+
 def _empty(value):
     return value is None or value == '' or value == [] or value == {}
 
 
-def _choice_map(question):
-    return {str(choice.id): choice.label for choice in question.choices.all()}
+def _choice_map(question, allowed_ids=None):
+    allowed_ids = set(allowed_ids or ())
+    return {
+        str(choice.id): choice.label
+        for choice in question.choices.all()
+        if not allowed_ids or str(choice.id) in allowed_ids
+    }
 
 
-def _selected_choice(question, raw_value):
-    choices = _choice_map(question)
+def _selected_choice(question, raw_value, allowed_ids=None):
+    choices = _choice_map(question, allowed_ids)
     if raw_value not in choices:
         raise ValueError('Select one of the available options.')
     return {'choice_id': raw_value, 'label': choices[raw_value]}
 
 
-def normalize_answer(question, data, enforce_required=True):
+def normalize_answer(
+    question,
+    data,
+    enforce_required=True,
+    presentation_data=None,
+):
     name = f'q_{question.id}'
     raw_value = data.get(name)
     if question.type in {Question.Type.MULTIPLE_CHOICE, Question.Type.RANKING}:
         raw_value = [value for value in data.getlist(name) if value]
     elif question.type == Question.Type.LIKERT_MATRIX:
+        presented_rows = (
+            presentation_data.get('rows', [])
+            if presentation_data is not None
+            else [str(row.id) for row in question.matrix_rows.all()]
+        )
         raw_value = {
-            str(row.id): data.get(f'{name}_{row.id}', '')
-            for row in question.matrix_rows.all()
-            if data.get(f'{name}_{row.id}', '')
+            row_id: data.get(f'{name}_{row_id}', '')
+            for row_id in presented_rows
+            if data.get(f'{name}_{row_id}', '')
         }
 
+    required = (
+        presentation_data.get('required', False)
+        if presentation_data is not None
+        else question.required
+    )
     if _empty(raw_value):
-        if question.required and enforce_required:
+        if required and enforce_required:
             raise ValueError('This question is required.')
         return None
 
@@ -359,16 +419,33 @@ def normalize_answer(question, data, enforce_required=True):
         except (TypeError, ValueError):
             raise ValueError('Enter a valid date.') from None
     if question.type in {Question.Type.SINGLE_CHOICE, Question.Type.DROPDOWN}:
-        return _selected_choice(question, raw_value)
+        return _selected_choice(
+            question,
+            raw_value,
+            presentation_data.get('choices') if presentation_data else None,
+        )
     if question.type == Question.Type.MULTIPLE_CHOICE:
         if len(raw_value) != len(set(raw_value)):
             raise ValueError('Select each option only once.')
-        return [_selected_choice(question, value) for value in raw_value]
+        return [
+            _selected_choice(
+                question,
+                value,
+                presentation_data.get('choices') if presentation_data else None,
+            )
+            for value in raw_value
+        ]
     if question.type == Question.Type.RANKING:
-        choices = _choice_map(question)
+        choices = _choice_map(
+            question,
+            presentation_data.get('choices') if presentation_data else None,
+        )
         if len(raw_value) != len(choices) or set(raw_value) != set(choices):
             raise ValueError('Rank every option exactly once.')
-        return [_selected_choice(question, value) for value in raw_value]
+        return [
+            _selected_choice(question, value, choices)
+            for value in raw_value
+        ]
     if question.type == Question.Type.SCALE:
         try:
             value = int(raw_value)
@@ -380,9 +457,17 @@ def normalize_answer(question, data, enforce_required=True):
             raise ValueError(f'Select a value from {minimum} to {maximum}.')
         return value
     if question.type == Question.Type.LIKERT_MATRIX:
-        choices = _choice_map(question)
-        rows = {str(row.id): row.label for row in question.matrix_rows.all()}
-        if question.required and set(raw_value) != set(rows):
+        choices = _choice_map(
+            question,
+            presentation_data.get('choices') if presentation_data else None,
+        )
+        allowed_rows = set(presentation_data.get('rows', [])) if presentation_data else set()
+        rows = {
+            str(row.id): row.label
+            for row in question.matrix_rows.all()
+            if not allowed_rows or str(row.id) in allowed_rows
+        }
+        if required and set(raw_value) != set(rows):
             raise ValueError('Answer every statement in this matrix.')
         if not set(raw_value).issubset(rows):
             raise ValueError('The matrix response contains an invalid statement.')
@@ -418,63 +503,91 @@ def _branch_values(value):
 
 
 def _branch_matches(rule, value):
-    if rule.operator == BranchRule.Operator.ANSWERED:
+    operator = rule['operator'] if isinstance(rule, dict) else rule.operator
+    compare = (
+        rule.get('compare_value', '')
+        if isinstance(rule, dict)
+        else rule.compare_value
+    )
+    if operator == BranchRule.Operator.ANSWERED:
         return bool(_branch_values(value))
-    compare_value = rule.compare_value.strip().casefold()
+    compare_value = compare.strip().casefold()
     values = [str(item).strip().casefold() for item in _branch_values(value)]
-    if rule.operator == BranchRule.Operator.EQUALS:
+    if operator == BranchRule.Operator.EQUALS:
         return compare_value in values
-    if rule.operator == BranchRule.Operator.NOT_EQUALS:
+    if operator == BranchRule.Operator.NOT_EQUALS:
         return bool(values) and compare_value not in values
-    if rule.operator == BranchRule.Operator.CONTAINS:
+    if operator == BranchRule.Operator.CONTAINS:
         return any(compare_value in item for item in values)
     return False
 
 
 def _completion_answers(submission, data):
-    sections = list(
-        submission.version.sections.prefetch_related(
-            'questions__choices',
-            'questions__matrix_rows',
-        ).order_by('order')
-    )
-    section_positions = {section.id: index for index, section in enumerate(sections)}
+    sections_by_id = {
+        str(section.id): section
+        for section in submission.version.sections.all()
+    }
+    questions_by_id = {
+        str(question.id): question
+        for question in Question.objects.filter(section__version=submission.version)
+        .prefetch_related('choices', 'matrix_rows')
+    }
+    presented_sections = submission.presentation.get('sections', [])
+    section_positions = {
+        section_data['id']: index
+        for index, section_data in enumerate(presented_sections)
+    }
     rules_by_section = {}
-    for rule in submission.version.branch_rules.select_related(
-        'source_question__section',
-        'target_section',
-    ).order_by('order'):
-        rules_by_section.setdefault(rule.source_question.section_id, []).append(rule)
+    for rule in submission.presentation.get('branch_rules', []):
+        rules_by_section.setdefault(rule['source_section_id'], []).append(rule)
 
     answers = []
     errors = {}
     position = 0
     visited = set()
-    while position < len(sections):
-        section = sections[position]
-        if section.id in visited:
+    while position < len(presented_sections):
+        section_data = presented_sections[position]
+        section_id = section_data['id']
+        section = sections_by_id.get(section_id)
+        if section is None:
+            position += 1
+            continue
+        if section_id in visited:
             errors['submission'] = 'The survey logic could not determine a valid route.'
             break
-        visited.add(section.id)
+        visited.add(section_id)
         section_values = {}
-        for question in section.questions.all():
+        for question_data in section_data.get('questions', []):
+            question = questions_by_id.get(question_data['id'])
+            if question is None:
+                continue
             try:
-                value = normalize_answer(question, data)
+                value = normalize_answer(
+                    question,
+                    data,
+                    presentation_data=question_data,
+                )
             except ValueError as error:
                 errors[str(question.id)] = str(error)
                 value = None
             else:
                 if value is not None:
                     answers.append(Answer(submission=submission, question=question, value=value))
-            section_values[question.id] = value
+            section_values[str(question.id)] = value
 
         next_position = position + 1
-        for rule in rules_by_section.get(section.id, []):
-            if not _branch_matches(rule, section_values.get(rule.source_question_id)):
+        for rule in rules_by_section.get(section_id, []):
+            if not _branch_matches(
+                rule,
+                section_values.get(rule['source_question_id']),
+            ):
                 continue
-            if rule.action == BranchRule.Action.END_SURVEY:
+            if rule['action'] == BranchRule.Action.END_SURVEY:
                 return answers, errors
-            next_position = section_positions.get(rule.target_section_id, len(sections))
+            next_position = section_positions.get(
+                rule['target_section_id'],
+                len(presented_sections),
+            )
             break
         position = next_position
     return answers, errors
@@ -492,17 +605,29 @@ def save_progress(submission_id, user, session_key, data):
     if submission.status == Submission.Status.COMPLETED:
         raise ResponseValidationError({'submission': 'Completed responses cannot be changed.'})
 
+    question_ids = presented_question_ids(submission.presentation)
     questions = list(
-        Question.objects.filter(section__version=submission.version)
+        Question.objects.filter(id__in=question_ids, section__version=submission.version)
         .select_related('section')
         .prefetch_related('choices', 'matrix_rows')
-        .order_by('section__order', 'order')
     )
+    questions_by_id = {str(question.id): question for question in questions}
     errors = {}
     values = {}
-    for question in questions:
+    for question_id in question_ids:
+        question = questions_by_id.get(question_id)
+        if question is None:
+            continue
         try:
-            values[question] = normalize_answer(question, data, enforce_required=False)
+            values[question] = normalize_answer(
+                question,
+                data,
+                enforce_required=False,
+                presentation_data=presentation_question(
+                    submission.presentation,
+                    question.id,
+                ),
+            )
         except ValueError as error:
             errors[str(question.id)] = str(error)
     if errors:
@@ -546,7 +671,7 @@ def complete_submission(submission_id, user, session_key, data):
     ).exclude(pk=submission.pk).first()
     if duplicate:
         raise DuplicateSubmission(duplicate)
-    _ensure_quota_available(submission.version)
+    _ensure_quota_available(survey, submission.version)
 
     answers, errors = _completion_answers(submission, data)
     if errors:

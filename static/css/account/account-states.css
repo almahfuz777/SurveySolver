@@ -2,8 +2,7 @@
 
 main > section[aria-labelledby="reset-heading"],
 main > section[aria-labelledby="verification-heading"],
-main > section[aria-labelledby="confirm-heading"],
-main > section[aria-labelledby="sign-out-heading"] {
+main > section[aria-labelledby="confirm-heading"] {
     width: min(calc(100% - 2rem), 30rem);
     min-height: 36rem;
     margin: 4rem auto;
@@ -12,4 +11,70 @@ main > section[aria-labelledby="sign-out-heading"] {
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
+}
+
+.sign-out-page {
+    display: grid;
+    min-height: calc(100vh - 4.5rem);
+    padding: 3rem 1rem;
+    place-items: center;
+    background:
+        radial-gradient(circle at 50% 15%, rgba(79, 70, 229, 0.12), transparent 28rem),
+        var(--surface-sunken);
+}
+
+.sign-out-card {
+    width: min(100%, 28rem);
+    padding: clamp(1.75rem, 5vw, 2.5rem);
+    text-align: center;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+}
+
+.sign-out-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin-bottom: 1rem;
+    color: var(--indigo-700);
+    background: var(--indigo-50);
+    border: 1px solid var(--indigo-100);
+    border-radius: 1rem;
+}
+
+.sign-out-icon svg {
+    width: 1.65rem;
+    height: 1.65rem;
+}
+
+.sign-out-card h1 {
+    margin: 0.45rem 0 0.65rem;
+    font-size: clamp(1.65rem, 5vw, 2rem);
+}
+
+.sign-out-card p {
+    margin: 0 auto;
+    color: var(--ink-600);
+    line-height: 1.65;
+}
+
+.sign-out-card form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    margin-top: 1.6rem;
+}
+
+.sign-out-card form .button {
+    width: 100%;
+}
+
+@media (max-width: 420px) {
+    .sign-out-card form {
+        grid-template-columns: 1fr;
+    }
 }

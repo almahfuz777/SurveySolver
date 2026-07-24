@@ -11,15 +11,20 @@
 .survey-grid { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .survey-management-card { display: flex; flex-direction: column; overflow: hidden; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); transition: box-shadow 0.15s ease, transform 0.15s ease; }
 .survey-management-card:hover { box-shadow: 0 10px 30px rgba(23, 22, 43, 0.12); transform: translateY(-2px); }
-.survey-card-visual { display: block; min-height: 6.5rem; padding: 1rem; background: linear-gradient(135deg, var(--indigo-900), var(--teal-700)); background-position: center; background-size: cover; }
-.survey-card-body { flex: 1; padding: 1rem 1.25rem 0.75rem; }
-.survey-card-body h2 { margin: 0 0 0.35rem; font-size: 1.15rem; line-height: 1.25; }
-.survey-card-body h2 a { color: var(--ink-950); text-decoration: none; }
-.survey-card-body h2 a:hover { color: var(--indigo-700); }
+.survey-card-visual { display: block; min-height: 6.5rem; padding: 1rem; background: linear-gradient(135deg, var(--indigo-900), var(--teal-700)); background-position: center; background-size: cover; text-decoration: none; }
+a.survey-card-body,
+a.survey-card-body:hover,
+a.survey-card-body:visited { flex: 1; padding: 1rem 1.25rem 0.75rem; color: inherit; text-decoration: none; }
+a.survey-card-body * { text-decoration: none; }
+.survey-card-body h2 { display: flex; align-items: baseline; gap: 0.45rem; margin: 0 0 0.35rem; font-size: 1.15rem; line-height: 1.25; }
+.survey-card-body h2 { color: var(--ink-950); }
+.survey-card-body:hover h2 { color: var(--indigo-700); }
+.survey-card-body:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .survey-card-summary { display: -webkit-box; overflow: hidden; margin: 0 0 0.6rem; color: var(--ink-600); font-size: 0.88rem; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .survey-card-summary-placeholder { display: none; }
 .survey-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; color: var(--ink-600); font-size: 0.78rem; }
 .survey-card-meta svg { vertical-align: -0.15rem; }
+.survey-version-pill { flex: none; padding: 0.12rem 0.36rem; color: var(--ink-600); background: var(--surface-muted); border: 1px solid var(--border); border-radius: 999px; font-size: 0.62rem; font-weight: 750; letter-spacing: 0.02em; line-height: 1; vertical-align: 0.12rem; }
 .survey-card-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.55rem; }
 .survey-card-dates { margin: 0.5rem 0 0; color: var(--ink-600); font-size: 0.74rem; }
 .survey-card-actions { display: flex; gap: 0.25rem; padding: 0.6rem 1rem; border-top: 1px solid var(--border); }
@@ -34,7 +39,7 @@
 .survey-grid[data-view="compact"] .survey-management-card { display: grid; grid-template-columns: 5.25rem minmax(0, 1fr) auto; align-items: stretch; }
 .survey-grid[data-view="compact"] .survey-management-card:hover { transform: none; }
 .survey-grid[data-view="compact"] .survey-card-visual { min-height: 0; padding: 0.55rem; }
-.survey-grid[data-view="compact"] .survey-card-visual .status-label { padding: 0.18rem 0.38rem; font-size: 0.58rem; }
+.survey-grid[data-view="compact"] .survey-card-visual .status-label { min-height: 0; padding: 0.18rem 0.38rem; font-size: 0.58rem; }
 .survey-grid[data-view="compact"] .survey-card-body { min-width: 0; padding: 0.65rem 0.85rem; }
 .survey-grid[data-view="compact"] .survey-card-body h2 { margin-bottom: 0.2rem; font-size: 0.95rem; }
 .survey-grid[data-view="compact"] .survey-card-summary { margin-bottom: 0.35rem; font-size: 0.78rem; white-space: nowrap; -webkit-line-clamp: 1; }
@@ -72,6 +77,12 @@
 .trash-item-actions form { margin: 0; }
 .trash-item-actions .trash-purge { color: var(--danger); background: var(--surface-raised); border: 1px solid var(--danger-border); }
 .trash-item-actions .trash-purge:hover { background: var(--danger-soft); }
+
+.survey-purge-card { max-width: 42rem; }
+.survey-purge-card form { display: grid; gap: 0.65rem; text-align: left; }
+.survey-purge-warning { display: grid; gap: 0.35rem; margin: 0 0 1.5rem; padding: 1rem; color: var(--danger); background: var(--danger-soft); border: 1px solid var(--danger-border); border-radius: var(--radius-md); text-align: left; }
+.survey-purge-warning span { color: var(--text-muted); font-size: 0.9rem; }
+.survey-purge-card .form-actions { margin-top: 0.65rem; }
 .page-empty-state { min-height: 25rem; }
 .page-empty-state .button { margin-top: 1rem; }
 .page-empty-state .button svg { margin-right: 0.35rem; vertical-align: -0.18rem; }

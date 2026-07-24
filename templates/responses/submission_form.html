@@ -7,79 +7,82 @@
 {% block extra_head %}<script src="{% static 'js/response.js' %}" defer></script>{% endblock %}
 
 {% block content %}
-<section class="page-heading response-heading">
-    <div class="shell page-heading-inner">
-        <div>
-            <span class="eyebrow">Survey in progress</span>
-            <h1>{{ survey.title }}</h1>
-            <p>{{ survey.summary }}</p>
-        </div>
-        <span class="response-time">About {{ survey.estimated_minutes }} min</span>
-    </div>
-</section>
-<section class="page-content">
+<section class="response-page">
     {{ branch_rules|json_script:"response-branch-rules" }}
-    <form class="shell response-form" method="post" novalidate>
+    <div class="shell response-shell">
+        <header class="response-intro">
+            <div>
+                <span class="response-eyebrow">Survey in progress</span>
+                <h1>{{ survey.title }}</h1>
+                {% if survey.summary %}<p>{{ survey.summary }}</p>{% endif %}
+            </div>
+            <span class="response-time">About {{ survey.estimated_minutes }} min</span>
+        </header>
+    <form class="response-form" method="post" novalidate>
         {% csrf_token %}
         {% if answer_errors %}
             <div class="message message-error" role="alert" tabindex="-1">
                 {% if answer_errors.submission %}{{ answer_errors.submission }}{% else %}Review the highlighted questions before submitting.{% endif %}
             </div>
         {% endif %}
-        {% for presented in presented_sections %}
-            <section class="panel response-section" data-response-section="{{ presented.section.id }}" aria-labelledby="section-{{ presented.section.id }}">
-                <div class="response-section-heading">
-                    <span class="section-number">Section {{ forloop.counter }}</span>
-                    <h2 id="section-{{ presented.section.id }}">{{ presented.section.title }}</h2>
-                    {% if presented.section.description %}<p>{{ presented.section.description }}</p>{% endif %}
-                </div>
-                {% for item in presented.items %}
-                    <fieldset class="response-question{% if item.error %} has-error{% endif %}" data-question-id="{{ item.question.id }}"{% if item.error %} aria-describedby="error-{{ item.question.id }}"{% endif %}>
-                        <legend>
-                            <span class="question-number">{{ forloop.counter }}</span>
-                            {{ item.question.prompt }}
-                            {% if item.question.required %}<span class="required-mark" aria-label="required">*</span>{% endif %}
-                        </legend>
-                        {% if item.question.help_text %}<p class="question-help">{{ item.question.help_text }}</p>{% endif %}
-                        {% if item.error %}<p class="field-error" id="error-{{ item.question.id }}">{{ item.error }}</p>{% endif %}
+        <div class="response-card">
+            {% for presented in presented_sections %}
+                <section class="response-section" data-response-section="{{ presented.section.id }}" aria-labelledby="section-{{ presented.section.id }}">
+                    <div class="response-section-heading">
+                        <span class="response-section-label">Section {{ forloop.counter }} of {{ presented_sections|length }}</span>
+                        <h2 id="section-{{ presented.section.id }}">{{ presented.section.title }}</h2>
+                        {% if presented.section.description %}<p>{{ presented.section.description }}</p>{% endif %}
+                    </div>
+                    {% for item in presented.items %}
+                        <fieldset class="response-question{% if item.error %} has-error{% endif %}" data-question-id="{{ item.question.id }}"{% if item.error %} aria-describedby="error-{{ item.question.id }}"{% endif %}>
+                            <legend class="response-prompt">
+                                <span class="response-question-number">{{ item.question.number }}.</span>
+                                <span>{{ item.question.prompt }}</span>
+                                {% if item.question.required %}<span class="required-mark" aria-label="required">*</span>{% endif %}
+                            </legend>
+                            {% if item.question.help_text %}<p class="response-help">{{ item.question.help_text }}</p>{% endif %}
+                            {% if item.error %}<p class="field-error" id="error-{{ item.question.id }}">{{ item.error }}</p>{% endif %}
 
-                        {% if item.question.type == 'likert_matrix' %}
-                            <div class="matrix-scroll" tabindex="0" aria-label="Scrollable response matrix">
-                                <table class="response-matrix">
-                                    <thead><tr><th scope="col">Statement</th>{% for option in item.choices %}<th scope="col">{{ option.choice.label }}</th>{% endfor %}</tr></thead>
-                                    <tbody>
-                                        {% for row in item.rows %}<tr><th scope="row">{{ row.row.label }}</th>{% for option in row.choices %}<td><label><span class="sr-only">{{ row.row.label }}: {{ option.choice.label }}</span><input type="radio" name="{{ row.name }}" value="{{ option.choice.id }}"{% if option.selected %} checked{% endif %}></label></td>{% endfor %}</tr>{% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% elif item.question.type == 'ranking' %}
-                            <div class="ranking-inputs">
-                                {% for rank in item.ranking %}<label><span>{{ rank.position }}</span><select name="{{ item.name }}"><option value="">Choose an option</option>{% for option in rank.options %}<option value="{{ option.choice.id }}"{% if option.selected %} selected{% endif %}>{{ option.choice.label }}</option>{% endfor %}</select></label>{% endfor %}
-                            </div>
-                        {% elif item.question.type == 'dropdown' %}
-                            <select name="{{ item.name }}"><option value="">Select an option</option>{% for option in item.choices %}<option value="{{ option.choice.id }}"{% if option.selected %} selected{% endif %}>{{ option.choice.label }}</option>{% endfor %}</select>
-                        {% elif item.question.type == 'single_choice' or item.question.type == 'multiple_choice' %}
-                            <div class="response-options">
-                                {% for option in item.choices %}<label class="response-option"><input type="{% if item.question.type == 'multiple_choice' %}checkbox{% else %}radio{% endif %}" name="{{ item.name }}" value="{{ option.choice.id }}"{% if option.selected %} checked{% endif %}> <span>{{ option.choice.label }}</span></label>{% endfor %}
-                            </div>
-                        {% elif item.question.type == 'long_text' %}
-                            <textarea name="{{ item.name }}" rows="5">{{ item.value }}</textarea>
-                        {% elif item.question.type == 'number' %}
-                            <input type="number" name="{{ item.name }}" value="{{ item.value }}" step="any">
-                        {% elif item.question.type == 'date' %}
-                            <input type="date" name="{{ item.name }}" value="{{ item.value }}">
-                        {% elif item.question.type == 'scale' %}
-                            <div class="scale-options">
-                                {% for value in item.scale_values %}<label><input type="radio" name="{{ item.name }}" value="{{ value }}"{% if item.value == value|stringformat:'s' %} checked{% endif %}><span>{{ value }}</span></label>{% endfor %}
-                            </div>
-                            <div class="scale-labels"><span>{{ item.question.config.scale_min_label }}</span><span>{{ item.question.config.scale_max_label }}</span></div>
-                        {% else %}
-                            <input type="text" name="{{ item.name }}" value="{{ item.value }}">
-                        {% endif %}
-                    </fieldset>
-                {% endfor %}
-            </section>
-        {% endfor %}
+                            {% if item.question.type == 'likert_matrix' %}
+                                <div class="response-matrix-scroll" tabindex="0" aria-label="Scrollable response matrix">
+                                    <table class="response-matrix">
+                                        <thead><tr><th scope="col">Statement</th>{% for option in item.choices %}<th scope="col">{{ option.choice.label }}</th>{% endfor %}</tr></thead>
+                                        <tbody>
+                                            {% for row in item.rows %}<tr><th scope="row">{{ row.row.label }}</th>{% for option in row.choices %}<td><label><span class="sr-only">{{ row.row.label }}: {{ option.choice.label }}</span><input type="radio" name="{{ row.name }}" value="{{ option.choice.id }}"{% if option.selected %} checked{% endif %}></label></td>{% endfor %}</tr>{% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% elif item.question.type == 'ranking' %}
+                                <p class="response-note" id="ranking-help-{{ item.question.id }}" data-ranking-help>Choose a different option for each rank.</p>
+                                <div class="response-ranking" data-ranking-list aria-describedby="ranking-help-{{ item.question.id }}">
+                                    {% for rank in item.ranking %}<label class="response-rank-row"><span class="response-rank-number">{{ rank.position }}</span><select name="{{ item.name }}"><option value="">Choose an option</option>{% for option in rank.options %}<option value="{{ option.choice.id }}"{% if option.selected %} selected{% endif %}>{{ option.choice.label }}</option>{% endfor %}</select></label>{% endfor %}
+                                </div>
+                                <p class="sr-only" role="status" aria-live="polite" data-ranking-status></p>
+                            {% elif item.question.type == 'dropdown' %}
+                                <select class="response-control response-select" name="{{ item.name }}"><option value="">Select an option…</option>{% for option in item.choices %}<option value="{{ option.choice.id }}"{% if option.selected %} selected{% endif %}>{{ option.choice.label }}</option>{% endfor %}</select>
+                            {% elif item.question.type == 'single_choice' or item.question.type == 'multiple_choice' %}
+                                <div class="response-options">
+                                    {% for option in item.choices %}<label class="response-option"><input type="{% if item.question.type == 'multiple_choice' %}checkbox{% else %}radio{% endif %}" name="{{ item.name }}" value="{{ option.choice.id }}"{% if option.selected %} checked{% endif %}><span class="response-glyph {% if item.question.type == 'multiple_choice' %}response-glyph-check{% else %}response-glyph-radio{% endif %}" aria-hidden="true"></span><span>{{ option.choice.label }}</span></label>{% endfor %}
+                                </div>
+                            {% elif item.question.type == 'long_text' %}
+                                <textarea class="response-control response-textarea" name="{{ item.name }}" rows="5" placeholder="Share as much detail as you like…">{{ item.value }}</textarea>
+                            {% elif item.question.type == 'number' %}
+                                <input class="response-control response-number" type="number" name="{{ item.name }}" value="{{ item.value }}" step="any" placeholder="0">
+                            {% elif item.question.type == 'date' %}
+                                <input class="response-control response-date" type="date" name="{{ item.name }}" value="{{ item.value }}">
+                            {% elif item.question.type == 'scale' %}
+                                <div class="response-scale">
+                                    {% for value in item.scale_values %}<label><input type="radio" name="{{ item.name }}" value="{{ value }}"{% if item.value == value|stringformat:'s' %} checked{% endif %}><span>{{ value }}</span></label>{% endfor %}
+                                </div>
+                                {% if item.question.config.scale_min_label or item.question.config.scale_max_label %}<div class="response-scale-labels"><span>{{ item.question.config.scale_min_label }}</span><span>{{ item.question.config.scale_max_label }}</span></div>{% endif %}
+                            {% else %}
+                                <input class="response-control" type="text" name="{{ item.name }}" value="{{ item.value }}" placeholder="Type your answer…">
+                            {% endif %}
+                        </fieldset>
+                    {% endfor %}
+                </section>
+            {% endfor %}
+        </div>
         <div class="response-submit panel">
             <div><strong>Ready to submit?</strong><p>Save and return on this browser, or submit when your answers are complete.</p></div>
             <div class="response-submit-actions">
@@ -88,5 +91,6 @@
             </div>
         </div>
     </form>
+    </div>
 </section>
 {% endblock %}

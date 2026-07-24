@@ -79,8 +79,8 @@ class AdvancedLogicTests(TestCase):
         )
 
         self.assertEqual(rule.target_section, second_section)
-        self.version.refresh_from_db()
-        self.assertEqual(self.version.response_limit, 100)
+        self.survey.refresh_from_db()
+        self.assertEqual(self.survey.response_limit, 100)
         self.assertEqual(revision, 5)
 
     def test_eligibility_criteria_are_validated_and_versioned(self):

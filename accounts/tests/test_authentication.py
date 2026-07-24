@@ -39,6 +39,19 @@ class AuthenticationFlowTests(TestCase):
         self.assertContains(response, 'name="password2"')
         self.assertContains(response, 'data-password-toggle', count=2)
 
+    def test_logout_confirmation_uses_compact_account_state_card(self):
+        user = get_user_model().objects.create_user(
+            email='leaving@example.com',
+            password=self.password,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('account_logout'))
+
+        self.assertContains(response, 'class="sign-out-page"')
+        self.assertContains(response, 'class="sign-out-card"')
+        self.assertContains(response, 'Stay signed in')
+
     def test_signup_creates_email_only_user_and_requests_verification(self):
         response = self.client.post(
             reverse('account_signup'),

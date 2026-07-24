@@ -8,7 +8,7 @@ from rewards.models import GuestRewardClaim, PointTransaction
 from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 
-from responses.management import permanently_delete_submission, set_analytics_exclusion
+from responses.management import permanently_delete_submission
 from responses.models import ResponseAuditEvent, Submission
 
 
@@ -42,27 +42,6 @@ class ResponseManagementTests(TestCase):
             completed_at=timezone.now(),
         )
         self.submission.refresh_from_db()
-
-    def test_exclusion_state_changes_are_audited(self):
-        set_analytics_exclusion(
-            self.submission.id,
-            self.owner,
-            excluded=True,
-            reason='Quality review',
-        )
-
-        self.submission.refresh_from_db()
-        self.assertTrue(self.submission.is_excluded)
-        self.assertEqual(self.submission.exclusion_reason, 'Quality review')
-        self.assertEqual(
-            ResponseAuditEvent.objects.get().action,
-            ResponseAuditEvent.Action.EXCLUDED,
-        )
-
-        set_analytics_exclusion(self.submission.id, self.owner, excluded=False)
-        self.submission.refresh_from_db()
-        self.assertFalse(self.submission.is_excluded)
-        self.assertEqual(ResponseAuditEvent.objects.count(), 2)
 
     def test_deletion_preserves_ledger_and_audit_while_invalidating_claim(self):
         transaction = PointTransaction.objects.create(

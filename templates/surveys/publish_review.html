@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Review changes · {{ survey.title }} | SurveySolver{% endblock %}
+
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/publish-review.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page-content">
+    <div class="shell">
+        <article class="panel publish-review">
+            <header class="publish-review-head">
+                <span class="eyebrow">Review before publishing</span>
+                <h1>{{ survey.title }}</h1>
+                {% if diff.is_first_publication %}
+                    <p class="publish-review-lead">This is the first publication. Everything below becomes version {{ publication_intent.version_number }}.</p>
+                {% elif publication_intent.action == 'replace' %}
+                    <p class="publish-review-lead">Version {{ active_version.number }} has not collected any responses yet, so publishing replaces it in place. Its version number stays {{ active_version.number }}.</p>
+                {% elif publication_intent.action == 'new' %}
+                    <p class="publish-review-lead">Version {{ active_version.number }} has collected responses, so publishing creates version {{ publication_intent.version_number }}. <strong>Responses, exports, and analytics for each version stay permanently separate and cannot be merged later.</strong></p>
+                {% else %}
+                    <p class="publish-review-lead">The questionnaire content matches the live version {{ active_version.number }}, so there is nothing to publish.</p>
+                {% endif %}
+            </header>
+
+            <div class="diff-legend" role="note">
+                <span class="diff-key diff-key-added">Added</span>
+                <span class="diff-key diff-key-changed">Changed</span>
+                <span class="diff-key diff-key-removed">Removed</span>
+                <span class="diff-legend-note">Ordering, placement, required state, randomization, branching and targeting are live settings — they already apply and are not listed here.</span>
+            </div>
+
+            {% if diff.has_changes %}
+                <p class="diff-summary">
+                    {% if diff.counts.questions_added %}<span class="diff-count diff-count-added">{{ diff.counts.questions_added }} question{{ diff.counts.questions_added|pluralize }} added</span>{% endif %}
+                    {% if diff.counts.questions_changed %}<span class="diff-count diff-count-changed">{{ diff.counts.questions_changed }} question{{ diff.counts.questions_changed|pluralize }} changed</span>{% endif %}
+                    {% if diff.counts.questions_removed %}<span class="diff-count diff-count-removed">{{ diff.counts.questions_removed }} question{{ diff.counts.questions_removed|pluralize }} removed</span>{% endif %}
+                    {% if diff.counts.sections_added %}<span class="diff-count diff-count-added">{{ diff.counts.sections_added }} section{{ diff.counts.sections_added|pluralize }} added</span>{% endif %}
+                    {% if diff.counts.sections_changed %}<span class="diff-count diff-count-changed">{{ diff.counts.sections_changed }} section{{ diff.counts.sections_changed|pluralize }} changed</span>{% endif %}
+                    {% if diff.counts.sections_removed %}<span class="diff-count diff-count-removed">{{ diff.counts.sections_removed }} section{{ diff.counts.sections_removed|pluralize }} removed</span>{% endif %}
+                </p>
+            {% endif %}
+
+            {% if title_changed %}
+                <p class="diff-note">The publication title recorded for this version will be “{{ survey.title }}”. Earlier versions keep the title they were published under.</p>
+            {% endif %}
+
+            {% for section in diff.sections %}
+                <section class="diff-section diff-{{ section.status }}">
+                    <h2 class="diff-section-title">
+                        <span class="diff-tag diff-tag-{{ section.status }}">{{ section.status|capfirst }}</span>
+                        {{ section.title }}
+                    </h2>
+                    {% if section.changes %}
+                        <ul class="diff-fields">
+                            {% for change in section.changes %}
+                                <li><span class="diff-field-label">{{ change.label }}</span> <del>{{ change.from }}</del> <ins>{{ change.to }}</ins></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {% for question in section.questions %}
+                        {% if question.status != 'unchanged' or section.status != 'unchanged' %}
+                            <div class="diff-question diff-{{ question.status }}">
+                                <p class="diff-question-head">
+                                    <span class="diff-tag diff-tag-{{ question.status }}">{{ question.status|capfirst }}</span>
+                                    <span class="diff-question-prompt">{{ question.prompt }}</span>
+                                    <span class="diff-question-type">{{ question.type_label }}</span>
+                                </p>
+                                {% if question.changes %}
+                                    <ul class="diff-fields">
+                                        {% for change in question.changes %}
+                                            <li><span class="diff-field-label">{{ change.label }}</span> <del>{{ change.from }}</del> <ins>{{ change.to }}</ins></li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                                {% if question.choices %}
+                                    <ul class="diff-options" aria-label="Choices">
+                                        {% for choice in question.choices %}
+                                            {% if choice.status != 'unchanged' %}
+                                                <li class="diff-option diff-{{ choice.status }}">
+                                                    <span class="diff-tag diff-tag-{{ choice.status }}">{{ choice.status|capfirst }}</span>
+                                                    {% if choice.previous %}<del>{{ choice.previous }}</del> <ins>{{ choice.label }}</ins>{% else %}{{ choice.label }}{% endif %}
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                                {% if question.rows %}
+                                    <ul class="diff-options" aria-label="Matrix statements">
+                                        {% for row in question.rows %}
+                                            {% if row.status != 'unchanged' %}
+                                                <li class="diff-option diff-{{ row.status }}">
+                                                    <span class="diff-tag diff-tag-{{ row.status }}">{{ row.status|capfirst }}</span>
+                                                    {% if row.previous %}<del>{{ row.previous }}</del> <ins>{{ row.label }}</ins>{% else %}{{ row.label }}{% endif %}
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if section.status == 'unchanged' %}
+                        <p class="diff-unchanged-note">No content changes in this section.</p>
+                    {% endif %}
+                </section>
+            {% endfor %}
+
+            {% if readiness_errors %}
+                <div class="diff-blockers">
+                    <h2>Fix before publishing</h2>
+                    <ul>{% for error in readiness_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                </div>
+            {% endif %}
+
+            <div class="publish-review-actions">
+                <a class="button button-secondary" href="{% url 'survey_builder' survey.id %}">Back to builder</a>
+                {% if publication_intent.can_publish and not readiness_errors %}
+                    <form method="post" action="{% url 'survey_publish' survey.id %}"{% if publication_intent.action == 'new' %} data-confirm="Publish version {{ publication_intent.version_number }}? Responses, exports, and analytics for this version will remain permanently separate and cannot be merged with earlier versions." data-confirm-ok="Publish version {{ publication_intent.version_number }}"{% endif %}>
+                        {% csrf_token %}
+                        <input type="hidden" name="revision" value="{{ version.revision }}">
+                        <button class="button button-primary" type="submit">
+                            {% if publication_intent.action == 'replace' %}Update version {{ publication_intent.version_number }}{% else %}Publish version {{ publication_intent.version_number }}{% endif %}
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </article>
+    </div>
+</section>
+{% endblock %}

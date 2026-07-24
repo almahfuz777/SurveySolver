@@ -118,6 +118,7 @@ if (builder) {
     document.querySelectorAll('[data-choice-editor]').forEach((container) => {
         const textarea = container.querySelector('textarea');
         if (!textarea) return;
+        const identityInput = container.querySelector('input[type="hidden"][name$="_identities_text"]');
         const itemName = container.dataset.itemName || 'option';
         textarea.hidden = true;
 
@@ -130,10 +131,16 @@ if (builder) {
         container.append(rows, addButton);
 
         const sync = () => {
-            textarea.value = [...rows.querySelectorAll('input')]
-                .map((input) => input.value.trim())
-                .filter(Boolean)
+            const populatedRows = [...rows.querySelectorAll('.choice-row')]
+                .filter((row) => row.querySelector('input').value.trim());
+            textarea.value = populatedRows
+                .map((row) => row.querySelector('input').value.trim())
                 .join('\n');
+            if (identityInput) {
+                identityInput.value = populatedRows
+                    .map((row) => row.dataset.identity || '')
+                    .join('\n');
+            }
         };
 
         const triggerSave = () => {
@@ -146,9 +153,10 @@ if (builder) {
             });
         };
 
-        const makeRow = (value) => {
+        const makeRow = (value, identity = '') => {
             const row = document.createElement('div');
             row.className = 'choice-row';
+            row.dataset.identity = identity;
             const input = document.createElement('input');
             input.type = 'text';
             input.value = value;
@@ -201,7 +209,7 @@ if (builder) {
             values: () => [...rows.querySelectorAll('input')].map((i) => i.value.trim()).filter(Boolean),
             setValues: (list) => {
                 rows.textContent = '';
-                list.forEach((label) => rows.append(makeRow(label)));
+                list.forEach((label) => rows.append(makeRow(label, '')));
                 if (!rows.children.length) rows.append(makeRow(''), makeRow(''));
                 api.refreshGlyphs();
                 sync();
@@ -227,8 +235,9 @@ if (builder) {
         };
         editors.push(api);
 
+        const identityValues = identityInput ? identityInput.value.split('\n') : [];
         textarea.value.split('\n').map((line) => line.trim()).filter(Boolean)
-            .forEach((line) => rows.append(makeRow(line)));
+            .forEach((line, index) => rows.append(makeRow(line, identityValues[index] || '')));
         if (!rows.children.length) {
             rows.append(makeRow(''), makeRow(''));
         }
@@ -709,16 +718,69 @@ if (builder) {
     // ---------- Selection scroll continuity ----------
 
     const scrollKey = `builder-scroll-${builder.dataset.surveyId || ''}`;
-    document.querySelectorAll('a[data-select]').forEach((link) => {
-        link.addEventListener('click', () => {
-            try {
-                sessionStorage.setItem(scrollKey, JSON.stringify({
-                    y: window.scrollY,
-                    rail: rail ? rail.scrollTop : 0,
-                }));
-            } catch (error) { /* storage unavailable — selection still works */ }
-        });
+    const rememberScroll = () => {
+        try {
+            sessionStorage.setItem(scrollKey, JSON.stringify({
+                y: window.scrollY,
+                rail: rail ? rail.scrollTop : 0,
+            }));
+        } catch (error) { /* storage unavailable — selection still works */ }
+    };
+    document.querySelectorAll('a[data-select], a[data-deselect]').forEach((link) => {
+        link.addEventListener('click', rememberScroll);
     });
+
+    // ---------- Canvas deselection ----------
+
+    // Clicking bare canvas (not a question, control, or text the creator is
+    // selecting) clears the selection so the inspector can return to its
+    // "select a question" state. The inspector's own [data-deselect] control
+    // covers the same action for keyboard users.
+    (() => {
+        const canvas = document.querySelector('[data-canvas-deselect]');
+        const deselectUrl = canvas && canvas.dataset.deselectUrl;
+        if (!canvas || !deselectUrl || !selectedCard) return;
+        const KEEPS_SELECTION = [
+            '.rv-q',
+            '.rv-section-head',
+            '.builder-add-bar',
+            '.rv-head',
+            '.survey-banner-section',
+            'a', 'button', 'input', 'textarea', 'select', 'label', 'form',
+            '[data-inspector]',
+        ].join(', ');
+
+        const deselect = () => {
+            rememberScroll();
+            // Deliberately not marking this as intentional navigation: the
+            // unsaved-changes guard should still fire, exactly as it does when
+            // clicking from one question to another.
+            window.location.href = deselectUrl;
+        };
+
+        canvas.addEventListener('click', (event) => {
+            if (event.button !== 0) return;
+            if (event.target.closest(KEEPS_SELECTION)) return;
+            // Don't fight a drag-to-select gesture that ended on the background.
+            const selection = window.getSelection && window.getSelection();
+            if (selection && String(selection)) return;
+            deselect();
+        });
+
+        // Keyboard parity for the background click, without adding another
+        // control to the inspector header. Only fires when Escape has nothing
+        // else to dismiss and the creator isn't typing.
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || event.defaultPrevented) return;
+            const active = document.activeElement;
+            if (active && active.closest('input, textarea, select, [contenteditable]')) return;
+            if (document.querySelector(
+                '.confirm-modal-overlay.is-open, [data-add-popover]:not([hidden]),'
+                + ' .studio-rail.is-open, .studio-inspector.is-open'
+            )) return;
+            deselect();
+        });
+    })();
     let restored = false;
     try {
         const stored = sessionStorage.getItem(scrollKey);

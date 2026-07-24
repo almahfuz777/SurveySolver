@@ -4,6 +4,7 @@ from django.test import TestCase
 from surveys import services
 from surveys.models import Question, Survey, SurveyVersion
 from surveys.publication import PublicationError, publish_survey
+from responses.services import start_submission
 
 
 class PublicationTests(TestCase):
@@ -42,6 +43,7 @@ class PublicationTests(TestCase):
         first_draft = self.survey.draft_version
         _, revision = services.add_question(first_draft.sections.get().id, Question.Type.DATE, first_draft.revision)
         first_published, second_draft = publish_survey(self.survey.id, self.user, revision)
+        start_submission(self.survey, None, 'publication-history')
         _, revision = services.add_question(second_draft.sections.get().id, Question.Type.NUMBER, second_draft.revision)
 
         second_published, third_draft = publish_survey(self.survey.id, self.user, revision)
@@ -51,7 +53,7 @@ class PublicationTests(TestCase):
         self.assertEqual(second_published.status, SurveyVersion.Status.PUBLISHED)
         self.assertEqual(third_draft.number, 3)
 
-    def test_publication_clones_eligibility_into_next_draft(self):
+    def test_eligibility_remains_live_at_survey_level(self):
         draft = self.survey.draft_version
         _, revision = services.add_question(
             draft.sections.get().id,
@@ -71,14 +73,16 @@ class PublicationTests(TestCase):
             },
         )
 
-        _, next_draft = publish_survey(self.survey.id, self.user, revision)
+        publish_survey(self.survey.id, self.user, revision)
 
-        cloned = next_draft.eligibility_criteria
-        self.assertNotEqual(cloned.pk, criteria.pk)
-        self.assertEqual(cloned.min_age, 18)
-        self.assertEqual(cloned.education_levels, ['undergraduate'])
+        self.assertEqual(self.survey.eligibility_criteria.pk, criteria.pk)
+        self.assertEqual(self.survey.eligibility_criteria.min_age, 18)
+        self.assertEqual(
+            self.survey.eligibility_criteria.education_levels,
+            ['undergraduate'],
+        )
 
-    def test_publication_clones_response_limit_into_next_draft(self):
+    def test_response_limit_remains_live_at_survey_level(self):
         draft = self.survey.draft_version
         _, revision = services.add_question(
             draft.sections.get().id,
@@ -87,7 +91,7 @@ class PublicationTests(TestCase):
         )
         revision = services.update_response_limit(draft.id, revision, 250)
 
-        published, next_draft = publish_survey(self.survey.id, self.user, revision)
+        publish_survey(self.survey.id, self.user, revision)
 
-        self.assertEqual(published.response_limit, 250)
-        self.assertEqual(next_draft.response_limit, 250)
+        self.survey.refresh_from_db()
+        self.assertEqual(self.survey.response_limit, 250)

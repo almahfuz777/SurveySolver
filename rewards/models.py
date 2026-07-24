@@ -29,7 +29,7 @@ class PointTransaction(models.Model):
     metadata = models.JSONField(default=dict, blank=True)
     survey = models.ForeignKey(
         'surveys.Survey',
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         related_name='point_transactions',
         blank=True,
         null=True,
@@ -67,6 +67,11 @@ class PointTransaction(models.Model):
                     | models.Q(
                         reason='survey_completion',
                         survey__isnull=False,
+                    )
+                    | models.Q(
+                        reason='survey_completion',
+                        survey__isnull=True,
+                        submission__isnull=True,
                     )
                 ),
                 name='rewards_transaction_context_valid',

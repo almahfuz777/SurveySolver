@@ -10,14 +10,14 @@
 <section class="page-heading">
     <div class="shell page-heading-inner">
         <div><span class="eyebrow">Creator response dashboard</span><h1>{{ survey.title }}</h1><p>Monitor collection and inspect submitted responses without changing respondent answers.</p></div>
-        <div class="hero-actions"><a class="button button-primary" href="{% url 'survey_analytics' survey.id %}">View analytics</a><a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a></div>
+        <div class="hero-actions"><a class="button button-primary" href="{% url 'analytics_dashboard' %}?survey={{ survey.id }}{% if selected_version %}&amp;version={{ selected_version.id }}{% endif %}">View analytics</a><a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a></div>
     </div>
 </section>
 <section class="page-content">
     <div class="shell creator-responses">
         <div class="metric-grid response-metrics" aria-label="Response summary">
-            <article class="metric-card"><span>Starts</span><strong>{{ metrics.starts }}</strong><small>All response sessions</small></article>
-            <article class="metric-card"><span>Completed</span><strong>{{ metrics.completions }}</strong><small>{{ metrics.completion_rate }}% completion rate</small></article>
+            <article class="metric-card"><span>Starts</span><strong>{{ metrics.starts }}</strong><small>{% if selected_version %}Version {{ selected_version.number }} sessions{% else %}No published version{% endif %}</small></article>
+            <article class="metric-card"><span>Completed</span><strong>{{ metrics.completions }}</strong><small>{% if selected_version %}Version {{ selected_version.number }} · {% endif %}{{ metrics.completion_rate }}% completion rate</small></article>
             <article class="metric-card"><span>Median duration</span><strong>{{ metrics.median_duration_display|default:'—' }}</strong><small>Completed responses</small></article>
         </div>
         <div class="response-view-tabs" role="tablist" aria-label="Response dashboard view">
@@ -28,7 +28,7 @@
             {% include 'responses/partials/response_activity.html' %}
         </div>
         <div id="responses-view" class="response-view-panel" role="tabpanel" aria-labelledby="responses-tab" hidden>
-            {% include 'responses/partials/response_sheet.html' %}
+            {% include 'responses/partials/response_sheet_versions.html' %}
         </div>
     </div>
 </section>

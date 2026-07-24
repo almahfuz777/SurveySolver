@@ -6,6 +6,7 @@ from django_countries import countries
 
 from responses.durations import duration_seconds, format_duration_seconds
 from responses.models import Answer, Submission
+from surveys.presentation import resolved_version
 
 
 PRIVACY_THRESHOLD = 5
@@ -71,7 +72,7 @@ def _answer_labels(answer):
     return []
 
 
-def question_summaries(submissions):
+def question_summaries(submissions, version):
     answers = Answer.objects.filter(
         submission__in=submissions.filter(status=Submission.Status.COMPLETED),
     ).select_related('question__section__version')
@@ -98,7 +99,18 @@ def question_summaries(submissions):
         ]
         summary['max_count'] = max(distribution.values(), default=0)
         results.append(summary)
-    return sorted(results, key=lambda item: (item['version_number'], item['question'].order))
+    presentation_order = {
+        question.id: index
+        for index, question in enumerate(
+            question
+            for section in resolved_version(version)
+            for question in section.questions.all()
+        )
+    }
+    return sorted(
+        results,
+        key=lambda item: presentation_order.get(item['question'].id, 10**9),
+    )
 
 
 def demographic_summaries(submissions):
@@ -143,12 +155,17 @@ def demographic_summaries(submissions):
     return summaries
 
 
-def survey_analytics(survey, version=None):
-    submissions = survey.submissions.filter(is_excluded=False)
-    if version:
-        submissions = submissions.filter(version=version)
+def survey_analytics(survey, version):
+    submissions = survey.submissions.filter(version=version)
+    fingerprints = set(
+        submissions.exclude(presentation__fingerprint='')
+        .values_list('presentation__fingerprint', flat=True)
+    )
+    fingerprints.discard(None)
     return {
         'metrics': overview_metrics(submissions),
-        'questions': question_summaries(submissions),
+        'questions': question_summaries(submissions, version),
         'demographics': demographic_summaries(submissions),
+        'presentation_fingerprint_count': len(fingerprints),
+        'has_multiple_presentations': len(fingerprints) > 1,
     }

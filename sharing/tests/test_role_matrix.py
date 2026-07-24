@@ -53,7 +53,7 @@ class CollaborationRoleMatrixTests(TestCase):
             reverse('survey_publish', args=[self.survey.id]),
             {'revision': self.survey.draft_version.revision},
         )
-        self.assertRedirects(published, reverse('survey_builder', args=[self.survey.id]))
+        self.assertRedirects(published, reverse('survey_list'))
         self.assertEqual(
             self.client.get(reverse('creator_response_list', args=[self.survey.id])).status_code,
             200,
@@ -99,13 +99,18 @@ class CollaborationRoleMatrixTests(TestCase):
         delete_url = reverse('creator_response_delete', args=[self.survey.id, submission.id])
 
         self.login(self.editor)
-        self.assertEqual(self.client.get(delete_url).status_code, 404)
+        self.assertEqual(self.client.post(delete_url).status_code, 404)
         self.client.logout()
         self.login(self.viewer)
-        self.assertEqual(self.client.get(delete_url).status_code, 404)
+        self.assertEqual(self.client.post(delete_url).status_code, 404)
         self.client.logout()
         self.login(self.owner)
-        self.assertEqual(self.client.get(delete_url).status_code, 200)
+        self.assertEqual(self.client.get(delete_url).status_code, 405)
+        self.assertRedirects(
+            self.client.post(delete_url),
+            reverse('creator_response_list', args=[self.survey.id]),
+        )
+        self.assertFalse(Submission.objects.filter(pk=submission.pk).exists())
 
     def test_outsider_cannot_discover_shared_dashboard_routes(self):
         self.login(self.outsider)

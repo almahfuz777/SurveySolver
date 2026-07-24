@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from rewards.models import PointTransaction
+from sharing.models import SurveyCollaborator
 from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 
@@ -188,7 +189,6 @@ class CreatorResponseDashboardTests(TestCase):
                 'activity-completion': Submission.Status.COMPLETED,
                 'activity-source': Submission.Source.DIRECT,
                 'activity-eligibility': 'eligible',
-                'activity-exclusion': 'included',
                 'activity-search': 'detailed response',
                 'activity-columns': ['status', 'duration'],
             },
@@ -234,51 +234,64 @@ class CreatorResponseDashboardTests(TestCase):
                 args=[self.survey.id, second.id],
             ),
         )
+        self.assertContains(filtered, 'icon-arrow-up-right')
+        self.assertContains(sorted_response, 'version-sheet-label')
         self.assertEqual(
             [submission.id for submission in sorted_response.context['responses_page']],
             [second.id, first.id],
         )
 
-    def test_exclude_and_include_actions_are_audited(self):
+    def test_response_detail_has_no_analytics_exclusion_controls(self):
         submission = self.complete_response()
         self.client.force_login(self.owner)
-        action_url = reverse(
-            'creator_response_exclusion',
-            args=[self.survey.id, submission.id],
+
+        response = self.client.get(
+            reverse(
+                'creator_response_detail',
+                args=[self.survey.id, submission.id],
+            ),
         )
 
-        excluded = self.client.post(
-            action_url,
-            {'action': 'exclude', 'reason': 'Failed attention check'},
+        self.assertNotContains(response, 'Analytics inclusion')
+        self.assertNotContains(response, 'Exclude from analytics')
+        self.assertNotContains(response, 'exclusion-reason')
+        self.assertContains(
+            response,
+            reverse(
+                'creator_response_delete',
+                args=[self.survey.id, submission.id],
+            ),
+        )
+        self.assertContains(response, 'data-confirm="Permanently delete this response?')
+
+    def test_editor_does_not_receive_owner_only_response_deletion(self):
+        submission = self.complete_response()
+        editor = get_user_model().objects.create_user(email='dashboard-editor@example.com')
+
+        SurveyCollaborator.objects.create(
+            survey=self.survey,
+            user=editor,
+            role=SurveyCollaborator.Role.EDITOR,
+            added_by=self.owner,
+        )
+        self.client.force_login(editor)
+
+        response = self.client.get(
+            reverse(
+                'creator_response_detail',
+                args=[self.survey.id, submission.id],
+            ),
         )
 
-        self.assertRedirects(
-            excluded,
-            reverse('creator_response_detail', args=[self.survey.id, submission.id]),
-        )
-        submission.refresh_from_db()
-        self.assertTrue(submission.is_excluded)
-        self.assertEqual(submission.exclusion_reason, 'Failed attention check')
-        event = ResponseAuditEvent.objects.get()
-        self.assertEqual(event.action, ResponseAuditEvent.Action.EXCLUDED)
-        self.assertEqual(event.metadata['reason'], 'Failed attention check')
-        default_list = self.client.get(reverse('creator_response_list', args=[self.survey.id]))
-        excluded_list = self.client.get(
-            reverse('creator_response_list', args=[self.survey.id]),
-            {'activity-exclusion': 'excluded'},
-        )
-        self.assertEqual(default_list.context['page_obj'].paginator.count, 0)
-        self.assertEqual(excluded_list.context['page_obj'].paginator.count, 1)
-
-        self.client.post(action_url, {'action': 'include'})
-        submission.refresh_from_db()
-        self.assertFalse(submission.is_excluded)
-        self.assertEqual(
-            ResponseAuditEvent.objects.filter(action=ResponseAuditEvent.Action.INCLUDED).count(),
-            1,
+        self.assertNotContains(
+            response,
+            reverse(
+                'creator_response_delete',
+                args=[self.survey.id, submission.id],
+            ),
         )
 
-    def test_permanent_deletion_requires_confirmation_and_preserves_audit_and_ledger(self):
+    def test_permanent_deletion_requires_post_and_preserves_audit_and_ledger(self):
         submission = self.complete_response()
         transaction = PointTransaction.objects.get(submission=submission)
         self.client.force_login(self.owner)
@@ -287,11 +300,11 @@ class CreatorResponseDashboardTests(TestCase):
             args=[self.survey.id, submission.id],
         )
 
-        rejected = self.client.post(delete_url, {'confirmation': 'delete'})
-        self.assertEqual(rejected.status_code, 200)
+        rejected = self.client.get(delete_url)
+        self.assertEqual(rejected.status_code, 405)
         self.assertTrue(Submission.objects.filter(pk=submission.id).exists())
 
-        deleted = self.client.post(delete_url, {'confirmation': 'DELETE'})
+        deleted = self.client.post(delete_url)
 
         self.assertRedirects(deleted, reverse('creator_response_list', args=[self.survey.id]))
         self.assertFalse(Submission.objects.filter(pk=submission.id).exists())

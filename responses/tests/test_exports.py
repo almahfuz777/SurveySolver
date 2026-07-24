@@ -78,6 +78,8 @@ class ResponseExportTests(TestCase):
             csv.reader(io.StringIO(self.body(response).decode('utf-8-sig')))
         )
         self.assertEqual(response.status_code, 200)
+        # A single clean table: one header row, one data row. Version metadata
+        # lives in the JSON/Excel exports, not as extra CSV rows.
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0][0], 'Submitted at')
         self.assertIn('Describe your experience', rows[0][1])
@@ -143,6 +145,8 @@ class ResponseExportTests(TestCase):
         self.assertEqual(formula_safe_cell.data_type, 's')
         self.assertNotIn(self.respondent.email, values)
         self.assertEqual(workbook['About']['B1'].value, self.survey.title)
+        self.assertEqual(workbook['About']['B2'].value, self.survey.title)
+        self.assertEqual(workbook['About']['B3'].value, 1)
 
     def test_invalid_filters_return_bad_request(self):
         self.client.force_login(self.owner)

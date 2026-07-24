@@ -18,7 +18,7 @@
 .response-table th { background: var(--surface-warm); color: var(--text-muted); font-size: 0.74rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .response-table td { font-size: 0.88rem; }
 .response-table td small { color: var(--text-muted); display: block; }
-.response-sheet-scroll { max-width: 100%; overscroll-behavior-inline: contain; scrollbar-gutter: stable; width: 100%; }
+.response-sheet-scroll { display: block; max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-gutter: stable; width: 100%; }
 .response-sheet-table { min-width: 100%; width: max-content; }
 .response-sheet-table th:not(.response-timestamp):not(.response-row-action),
 .response-sheet-table td:not(.response-timestamp):not(.response-row-action) { max-width: 22rem; min-width: 15rem; overflow-wrap: anywhere; vertical-align: top; white-space: normal; }
@@ -29,7 +29,7 @@
 .response-sheet-table th.response-row-action { background: var(--surface-warm); z-index: 2; }
 .response-sheet-table tbody tr:hover td { background: var(--indigo-50); }
 .response-open-link { align-items: center; border-radius: 999px; color: var(--text-muted); display: inline-flex; height: 2rem; justify-content: center; transition: background-color 150ms ease, color 150ms ease, transform 150ms ease; width: 2rem; }
-.response-open-link:hover { background: var(--surface); color: var(--indigo-600); transform: translateX(2px); }
+.response-open-link:hover { background: var(--surface); color: var(--indigo-600); transform: translate(2px, -2px); }
 .sheet-column-heading { align-items: start; display: grid; gap: 0.45rem; grid-template-columns: minmax(0, 1fr) auto; }
 .sheet-sort-link { align-items: flex-start; color: inherit; display: inline-flex; gap: 0.35rem; line-height: 1.35; text-decoration: none; }
 .sheet-sort-link:hover, .sheet-sort-link.is-sorted { color: var(--indigo-600); }
@@ -85,17 +85,8 @@
 .sheet-heading-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: flex-end; }
 .sheet-filter-error { margin: 0 1.25rem 1rem; }
 .sheet-filter-submit { margin: 1rem; }
-.response-row-excluded { background: var(--warn-soft); opacity: 0.82; }
 .response-management { border-top: 1px solid var(--border); display: grid; gap: 0.7rem; margin-top: 1.2rem; padding-top: 1rem; }
-.response-management h3 { font-size: 0.9rem; margin: 0; }
-.response-management form { display: grid; gap: 0.55rem; }
-.response-management label { color: var(--text-muted); font-size: 0.78rem; font-weight: 700; }
-.destructive-confirmation { max-width: 42rem; padding: clamp(1.5rem, 5vw, 3rem); }
-.destructive-confirmation > p { color: var(--text-muted); }
-.destructive-confirmation dl { border-block: 1px solid var(--border); margin: 1.25rem 0; padding: 1rem 0; }
-.destructive-confirmation dl div { display: flex; gap: 1rem; justify-content: space-between; }
-.destructive-confirmation dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
-.destructive-confirmation form { display: grid; gap: 0.65rem; }
+.response-management form { margin: 0; }
 
 @media (max-width: 860px) {
     .response-filter-grid {
@@ -135,4 +126,76 @@
         align-items: flex-start;
         justify-content: flex-start;
     }
+}
+.version-sheets {
+    display: grid;
+    gap: 0.85rem;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+.version-sheet {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    width: 100%;
+}
+
+.version-sheet > .response-table-panel {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+.version-sheet > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.version-sheet > summary::-webkit-details-marker {
+    display: none;
+}
+
+.version-sheet > summary > span:first-child {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.version-sheet-label {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.version-sheet > summary small {
+    color: var(--text-muted);
+}
+
+.version-active-badge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: var(--teal-50);
+    color: var(--teal-600);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.version-sheet-empty {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+    border-top: 1px solid var(--border);
 }

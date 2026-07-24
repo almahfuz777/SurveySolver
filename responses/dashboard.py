@@ -66,11 +66,6 @@ def filter_submissions(queryset, filters, survey):
         queryset = queryset.filter(is_eligible=True)
     elif eligibility == 'ineligible':
         queryset = queryset.filter(is_eligible=False)
-    exclusion = filters.get('exclusion') or 'included'
-    if exclusion == 'included':
-        queryset = queryset.filter(is_excluded=False)
-    elif exclusion == 'excluded':
-        queryset = queryset.filter(is_excluded=True)
     search = filters.get('search', '').strip()
     if search:
         answer_matches = (
@@ -203,7 +198,8 @@ def filter_response_sheet(queryset, filters, questions):
 def creator_identity(submission):
     if (
         submission.status == Submission.Status.COMPLETED
-        and submission.survey.identity_mode == submission.survey.IdentityMode.IDENTIFIED
+        and submission.identity_consent_at is not None
+        and submission.identity_data
     ):
         return submission.identity_data
     return None

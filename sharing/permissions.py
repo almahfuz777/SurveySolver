@@ -35,7 +35,7 @@ def accessible_surveys(user, roles=VIEW_ROLES):
     collaboration_roles = [role for role in roles if role != OWNER]
     if collaboration_roles:
         query |= Q(collaborators__user=user, collaborators__role__in=collaboration_roles)
-    return Survey.objects.filter(query).filter(deleted_at__isnull=True)
+    return Survey.objects.filter(query, deleted_at__isnull=True).distinct()
 
 
 def get_accessible_survey(user, survey_id, roles=VIEW_ROLES):

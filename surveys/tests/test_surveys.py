@@ -2,7 +2,10 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
+from responses.models import ResponseAuditEvent, Submission
+from rewards.models import PointTransaction
 from surveys import services
 from surveys.forms import SurveyMetadataForm
 from surveys.models import Question, Survey, Topic
@@ -67,16 +70,23 @@ class SurveyManagementTests(TestCase):
         self.assertTrue(Survey.objects.filter(pk=survey.pk).exists())
 
     def test_survey_list_offers_card_and_compact_views(self):
-        Survey.objects.create(owner=self.user, title='View options', summary='')
+        survey = Survey.objects.create(owner=self.user, title='View options', summary='')
         self.client.force_login(self.user)
 
         response = self.client.get(reverse('survey_list'))
+        responses_url = reverse('creator_response_list', args=[survey.id])
 
         self.assertContains(response, 'data-survey-view')
         self.assertContains(response, '<option value="card">Card</option>', html=True)
         self.assertContains(response, '<option value="compact">Compact</option>', html=True)
         self.assertContains(response, 'data-survey-grid')
         self.assertContains(response, 'survey-card-summary-placeholder')
+        self.assertContains(response, f'class="survey-card-body" href="{responses_url}"')
+        self.assertContains(
+            response,
+            '<span class="survey-version-pill" aria-label="Version 1">v1</span>',
+            html=True,
+        )
 
     def test_survey_detail_redirects_editors_to_builder(self):
         survey = Survey.objects.create(owner=self.user, title='Redirect study', summary='Detail page routes to the builder.')
@@ -118,9 +128,71 @@ class SurveyManagementTests(TestCase):
         self.assertIsNone(survey.deleted_at)
 
         self.client.post(reverse('survey_delete', args=[survey.id]))
-        response = self.client.post(reverse('survey_purge', args=[survey.id]))
+        purge_url = reverse('survey_purge', args=[survey.id])
+        confirmation_page = self.client.get(purge_url)
+        rejected = self.client.post(purge_url, {'confirmation': 'DELETE'})
+
+        self.assertContains(confirmation_page, 'DELETE Disposable study')
+        self.assertEqual(rejected.status_code, 200)
+        self.assertTrue(Survey.objects.filter(id=survey.id).exists())
+
+        response = self.client.post(
+            purge_url,
+            {'confirmation': 'DELETE Disposable study'},
+        )
         self.assertRedirects(response, reverse('survey_list'))
         self.assertFalse(Survey.objects.filter(id=survey.id).exists())
+
+    def test_owner_can_purge_survey_with_responses_and_retain_tombstones(self):
+        survey = Survey.objects.create(
+            owner=self.user,
+            title='Completed study',
+            summary='Contains response history.',
+        )
+        draft = survey.draft_version
+        Question.objects.create(
+            section=draft.sections.get(),
+            type=Question.Type.SHORT_TEXT,
+            prompt='Question',
+            order=1,
+        )
+        version, _ = publish_survey(survey.id, self.user, draft.revision)
+        submission = Submission.objects.create(
+            survey=survey,
+            version=version,
+            respondent=self.other_user,
+            session_key_hash='a' * 64,
+            presentation={'sections': []},
+        )
+        Submission.objects.filter(pk=submission.pk).update(
+            status=Submission.Status.COMPLETED,
+            completed_at=timezone.now(),
+        )
+        transaction = PointTransaction.objects.create(
+            user=self.other_user,
+            amount=10,
+            reason=PointTransaction.Reason.SURVEY_COMPLETION,
+            idempotency_key=f'survey-completion:{self.other_user.id}:{survey.id}',
+            survey=survey,
+            submission=submission,
+        )
+        survey.soft_delete()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('survey_purge', args=[survey.id]),
+            {'confirmation': 'DELETE Completed study'},
+        )
+
+        self.assertRedirects(response, reverse('survey_list'))
+        self.assertFalse(Survey.objects.filter(pk=survey.id).exists())
+        self.assertFalse(Submission.objects.filter(pk=submission.id).exists())
+        transaction.refresh_from_db()
+        self.assertIsNone(transaction.survey)
+        self.assertIsNone(transaction.submission)
+        event = ResponseAuditEvent.objects.get(submission_id=submission.id)
+        self.assertIsNone(event.survey)
+        self.assertEqual(event.metadata['reason'], 'survey_deleted')
 
     def test_deleted_survey_is_inaccessible_and_non_owner_cannot_delete(self):
         survey = Survey.objects.create(owner=self.user, title='Hidden study', summary='Soft deleted.')
@@ -232,13 +304,37 @@ class SurveyManagementTests(TestCase):
             reverse('survey_publish', args=[survey.id]),
             {'revision': response.json()['revision']},
         )
-        self.assertRedirects(publish_response, reverse('survey_builder', args=[survey.id]))
+        self.assertRedirects(
+            publish_response,
+            reverse('survey_publish_review', args=[survey.id]),
+        )
         survey.refresh_from_db()
         self.assertEqual(survey.estimated_minutes, 17)
         self.assertEqual(list(survey.topics.values_list('id', flat=True)), [self.topic.id])
         survey_list = self.client.get(reverse('survey_list'))
         self.assertContains(survey_list, '17 min')
         self.assertContains(survey_list, self.topic.name)
+
+    def test_successful_publish_returns_to_my_surveys(self):
+        survey = Survey.objects.create(
+            owner=self.user,
+            title='Publish redirect',
+            summary='Return to the survey list after review.',
+        )
+        draft = survey.draft_version
+        _, revision = services.add_question(
+            draft.sections.get().id,
+            Question.Type.SHORT_TEXT,
+            draft.revision,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('survey_publish', args=[survey.id]),
+            {'revision': revision},
+        )
+
+        self.assertRedirects(response, reverse('survey_list'))
 
     def test_versioned_settings_autosave_returns_each_new_revision(self):
         survey = Survey.objects.create(owner=self.user, title='Autosave revisions', summary='Sequential settings saves.')

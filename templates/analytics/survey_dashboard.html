@@ -1,28 +1,37 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Analytics · {{ survey.title }} | SurveySolver{% endblock %}
+{% block title %}Analytics{% if survey %} · {{ survey.title }}{% endif %} | SurveySolver{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/analytics/analytics.css' %}">{% endblock %}
 
 {% block content %}
 <section class="page-heading">
   <div class="shell page-heading-inner">
-    <div><span class="eyebrow">Version-aware analytics</span><h1>{{ survey.title }}</h1><p>Included response activity and question summaries. Excluded responses never affect these results.</p></div>
-    <div class="hero-actions"><a class="button button-secondary" href="{% url 'creator_response_list' survey.id %}">View responses</a><a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a></div>
+    <div><span class="eyebrow">Exact-version analytics</span><h1>{% if survey %}{{ survey.title }}{% else %}Survey analytics{% endif %}</h1><p>Each questionnaire version is analyzed independently.</p></div>
+    {% if survey %}<div class="hero-actions"><a class="button button-secondary" href="{% url 'creator_response_list' survey.id %}?sheet_version={{ selected_version.id }}">View responses</a><a class="button button-secondary" href="{% url 'survey_detail' survey.id %}">Back to survey</a></div>{% endif %}
   </div>
 </section>
 <section class="page-content">
   <div class="shell analytics-layout">
     <form class="panel analytics-filter" method="get">
-      <label for="analytics-version">Survey version</label>
-      <select id="analytics-version" name="version">
-        <option value="">All published versions</option>
-        {% for version in versions %}<option value="{{ version.id }}"{% if selected_version.id == version.id %} selected{% endif %}>Version {{ version.number }}</option>{% endfor %}
-      </select>
+      <label for="analytics-survey">
+        <span>Survey</span>
+        <select id="analytics-survey" name="survey" onchange="this.form.submit()">
+          {% for survey_item in surveys %}<option value="{{ survey_item.id }}"{% if survey_item.id == survey.id %} selected{% endif %}>{{ survey_item.title }}</option>{% endfor %}
+        </select>
+      </label>
+      <label for="analytics-version">
+        <span>Questionnaire version</span>
+        <select id="analytics-version" name="version">
+          {% for version in versions %}<option value="{{ version.id }}"{% if selected_version.id == version.id %} selected{% endif %}>Version {{ version.number }}{% if version.status == 'published' %} · Active{% endif %} · {{ version.title_snapshot|default:survey.title }}</option>{% endfor %}
+        </select>
+      </label>
       <button class="button button-primary" type="submit">Apply</button>
     </form>
+    {% if has_multiple_presentations %}<div class="message message-warning" role="status">This questionnaire version has {{ presentation_fingerprint_count }} presentation configurations. Ordering, required state, randomization, or branching changed while responses were collected; answer meaning did not change.</div>{% endif %}
+    {% if selected_version %}
     <div class="metric-grid analytics-metrics" aria-label="Survey analytics summary">
-      <article class="metric-card"><span>Starts</span><strong>{{ metrics.starts }}</strong><small>Included response sessions</small></article>
+      <article class="metric-card"><span>Starts</span><strong>{{ metrics.starts }}</strong><small>Response sessions</small></article>
       <article class="metric-card"><span>Completed</span><strong>{{ metrics.completions }}</strong><small>{{ metrics.completion_rate }}% completion rate</small></article>
       <article class="metric-card"><span>Abandoned</span><strong>{{ metrics.abandonments }}</strong><small>Started but not submitted</small></article>
       <article class="metric-card"><span>Median duration</span><strong>{{ metrics.median_duration_display|default:'—' }}</strong><small>Completed responses</small></article>
@@ -39,6 +48,9 @@
       <div class="analytics-grid-heading"><span class="panel-kicker">Privacy-protected breakdowns</span><h2 id="demographics-heading">Eligibility demographics</h2><p>Groups with fewer than {{ privacy_threshold }} responses are suppressed.</p></div>
       {% for summary in demographics %}<article class="panel question-summary"><h3>{{ summary.label }}</h3>{% if summary.groups %}<dl>{% for group in summary.groups %}<div><dt>{{ group.label }}</dt><dd><meter min="0" max="{{ summary.max_count }}" value="{{ group.count }}">{{ group.count }}</meter><strong>{{ group.count }}</strong></dd></div>{% endfor %}</dl>{% endif %}{% if summary.has_suppressed_groups %}<p class="privacy-note">One or more small groups are hidden to protect respondents.</p>{% endif %}</article>{% empty %}<div class="panel empty-state"><p>No eligible demographic breakdowns are available yet.</p></div>{% endfor %}
     </section>
+    {% else %}
+      <div class="panel empty-state"><p>No published questionnaire version is available for this survey.</p></div>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

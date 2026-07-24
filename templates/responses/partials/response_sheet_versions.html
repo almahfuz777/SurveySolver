@@ -1,0 +1,17 @@
+<div class="version-sheets" aria-label="Questionnaire version response sheets">
+    {% for version_item in versions %}
+        <details class="version-sheet"{% if version_item.id == selected_version.id %} open{% endif %}>
+            <summary>
+                <span><span class="version-sheet-label"><strong>Version {{ version_item.number }}</strong>{% if version_item.status == 'published' %}<span class="version-active-badge">Active</span>{% endif %}</span><small>{{ version_item.title_snapshot|default:survey.title }}</small></span>
+                <span>{{ version_item.completed_count }} response{{ version_item.completed_count|pluralize }}</span>
+            </summary>
+            {% if version_item.id == selected_version.id %}
+                {% include 'responses/partials/response_sheet.html' %}
+            {% else %}
+                <div class="version-sheet-empty"><p>This questionnaire version has its own immutable response sheet.</p><a class="button button-secondary button-small" data-sheet-version href="?sheet_version={{ version_item.id }}">Open version {{ version_item.number }} sheet</a></div>
+            {% endif %}
+        </details>
+    {% empty %}
+        <div class="panel empty-state"><p>Publish the questionnaire to create its first response sheet.</p></div>
+    {% endfor %}
+</div>

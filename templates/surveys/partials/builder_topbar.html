@@ -17,7 +17,15 @@
                     <h1 class="builder-title-static">{{ survey.title }}</h1>
                 {% endif %}
             {% endif %}
-            <span class="builder-save-status" data-save-status aria-live="polite"><span class="save-dot" aria-hidden="true"></span><span data-save-text>All changes saved</span></span>
+            <div class="builder-status-row">
+                <span class="builder-save-status" data-save-status aria-live="polite"><span class="save-dot" aria-hidden="true"></span><span data-save-text>All changes saved</span></span>
+                {% if publication_intent.has_draft_changes %}
+                    <span class="builder-draft-status" aria-label="Unpublished changes" title="These questionnaire changes are saved but are not live yet.">
+                        <span class="builder-draft-dot" aria-hidden="true"></span>
+                        <span class="builder-draft-status-text">Unpublished changes</span>
+                    </span>
+                {% endif %}
+            </div>
         </div>
     </div>
     {% if survey.access_role == 'owner' or survey.access_role == 'editor' %}
@@ -28,17 +36,29 @@
         </nav>
         <div class="builder-topbar-actions">
             {% if question_total %}<span class="builder-meta">{{ question_total }} question{{ question_total|pluralize }} · ~{{ survey.estimated_minutes }} min</span>{% endif %}
+            {% if publication_intent.has_draft_changes %}
+                <form class="builder-discard-form" method="post" action="{% url 'survey_discard_draft' survey.id %}" data-confirm="Discard your draft changes? The builder will reset to the published version {{ publication_intent.version_number }} and your unpublished edits will be lost." data-confirm-ok="Discard draft">
+                    {% csrf_token %}
+                    <input type="hidden" name="revision" value="{{ version.revision }}">
+                    <button class="button button-small builder-discard-button" type="submit" aria-label="Discard unpublished draft changes" title="Reset the questionnaire to the published version">
+                        {% include 'partials/icon.html' with name='trash' size='14' %}
+                        <span class="builder-discard-label">Discard draft</span>
+                    </button>
+                </form>
+            {% endif %}
             {% if version %}
                 {% if readiness_errors %}
                     <details class="builder-readiness">
                         <summary>{% include 'partials/icon.html' with name='alert' size='16' %} {{ readiness_errors|length }} issue{{ readiness_errors|length|pluralize }} before publishing</summary>
                         <ul>{% for error in readiness_errors %}<li>{{ error }}</li>{% endfor %}</ul>
                     </details>
+                {% elif not publication_intent.can_publish %}
+                    <button class="button button-primary button-small" type="button" disabled title="Change questionnaire content to publish a version">{% include 'partials/icon.html' with name='publish' size='15' %}<span class="builder-publish-label">No changes to publish</span></button>
                 {% else %}
-                    <form method="post" action="{% url 'survey_publish' survey.id %}"{% if active == 'settings' %} data-settings-publish{% endif %}>
-                        {% csrf_token %}
+                    {# GET form (not a link) so the settings page can still flush pending autosaves before navigating. #}
+                    <form method="get" action="{% url 'survey_publish_review' survey.id %}"{% if active == 'settings' %} data-settings-publish{% endif %}>
                         <input type="hidden" name="revision" value="{{ version.revision }}">
-                        <button class="button button-primary button-small" type="submit" aria-label="{% if survey.status == 'published' %}Publish changes{% else %}Publish survey{% endif %}">{% include 'partials/icon.html' with name='publish' size='15' %}<span class="builder-publish-label">{% if survey.status == 'published' %}Publish changes{% else %}Publish{% endif %}</span></button>
+                        <button class="button button-primary button-small" type="submit" aria-label="Review changes before publishing">{% include 'partials/icon.html' with name='publish' size='15' %}<span class="builder-publish-label">Review &amp; publish</span></button>
                     </form>
                 {% endif %}
             {% endif %}

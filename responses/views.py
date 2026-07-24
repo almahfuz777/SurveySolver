@@ -11,7 +11,7 @@ from accounts.models import Profile
 from rewards.claims import BASE_COMPLETION_POINTS, claim_secret_from_session, create_guest_claim, store_claim_secret
 from rewards.models import GuestRewardClaim
 from rewards.services import award_survey_completion
-from surveys.models import Survey
+from surveys.models import Question, Survey
 from sharing.respondent_invitations import invitation_from_session
 
 from .models import Submission
@@ -25,6 +25,7 @@ from .services import (
     can_access_submission,
     complete_submission,
     current_published_version,
+    discard_in_progress_submission,
     save_progress,
     start_submission,
 )
@@ -89,7 +90,7 @@ def survey_landing(request, slug):
             return redirect('response_form', submission_id=submission.id)
     default_name = request.user.get_full_name() if request.user.is_authenticated else ''
     default_email = request.user.email if request.user.is_authenticated else ''
-    criteria = getattr(version, 'eligibility_criteria', None)
+    criteria = getattr(survey, 'eligibility_criteria', None)
     return render(
         request,
         'responses/survey_landing.html',
@@ -125,22 +126,28 @@ def _presented_sections(submission, data=None, errors=None):
     errors = errors or {}
     sections = {
         str(section.id): section
-        for section in submission.version.sections.prefetch_related(
-            'questions__choices',
-            'questions__matrix_rows',
-        )
+        for section in submission.version.sections.all()
+    }
+    questions = {
+        str(question.id): question
+        for question in Question.objects.filter(
+            section__version=submission.version,
+        ).prefetch_related('choices', 'matrix_rows')
     }
     presented = []
+    question_number = 0
     for section_data in submission.presentation.get('sections', []):
         section = sections.get(section_data['id'])
         if not section:
             continue
-        questions = {str(question.id): question for question in section.questions.all()}
         items = []
         for question_data in section_data.get('questions', []):
             question = questions.get(question_data['id'])
             if not question:
                 continue
+            question_number += 1
+            question.number = question_number
+            question.required = question_data.get('required', False)
             choices = {str(choice.id): choice for choice in question.choices.all()}
             rows = {str(row.id): row for row in question.matrix_rows.all()}
             name = f'q_{question.id}'
@@ -289,17 +296,14 @@ def submission_form(request, submission_id):
     form_data = request.POST if request.method == 'POST' else _saved_answer_data(submission)
     branch_rules = [
         {
-            'source_question': str(rule.source_question_id),
-            'source_section': str(rule.source_question.section_id),
-            'operator': rule.operator,
-            'compare_value': rule.compare_value,
-            'action': rule.action,
-            'target_section': str(rule.target_section_id) if rule.target_section_id else None,
+            'source_question': rule['source_question_id'],
+            'source_section': rule['source_section_id'],
+            'operator': rule['operator'],
+            'compare_value': rule['compare_value'],
+            'action': rule['action'],
+            'target_section': rule['target_section_id'],
         }
-        for rule in submission.version.branch_rules.select_related(
-            'source_question__section',
-            'target_section',
-        ).order_by('order')
+        for rule in submission.presentation.get('branch_rules', [])
     ]
     return render(
         request,
@@ -338,3 +342,17 @@ def submission_complete(request, submission_id):
             'claim_secret': claim_secret,
         },
     )
+
+
+@require_http_methods(['POST'])
+def submission_discard(request, submission_id):
+    try:
+        survey_title = discard_in_progress_submission(
+            submission_id,
+            request.user,
+            _session_key(request),
+        )
+    except Submission.DoesNotExist as error:
+        raise Http404('This saved response is unavailable.') from error
+    messages.success(request, f'Saved progress for “{survey_title}” was discarded.')
+    return redirect('discover')

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete version {{ version.number }} · {{ survey.title }} | SurveySolver{% endblock %}
+
+{% block content %}
+<section class="page-content">
+    <div class="shell narrow-shell completion-shell">
+        <article class="panel completion-card">
+            <span class="eyebrow">Permanent version deletion</span>
+            <h1>Delete version {{ version.number }}?</h1>
+            <p>This permanently removes this version’s questionnaire and every response collected for it.</p>
+            <p><strong>This action cannot be undone.</strong> Export any responses you need before continuing.</p>
+            <form method="post">
+                {% csrf_token %}
+                <label for="version-confirmation">Type <strong>{{ confirmation }}</strong> to continue</label>
+                <input id="version-confirmation" name="confirmation" autocomplete="off" required>
+                <div class="hero-actions">
+                    <button class="button button-danger" type="submit">Delete version {{ version.number }}</button>
+                    <a class="button button-secondary" href="{% url 'survey_edit' survey.id %}">Cancel</a>
+                </div>
+            </form>
+        </article>
+    </div>
+</section>
+{% endblock %}

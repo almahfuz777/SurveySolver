@@ -54,9 +54,7 @@ class ResponseRuntimeTests(TestCase):
             draft.revision,
             values,
         )
-        self.published, _ = publish_survey(self.survey.id, self.owner, revision)
         self.survey.refresh_from_db()
-        self.question = Question.objects.get(section__version=self.published)
 
     def add_branched_section(self):
         draft = self.survey.draft_version
@@ -70,9 +68,20 @@ class ResponseRuntimeTests(TestCase):
             Question.Type.LONG_TEXT,
             revision,
         )
-        second_question.prompt = 'Explain your study routine'
-        second_question.required = True
-        second_question.save(update_fields=('prompt', 'required'))
+        second_question, revision = survey_services.update_question(
+            second_question.id,
+            revision,
+            {
+                'type': Question.Type.LONG_TEXT,
+                'prompt': 'Explain your study routine',
+                'help_text': '',
+                'required': True,
+                'randomize_choices': False,
+            },
+            {},
+            [],
+            [],
+        )
         _, revision = survey_services.add_branch_rule(
             draft.id,
             revision,
@@ -96,9 +105,7 @@ class ResponseRuntimeTests(TestCase):
             draft.revision,
             limit,
         )
-        self.published, _ = publish_survey(self.survey.id, self.owner, revision)
         self.survey.refresh_from_db()
-        self.question = Question.objects.get(section__version=self.published)
 
     def test_guest_response_is_bound_to_published_version_and_session(self):
         response = self.start()
@@ -112,6 +119,116 @@ class ResponseRuntimeTests(TestCase):
             hash_session_key(self.client.session.session_key),
         )
         self.assertNotEqual(submission.session_key_hash, self.client.session.session_key)
+
+    def test_response_form_uses_responder_preview_layout(self):
+        self.start()
+        submission = Submission.objects.get()
+
+        response = self.client.get(reverse('response_form', args=[submission.id]))
+
+        self.assertContains(response, 'class="response-intro"')
+        self.assertContains(response, 'class="response-card"')
+        self.assertContains(
+            response,
+            '<span class="response-question-number">1.</span>',
+            html=True,
+        )
+
+    def test_ranking_question_renders_reorderable_items_and_preserves_posted_order(self):
+        draft = self.survey.draft_version
+        ranking, revision = survey_services.add_question(
+            draft.sections.get().id,
+            Question.Type.RANKING,
+            draft.revision,
+        )
+        ranking, revision = survey_services.update_question(
+            ranking.id,
+            revision,
+            {
+                'type': Question.Type.RANKING,
+                'prompt': 'Rank these study spaces',
+                'help_text': '',
+                'required': True,
+                'randomize_choices': False,
+            },
+            {},
+            ['Library', 'Study hall', 'Home'],
+            [],
+        )
+        published, _ = publish_survey(self.survey.id, self.owner, revision)
+        ranking = published.sections.get().questions.get(type=Question.Type.RANKING)
+        short_text = published.sections.get().questions.get(type=Question.Type.SHORT_TEXT)
+        choices = list(ranking.choices.order_by('order'))
+        self.start()
+        submission = Submission.objects.get()
+
+        response = self.client.get(reverse('response_form', args=[submission.id]))
+
+        self.assertContains(response, 'data-ranking-list')
+        self.assertContains(response, f'name="q_{ranking.id}"', count=3)
+
+        ranked_ids = [str(choice.id) for choice in reversed(choices)]
+        response = self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {
+                f'q_{short_text.id}': 'Quiet rooms',
+                f'q_{ranking.id}': ranked_ids,
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('response_complete', args=[submission.id]),
+        )
+        answer = submission.answers.get(question=ranking)
+        self.assertEqual(
+            [item['choice_id'] for item in answer.value],
+            ranked_ids,
+        )
+
+    def test_guest_can_discard_saved_progress_from_same_browser(self):
+        self.start()
+        submission = Submission.objects.get()
+        self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {
+                'action': 'save',
+                f'q_{self.question.id}': 'Saved but no longer needed',
+            },
+        )
+
+        response = self.client.post(
+            reverse('response_discard', args=[submission.id]),
+        )
+
+        self.assertRedirects(response, reverse('discover'))
+        self.assertFalse(Submission.objects.filter(pk=submission.pk).exists())
+
+    def test_other_browser_cannot_discard_saved_progress(self):
+        self.start()
+        submission = Submission.objects.get()
+
+        response = self.client_class().post(
+            reverse('response_discard', args=[submission.id]),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Submission.objects.filter(pk=submission.pk).exists())
+
+    def test_completed_response_cannot_be_discarded_as_draft(self):
+        self.start()
+        submission = Submission.objects.get()
+        self.client.post(
+            reverse('response_form', args=[submission.id]),
+            {f'q_{self.question.id}': 'Completed answer'},
+        )
+
+        response = self.client.post(
+            reverse('response_discard', args=[submission.id]),
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Submission.objects.filter(pk=submission.pk).exists())
 
     def test_valid_guest_answers_are_normalized_and_submission_is_completed(self):
         self.start()

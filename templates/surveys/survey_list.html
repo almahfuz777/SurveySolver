@@ -81,19 +81,14 @@
                         <li>
                             <div class="trash-item-info">
                                 <strong>{{ survey.title }}</strong>
-                                <small>Deleted {{ survey.deleted_at|date:'M j, Y' }}{% if survey.has_response_history %} · has collected responses, cannot be deleted forever{% endif %}</small>
+                                <small>Deleted {{ survey.deleted_at|date:'M j, Y' }}</small>
                             </div>
                             <div class="trash-item-actions">
                                 <form method="post" action="{% url 'survey_restore' survey.id %}">
                                     {% csrf_token %}
                                     <button class="button button-secondary button-small" type="submit">Restore</button>
                                 </form>
-                                {% if not survey.has_response_history %}
-                                    <form method="post" action="{% url 'survey_purge' survey.id %}" data-confirm="Delete “{{ survey.title|escapejs }}” forever? This cannot be undone." data-confirm-ok="Delete forever">
-                                        {% csrf_token %}
-                                        <button class="button button-quiet button-small trash-purge" type="submit">Delete forever</button>
-                                    </form>
-                                {% endif %}
+                                <a class="button button-quiet button-small trash-purge" href="{% url 'survey_purge' survey.id %}">Delete forever</a>
                             </div>
                         </li>
                     {% endfor %}
