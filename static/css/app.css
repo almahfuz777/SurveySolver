@@ -259,6 +259,56 @@ a {
     gap: 1rem;
 }
 
+/* Reward balance — coin chip sitting beside the account avatar */
+.primary-nav > a.coin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.28rem 0.7rem 0.28rem 0.35rem;
+    color: var(--warn-text);
+    background: var(--warn-soft);
+    border: 1px solid var(--warn-border);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.primary-nav > a.coin-chip:hover {
+    color: var(--warn-text);
+    border-color: #f59e0b;
+    box-shadow: 0 4px 14px rgba(217, 119, 6, 0.24);
+    transform: translateY(-1px);
+}
+
+.coin-chip:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.coin-chip-mark {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex: none;
+    filter: drop-shadow(0 1px 2px rgba(180, 83, 9, 0.35));
+}
+
+.coin-chip:hover .coin-chip-mark {
+    animation: coin-flip 620ms ease;
+}
+
+.coin-chip-value {
+    line-height: 1;
+}
+
+@keyframes coin-flip {
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(360deg); }
+}
+
 /* Theme switcher — segmented light / system / dark, lives in the account menu */
 .account-theme {
     display: grid;
@@ -936,6 +986,10 @@ form button[type="submit"] {
 
     .primary-nav.is-open {
         display: flex;
+    }
+
+    .primary-nav > a.coin-chip {
+        align-self: flex-start;
     }
 
     .metric-grid {

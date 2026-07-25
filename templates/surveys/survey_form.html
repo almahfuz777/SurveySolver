@@ -333,11 +333,11 @@ document.addEventListener('DOMContentLoaded', () => {
             {% if survey.owner_id == request.user.id %}
                 {% if survey.status == 'published' or survey.status == 'closed' %}<a href="#collection">Response collection</a>{% endif %}
             {% endif %}
-            <a href="#overview">Classification &amp; duration</a>
             <a href="#audience">Audience &amp; privacy</a>
+            <a href="#overview">Classification &amp; duration</a>
             {% if version %}
-                <a href="#eligibility">Eligibility</a>
-                <a href="#response-limit">Response limit</a>
+                <a href="#eligibility">Eligibility Criteria</a>
+                <a href="#response-limit">Limit Responses</a>
             {% endif %}
         </nav>
         <div class="settings-rail-divider"></div>
@@ -389,30 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <input type="hidden" name="action" value="metadata">
             {% if version %}<input type="hidden" name="revision" value="{{ version.revision }}">{% endif %}
             {{ form.non_field_errors }}
-
-            <section id="overview" class="settings-card">
-                <h2>Classification &amp; duration</h2>
-                <p class="settings-panel-hint">Set how respondents find this research and estimate the time it takes.</p>
-
-                <div class="settings-section-gap">
-                    <label class="settings-field-label" for="{{ form.topics.id_for_label }}">Topics <span class="optional-tag">choose up to 3</span></label>
-                    {{ form.topics }}
-                    {{ form.topics.errors }}
-                </div>
-
-                <div class="time-row">
-                    <div>
-                        <div class="time-row-title">Estimated time to complete</div>
-                        <div class="time-row-hint">Shown to respondents before they start</div>
-                    </div>
-                    <div class="stepper" data-stepper>
-                        <button type="button" data-step="-1" aria-label="Decrease estimated minutes">&minus;</button>
-                        {{ form.estimated_minutes }}
-                        <button type="button" data-step="1" aria-label="Increase estimated minutes">+</button>
-                    </div>
-                </div>
-                {{ form.estimated_minutes.errors }}
-            </section>
 
             <section id="audience" class="settings-card">
                 <h2>Audience &amp; privacy</h2>
@@ -467,11 +443,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <div class="settings-autosave-error" data-autosave-error aria-live="polite"></div>
             </section>
+
+            <section id="overview" class="settings-card">
+                <h2>Classification &amp; duration</h2>
+                <p class="settings-panel-hint">Set how respondents find this research and estimate the time it takes.</p>
+
+                <div class="settings-section-gap">
+                    <label class="settings-field-label" for="{{ form.topics.id_for_label }}">Topics <span class="optional-tag">choose up to 3</span></label>
+                    {{ form.topics }}
+                    {{ form.topics.errors }}
+                </div>
+
+                <div class="time-row">
+                    <div>
+                        <div class="time-row-title">Estimated time to complete</div>
+                        <div class="time-row-hint">Shown to respondents before they start</div>
+                    </div>
+                    <div class="stepper" data-stepper>
+                        <button type="button" data-step="-1" aria-label="Decrease estimated minutes">&minus;</button>
+                        {{ form.estimated_minutes }}
+                        <button type="button" data-step="1" aria-label="Increase estimated minutes">+</button>
+                    </div>
+                </div>
+                {{ form.estimated_minutes.errors }}
+            </section>
         </form>
 
         {% if version %}
             <section id="eligibility" class="settings-card" aria-labelledby="eligibility-heading">
-                <h2 id="eligibility-heading">Respondent eligibility</h2>
+                <h2 id="eligibility-heading">Respondent Eligibility Criteria</h2>
                 <p class="settings-panel-hint">Everyone is eligible by default. Turn on only the restrictions this study needs.</p>
                 <form method="post" action="{% url 'survey_edit' survey.id %}" class="eligibility-form" data-settings-autosave>
                     {% csrf_token %}
@@ -643,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </section>
 
             <section id="response-limit" class="settings-card" aria-labelledby="response-limit-heading">
-                <h2 id="response-limit-heading">Response limit</h2>
+                <h2 id="response-limit-heading">Limit Responses</h2>
                 <p class="settings-panel-hint">Optionally stop new completions after the published survey reaches a maximum.</p>
                 <form method="post" action="{% url 'survey_edit' survey.id %}" class="response-limit-form" data-settings-autosave>
                     {% csrf_token %}
@@ -669,7 +669,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2 id="version-history-heading">Questionnaire version history</h2>
                 <p class="settings-panel-hint">Versions and their response data stay separate. Restoring copies historical content into the draft without changing live order, logic, eligibility, or other survey settings.</p>
                 <div class="version-history-list">
-                    {% for historical_version in historical_versions %}
+                    {% for historical_version in historical_versions|slice:':3' %}
                     <article class="setting-toggle-row">
                         <span><strong>Version {{ historical_version.number }}</strong><small>{{ historical_version.title_snapshot|default:survey.title }} · Published {{ historical_version.published_at|date:'M j, Y' }}</small></span>
                         <span class="hero-actions">
@@ -683,6 +683,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     </article>
                     {% endfor %}
                 </div>
+                {% if historical_versions|length > 3 %}
+                <details class="version-history-more">
+                    <summary>Show {{ historical_versions|length|add:'-3' }} more version{{ historical_versions|length|add:'-3'|pluralize }}</summary>
+                    <div class="version-history-list">
+                        {% for historical_version in historical_versions|slice:'3:' %}
+                        <article class="setting-toggle-row">
+                            <span><strong>Version {{ historical_version.number }}</strong><small>{{ historical_version.title_snapshot|default:survey.title }} · Published {{ historical_version.published_at|date:'M j, Y' }}</small></span>
+                            <span class="hero-actions">
+                                <form method="post" action="{% url 'survey_version_restore' survey.id historical_version.id %}" data-confirm="Replace the current draft content with version {{ historical_version.number }}? Live presentation and survey settings will stay unchanged." data-confirm-ok="Restore as draft">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="revision" value="{{ version.revision }}">
+                                    <button class="button button-secondary button-small" type="submit">Restore as draft</button>
+                                </form>
+                                <a class="button button-danger button-small" href="{% url 'survey_version_delete' survey.id historical_version.id %}">Delete version</a>
+                            </span>
+                        </article>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
             </section>
             {% endif %}
         {% endif %}

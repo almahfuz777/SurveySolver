@@ -19,8 +19,8 @@
         <p>You’ll leave your current session. Your surveys, responses, and account data stay exactly as they are.</p>
         <form method="post" action="{% url 'account_logout' %}">
             {% csrf_token %}
-            <a class="button button-secondary" href="{% url 'overview' %}">Stay signed in</a>
-            <button class="button button-primary" type="submit">Sign out</button>
+            <a class="button button-secondary" href="{% url 'overview' %}" aria-label="Return to dashboard without signing out">Stay signed in</a>
+            <button class="button button-primary" type="submit" aria-label="Sign out from your account">Sign out</button>
         </form>
     </article>
 </section>

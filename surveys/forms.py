@@ -17,6 +17,10 @@ class SurveyMetadataForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['topics'].queryset = Topic.objects.filter(is_active=True)
+        self.fields['identity_mode'].choices = [
+            (Survey.IdentityMode.ANONYMOUS, 'Anonymous'),
+            (Survey.IdentityMode.IDENTIFIED, 'Collect Responder Profiles'),
+        ]
 
     class Meta:
         model = Survey

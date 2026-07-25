@@ -286,10 +286,19 @@
 .settings-switch input:checked + .settings-switch-track::after { transform: translateX(1.125rem); }
 .settings-switch input:focus-visible + .settings-switch-track { outline: 3px solid var(--focus); outline-offset: 2px; }
 
-.setting-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0; padding: 0.9rem 1rem; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 0.85rem; cursor: pointer; }
-.setting-toggle-row > span:first-child { display: grid; gap: 0.15rem; }
-.setting-toggle-row strong { color: var(--text); font-size: 0.84rem; }
-.setting-toggle-row small { color: var(--text-muted); font-size: 0.72rem; font-weight: 500; }
+.setting-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0; padding: 0.6rem 0.85rem; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 0.7rem; cursor: pointer; }
+.setting-toggle-row > span:first-child { display: grid; gap: 0.1rem; }
+.setting-toggle-row strong { color: var(--text); font-size: 0.82rem; }
+.setting-toggle-row small { color: var(--text-muted); font-size: 0.7rem; font-weight: 500; }
+.version-history-list { display: grid; gap: 0.5rem; }
+.version-history-list + .version-history-more { margin-top: 0.5rem; }
+.version-history-more summary { cursor: pointer; color: var(--indigo-700); font-size: 0.78rem; font-weight: 700; padding: 0.4rem 0.1rem; list-style: none; }
+.version-history-more summary::-webkit-details-marker { display: none; }
+.version-history-more summary::before { content: '▸ '; }
+.version-history-more[open] summary::before { content: '▾ '; }
+.version-history-more .version-history-list { margin-top: 0.5rem; }
+.setting-toggle-row .hero-actions { margin-top: 0; align-items: center; }
+.setting-toggle-row .hero-actions .button-small { min-height: 1.9rem; padding: 0.35rem 0.65rem; font-size: 0.76rem; }
 .response-limit-fields { display: grid; gap: 0.4rem; margin-top: 0.85rem; max-width: 22rem; }
 .response-limit-fields[hidden] { display: none; }
 .response-limit-fields label { margin: 0; color: var(--ink-800); font-size: 0.75rem; font-weight: 700; }

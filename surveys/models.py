@@ -101,6 +101,15 @@ class Survey(models.Model):
         choices=IdentityMode.choices,
         default=IdentityMode.ANONYMOUS,
     )
+
+    RESPONDENT_IDENTITY_LABELS = {
+        IdentityMode.ANONYMOUS: 'Anonymous',
+        IdentityMode.IDENTIFIED: 'Profile shared with creator',
+    }
+
+    @property
+    def respondent_identity_label(self):
+        return self.RESPONDENT_IDENTITY_LABELS.get(self.identity_mode, self.get_identity_mode_display())
     status = models.CharField(
         max_length=16,
         choices=Status.choices,

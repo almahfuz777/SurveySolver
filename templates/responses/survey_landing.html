@@ -13,9 +13,9 @@
             <p class="response-summary">{{ survey.summary }}</p>
             {% if survey.description %}<div class="response-description">{{ survey.description|linebreaks }}</div>{% endif %}
             <div class="survey-meta" aria-label="Survey details">
-                <span>{{ survey.estimated_minutes }} minute{{ survey.estimated_minutes|pluralize }}</span>
-                <span>{{ version.sections.count }} section{{ version.sections.count|pluralize }}</span>
-                <span>{{ survey.get_identity_mode_display }}</span>
+                <span><svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>{{ survey.estimated_minutes }} minute{{ survey.estimated_minutes|pluralize }}</span>
+                <span><svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/></svg>{{ version.sections.count }} section{{ version.sections.count|pluralize }}</span>
+                <span><svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>{{ survey.respondent_identity_label }}</span>
             </div>
             {% if survey.topics.exists %}
                 <div class="topic-list" aria-label="Survey topics">

@@ -10,7 +10,7 @@
                     <div class="discovery-card-topics" aria-label="Survey topics">{% for topic in survey.topics.all %}<strong>{{ topic.name }}</strong>{% endfor %}</div>
                     <h3>{{ survey.title }}</h3>
                     <p>{{ survey.summary }}</p>
-                    <div class="discovery-card-meta"><span>{{ survey.estimated_minutes }} min</span><span>{{ survey.get_identity_mode_display }}</span></div>
+                    <div class="discovery-card-meta"><span>{% include 'partials/icon.html' with name='clock' size='14' %}{{ survey.estimated_minutes }} min</span><span>{% include 'partials/icon.html' with name='lock-closed' size='14' %}{{ survey.respondent_identity_label }}</span></div>
                     <a class="button button-primary button-block" href="{% url 'respond_survey' survey.slug %}">View survey</a>
                 </div>
             </article>
