@@ -1,0 +1,183 @@
+/* My responses — the respondent-side home. Creator statistics live on
+   My surveys; this page only covers what the user has answered and earned.
+   The heading reuses the shared `.page-heading` component. */
+
+.responses-content {
+    min-height: 34rem;
+    padding-bottom: 5rem;
+    background: var(--surface-muted);
+}
+
+.responses-content .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Placeholder card for the unbuilt badge program. */
+.metric-card-upcoming {
+    border-style: dashed;
+}
+
+.metric-card-upcoming strong {
+    color: var(--text-muted);
+}
+
+/* `core/partials/resumable_surveys.html` is a full-width band on Discover; here
+   it sits inside this page's shell, so its own wrappers are neutralised. */
+.responses-content .resume-section {
+    padding-block: 0 1.5rem;
+    background: transparent;
+}
+
+.responses-content .resume-section .shell {
+    max-width: none;
+    padding-inline: 0;
+}
+
+.responses-grid {
+    display: grid;
+    gap: 1rem;
+    align-items: start;
+    grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.8fr);
+}
+
+.responses-main,
+.responses-side {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+}
+
+/* With a complete profile the side column is not rendered at all. */
+.responses-grid:not(:has(.responses-side)) {
+    grid-template-columns: 1fr;
+}
+
+.history-panel {
+    min-width: 0;
+    overflow: hidden;
+    padding: 0;
+}
+
+.history-panel .panel-heading {
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+}
+
+.history-sort {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.sort-chip {
+    padding: 0.35rem 0.7rem;
+    color: var(--ink-800);
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 650;
+    text-decoration: none;
+}
+
+.sort-chip.is-active {
+    color: var(--indigo-700);
+    background: var(--indigo-50);
+    border-color: var(--indigo-300);
+}
+
+.history-table {
+    width: 100%;
+    min-width: 34rem;
+    border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+    padding: 0.8rem 1.5rem;
+    border-top: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.history-table th {
+    color: var(--text-muted);
+    background: var(--surface-warm);
+    font-size: 0.74rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.history-table td {
+    font-size: 0.88rem;
+}
+
+.history-table td small {
+    display: block;
+    color: var(--text-muted);
+}
+
+.history-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.35rem;
+}
+
+.history-topics span {
+    padding: 0.15rem 0.45rem;
+    color: var(--ink-600);
+    background: var(--surface-muted);
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 650;
+}
+
+.history-points {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.points-gain {
+    color: var(--teal-700);
+    font-weight: 800;
+}
+
+.history-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.85rem;
+}
+
+.history-panel .empty-state {
+    padding: 2.5rem 1.5rem;
+}
+
+.progress-panel .progress-ring {
+    margin-block: 1rem;
+}
+
+.progress-panel .button {
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 860px) {
+    .responses-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .responses-content .metric-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .history-panel .panel-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+}

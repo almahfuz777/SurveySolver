@@ -3,7 +3,7 @@ from django.db import transaction
 from responses.models import Submission
 from sharing.models import SurveyCollaborator
 
-from .models import Badge, BadgeAward, PointTransaction
+from .models import PointTransaction
 
 
 PROFILE_COMPLETION_BONUS = 50
@@ -37,7 +37,7 @@ def award_survey_completion(user, submission, points):
         or (submission.respondent_id and submission.respondent_id != user.id)
     ):
         return None, False
-    transaction_record, created = PointTransaction.objects.get_or_create(
+    return PointTransaction.objects.get_or_create(
         user=user,
         survey=submission.survey,
         reason=PointTransaction.Reason.SURVEY_COMPLETION,
@@ -53,11 +53,3 @@ def award_survey_completion(user, submission, points):
             },
         },
     )
-    if created:
-        completion_count = PointTransaction.objects.filter(
-            user=user,
-            reason=PointTransaction.Reason.SURVEY_COMPLETION,
-        ).count()
-        for badge in Badge.objects.filter(completion_threshold__lte=completion_count):
-            BadgeAward.objects.get_or_create(user=user, badge=badge)
-    return transaction_record, created

@@ -1,15 +1,17 @@
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.core.paginator import Paginator
 from django.shortcuts import render
 
 from responses.models import Submission
 from responses.services import resumable_submissions
-from rewards.models import BadgeAward, PointTransaction
+from rewards.models import PointTransaction
 from rewards.claims import BASE_COMPLETION_POINTS
 from surveys.discovery import discover_surveys
 from surveys.models import Survey, Topic
 from surveys.presentation import presented_question_ids
-from surveys.services import discard_empty_drafts
+
+
+COMPLETED_RESPONSES_PER_PAGE = 20
 
 
 def home(request):
@@ -17,7 +19,7 @@ def home(request):
 
 
 def discover(request):
-    topic = request.GET.get('topic', '').strip()
+    topics = [slug.strip() for slug in request.GET.getlist('topic') if slug.strip()]
     try:
         duration = int(request.GET.get('duration', ''))
     except (TypeError, ValueError):
@@ -35,11 +37,13 @@ def discover(request):
         privacy = Survey.IdentityMode.ANONYMOUS
     elif privacy not in Survey.IdentityMode.values:
         privacy = ''
+    show_completed = request.GET.get('show_completed') == '1'
     discovery_surveys = discover_surveys(
         request.user,
-        topic=topic or None,
+        topics=topics or None,
         duration=duration,
         identity_mode=privacy or None,
+        include_completed=show_completed,
     )
     if minimum_points and BASE_COMPLETION_POINTS < minimum_points:
         discovery_surveys = []
@@ -58,6 +62,8 @@ def discover(request):
         for survey in discovery_surveys
         if survey.id not in ongoing_survey_ids
     ]
+    completed_surveys = [survey for survey in discovery_surveys if survey.is_completed]
+    discovery_surveys = [survey for survey in discovery_surveys if not survey.is_completed]
     for submission in ongoing_submissions:
         submission.question_count = len(
             presented_question_ids(submission.presentation)
@@ -81,57 +87,69 @@ def discover(request):
         template_name,
         {
             'discovery_surveys': discovery_surveys,
+            'completed_surveys': completed_surveys,
             'ongoing_submissions': ongoing_submissions,
             'topics': Topic.objects.filter(is_active=True),
-            'selected_topic': topic,
+            'selected_topics': topics,
             'selected_duration': duration,
             'selected_points': minimum_points,
             'selected_privacy': privacy,
+            'show_completed': show_completed,
             'base_completion_points': BASE_COMPLETION_POINTS,
         },
     )
 
 
 @login_required
-def overview(request):
+def my_responses(request):
+    """Respondent-side home: what this user has answered and earned.
+
+    Surveys the user *owns* belong to My surveys; nothing creator-facing is
+    repeated here.
+    """
     user = request.user
-    discard_empty_drafts(user)
-    owned_surveys = Survey.objects.owned_by(user).filter(deleted_at__isnull=True)
+    sort = 'oldest' if request.GET.get('sort') == 'oldest' else 'newest'
 
-    # Per-status breakdown of the user's own (non-deleted) surveys.
-    status_rows = owned_surveys.values('status').annotate(count=Count('id'))
-    counts_by_status = {row['status']: row['count'] for row in status_rows}
-    survey_status_counts = {
-        'draft': counts_by_status.get(Survey.Status.DRAFT, 0),
-        'published': counts_by_status.get(Survey.Status.PUBLISHED, 0),
-        'closed': counts_by_status.get(Survey.Status.CLOSED, 0),
-    }
-    active_survey_count = sum(survey_status_counts.values())
+    completed = (
+        Submission.objects.filter(
+            respondent=user,
+            status=Submission.Status.COMPLETED,
+        )
+        .select_related('survey', 'version', 'point_transaction')
+        .prefetch_related('survey__topics')
+        .order_by('completed_at' if sort == 'oldest' else '-completed_at')
+    )
+    page = Paginator(completed, COMPLETED_RESPONSES_PER_PAGE).get_page(
+        request.GET.get('page')
+    )
+    for submission in page:
+        # Reverse one-to-one: absent whenever the completion earned no points
+        # (self-owned survey, collaborator, or an already rewarded survey).
+        transaction_record = getattr(submission, 'point_transaction', None)
+        submission.points_earned = transaction_record.amount if transaction_record else 0
 
-    # Responses this user has *received* on surveys they own.
-    total_responses = Submission.objects.filter(
-        survey__owner=user,
-        status=Submission.Status.COMPLETED,
-    ).count()
-
-    # Respondent side: surveys this user has *completed* for points.
-    surveys_completed_count = Submission.objects.filter(
-        respondent=user,
-        status=Submission.Status.COMPLETED,
-    ).count()
+    ongoing_submissions = list(
+        resumable_submissions(user, request.session.session_key)
+    )
+    for submission in ongoing_submissions:
+        submission.question_count = len(
+            presented_question_ids(submission.presentation)
+        )
+        submission.progress_percent = (
+            round(submission.saved_answer_count / submission.question_count * 100)
+            if submission.question_count
+            else 0
+        )
 
     return render(
         request,
-        'core/overview.html',
+        'core/my_responses.html',
         {
             'profile': user.profile,
             'points_balance': PointTransaction.objects.balance_for(user),
-            'active_survey_count': active_survey_count,
-            'survey_status_counts': survey_status_counts,
-            'total_response_count': total_responses,
-            'surveys_completed_count': surveys_completed_count,
-            'latest_survey': owned_surveys.first(),
-            'recent_earnings': PointTransaction.objects.filter(user=user).select_related('survey')[:5],
-            'badge_awards': BadgeAward.objects.filter(user=user).select_related('badge')[:4],
+            'surveys_completed_count': page.paginator.count,
+            'completed_page': page,
+            'ongoing_submissions': ongoing_submissions,
+            'sort': sort,
         },
     )

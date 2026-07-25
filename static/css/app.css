@@ -725,10 +725,6 @@ a {
 .completion-card h1 { margin: 0.55rem 0 0.75rem; }
 .completion-card p { color: var(--text-muted); margin-bottom: 1.5rem; }
 
-.badge-summary { border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 1.25rem; padding-top: 1rem; }
-.badge-summary h3 { flex-basis: 100%; font-size: 0.9rem; margin: 0; }
-.badge-summary span { background: var(--teal-50); border: 1px solid var(--teal-200); border-radius: 999px; color: var(--teal-700); font-size: 0.72rem; font-weight: 750; padding: 0.35rem 0.55rem; }
-
 .site-footer {
     padding-block: 3rem;
     color: #c9c8dd;

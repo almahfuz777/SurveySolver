@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 {% if survey.status == 'published' or survey.status == 'closed' %}<a href="#collection">Response collection</a>{% endif %}
             {% endif %}
             <a href="#audience">Audience &amp; privacy</a>
-            <a href="#overview">Classification &amp; duration</a>
+            <a href="#classification">Classification &amp; duration</a>
             {% if version %}
                 <a href="#eligibility">Eligibility Criteria</a>
                 <a href="#response-limit">Limit Responses</a>
@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="settings-autosave-error" data-autosave-error aria-live="polite"></div>
             </section>
 
-            <section id="overview" class="settings-card">
+            <section id="classification" class="settings-card">
                 <h2>Classification &amp; duration</h2>
                 <p class="settings-panel-hint">Set how respondents find this research and estimate the time it takes.</p>
 

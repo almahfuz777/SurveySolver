@@ -12,7 +12,7 @@ from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 
 from rewards.claims import CLAIM_SECRET_SESSION_KEY, PENDING_CLAIM_SESSION_KEY
-from rewards.models import BadgeAward, GuestRewardClaim, PointTransaction
+from rewards.models import GuestRewardClaim, PointTransaction
 
 
 class GuestRewardClaimTests(TestCase):
@@ -143,10 +143,6 @@ class GuestRewardClaimTests(TestCase):
         self.assertEqual(transaction.amount, 10)
         self.assertEqual(transaction.survey, self.survey)
         self.assertEqual(transaction.submission, submission)
-        self.assertEqual(
-            BadgeAward.objects.get(user=respondent).badge.slug,
-            'first-response',
-        )
 
     def test_verified_login_consumes_claim_without_reidentifying_answers(self):
         submission = self.complete_guest_response()

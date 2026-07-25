@@ -7,7 +7,6 @@ from django.utils import timezone
 
 from responses.models import Answer, Submission
 from responses.services import start_submission
-from rewards.models import PointTransaction
 from surveys import services
 from surveys.models import Question, Survey, Topic
 from surveys.publication import publish_survey
@@ -217,6 +216,36 @@ class SurveyDiscoveryTests(TestCase):
         self.assertNotContains(response, completed_survey.title)
         self.assertNotContains(response, owned.title)
 
+    def test_show_completed_lists_completed_surveys_separately_with_disabled_start(self):
+        completed_survey, version = self.publish_survey('Completed study')
+        other_survey, _ = self.publish_survey('Other study')
+        respondent = get_user_model().objects.create_user(email='show-completed@example.com')
+        Submission.objects.create(
+            survey=completed_survey,
+            version=version,
+            respondent=respondent,
+            session_key_hash='a' * 64,
+            status=Submission.Status.COMPLETED,
+            completed_at=timezone.now(),
+            presentation={'sections': []},
+            eligibility_data={'targeted': False},
+            eligibility_checked_at=timezone.now(),
+        )
+        self.client.force_login(respondent)
+
+        default_response = self.client.get(reverse('discover'))
+        self.assertNotContains(default_response, completed_survey.title)
+
+        response = self.client.get(reverse('discover'), {'show_completed': '1'})
+
+        self.assertContains(response, completed_survey.title)
+        self.assertContains(response, other_survey.title)
+        self.assertEqual(len(response.context['completed_surveys']), 1)
+        self.assertEqual(response.context['completed_surveys'][0], completed_survey)
+        self.assertNotIn(completed_survey, response.context['discovery_surveys'])
+        self.assertContains(response, 'discovery-completed-section')
+        self.assertContains(response, '<button class="button button-primary button-block" type="button" disabled>Completed</button>', html=True)
+
     def test_guest_saved_response_is_pinned_with_progress_and_not_duplicated(self):
         survey, version = self.publish_survey('Resume this study')
         session = self.client.session
@@ -308,6 +337,25 @@ class SurveyDiscoveryTests(TestCase):
         self.assertContains(response, short.title)
         self.assertNotContains(response, long.title)
 
+    def test_topic_filter_accepts_multiple_selected_topics(self):
+        other_topic = Topic.objects.create(name='Public Health', slug='public-health-test')
+        first, _ = self.publish_survey('Learning study one')
+        second, version = self.publish_survey('Public health study')
+        second.topics.set([other_topic])
+        excluded, _ = self.publish_survey('Unrelated topic study')
+        excluded.topics.clear()
+        third_topic = Topic.objects.create(name='Unrelated', slug='unrelated-test')
+        excluded.topics.add(third_topic)
+
+        response = self.client.get(
+            reverse('discover'),
+            {'topic': [self.topic.slug, other_topic.slug]},
+        )
+
+        self.assertContains(response, first.title)
+        self.assertContains(response, second.title)
+        self.assertNotContains(response, excluded.title)
+
     def test_discovery_filters_are_live_and_page_assets_are_modular(self):
         response = self.client.get(reverse('discover'))
 
@@ -330,34 +378,3 @@ class SurveyDiscoveryTests(TestCase):
         self.assertContains(response, matching.title)
         self.assertNotContains(response, excluded.title)
         self.assertNotContains(response, 'data-live-filters')
-
-
-class DashboardMetricTests(TestCase):
-    def test_dashboard_context_uses_correct_metric_sources(self):
-        user = get_user_model().objects.create_user(email='metrics@example.com')
-        owned = Survey.objects.create(
-            owner=user,
-            title='Owned survey',
-            summary='Owned survey summary',
-        )
-        PointTransaction.objects.create(
-            user=user,
-            amount=50,
-            reason=PointTransaction.Reason.PROFILE_COMPLETION,
-            idempotency_key=f'profile-completion:{user.id}',
-        )
-        Submission.objects.create(
-            survey=owned,
-            version=owned.draft_version,
-            session_key_hash='b' * 64,
-            status=Submission.Status.COMPLETED,
-            completed_at=timezone.now(),
-            presentation={'sections': []},
-        )
-        self.client.force_login(user)
-
-        response = self.client.get(reverse('overview'))
-
-        self.assertEqual(response.context['active_survey_count'], 1)
-        self.assertEqual(response.context['total_response_count'], 1)
-        self.assertEqual(response.context['points_balance'], 50)

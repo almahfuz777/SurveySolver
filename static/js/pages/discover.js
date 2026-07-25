@@ -1,6 +1,16 @@
 const filterForm = document.querySelector('[data-live-filters]');
 const discoveryResults = document.querySelector('[data-discovery-results]');
 const filterStatus = document.querySelector('[data-filter-status]');
+const topicMultiselect = document.querySelector('.topic-multiselect');
+const topicSummary = topicMultiselect?.querySelector('summary');
+
+if (topicMultiselect && topicSummary) {
+    const updateTopicSummary = () => {
+        const checked = topicMultiselect.querySelectorAll('input[name="topic"]:checked').length;
+        topicSummary.textContent = checked ? `${checked} selected` : 'All topics';
+    };
+    topicMultiselect.addEventListener('change', updateTopicSummary);
+}
 
 if (filterForm && discoveryResults && filterStatus) {
     let activeRequest;

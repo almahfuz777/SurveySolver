@@ -46,7 +46,7 @@ def profile_matches(criteria, profile):
     return True
 
 
-def discover_surveys(user=None, topic=None, duration=None, identity_mode=None):
+def discover_surveys(user=None, topics=None, duration=None, identity_mode=None, include_completed=False):
     published_versions = SurveyVersion.objects.filter(
         status=SurveyVersion.Status.PUBLISHED,
     )
@@ -56,20 +56,23 @@ def discover_surveys(user=None, topic=None, duration=None, identity_mode=None):
         .prefetch_related('topics', Prefetch('versions', published_versions, to_attr='live_versions'))
         .order_by('-published_at')
     )
-    if topic:
-        queryset = queryset.filter(topics__slug=topic)
+    if topics:
+        queryset = queryset.filter(topics__slug__in=topics)
     if duration:
         queryset = queryset.filter(estimated_minutes__lte=duration)
     if identity_mode:
         queryset = queryset.filter(identity_mode=identity_mode)
+    completed_survey_ids = set()
     if user and user.is_authenticated:
-        queryset = queryset.exclude(
-            Q(owner=user)
-            | Q(
+        queryset = queryset.exclude(owner=user)
+        completed_survey_ids = set(
+            queryset.filter(
                 submissions__respondent=user,
                 submissions__status='completed',
-            )
+            ).values_list('id', flat=True)
         )
+        if not include_completed:
+            queryset = queryset.exclude(id__in=completed_survey_ids)
     surveys = []
     for survey in queryset.distinct():
         if not survey.live_versions:
@@ -79,7 +82,8 @@ def discover_surveys(user=None, topic=None, duration=None, identity_mode=None):
             criteria = survey.eligibility_criteria
         except SurveyEligibilityCriteria.DoesNotExist:
             criteria = None
-        if user and user.is_authenticated and not profile_matches(criteria, user.profile):
+        survey.is_completed = survey.id in completed_survey_ids
+        if not survey.is_completed and user and user.is_authenticated and not profile_matches(criteria, user.profile):
             continue
         survey.requires_screener = bool(
             criteria and criteria.is_targeted and not (user and user.is_authenticated)

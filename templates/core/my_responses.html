@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My responses | SurveySolver{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/core/resumable.css' %}"><link rel="stylesheet" href="{% static 'css/core/my-responses.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div class="shell page-heading-inner">
+        <div>
+            <span class="eyebrow">Your participation</span>
+            <h1>My responses</h1>
+            <p>Surveys you have answered and the points they earned.</p>
+        </div>
+    </div>
+</section>
+
+<section class="responses-content">
+    <div class="shell">
+        <div class="metric-grid" aria-label="Participation summary">
+            <article class="metric-card">
+                <span>Surveys completed</span>
+                <strong>{{ surveys_completed_count }}</strong>
+                <small>Studies you’ve taken</small>
+            </article>
+            <article class="metric-card metric-card-reward">
+                <span>Reward points</span>
+                <strong>{{ points_balance }}</strong>
+                <small>Earned through contributions</small>
+            </article>
+            <article class="metric-card metric-card-upcoming">
+                <span>Badges</span>
+                <strong aria-hidden="true">—</strong>
+                <small>Coming soon</small>
+            </article>
+        </div>
+
+        {% include 'core/partials/resumable_surveys.html' %}
+
+        <div class="responses-grid">
+            <div class="responses-main">
+                <section class="panel history-panel" aria-labelledby="history-heading">
+                    <div class="panel-heading">
+                        <div>
+                            <span class="panel-kicker">Completed</span>
+                            <h2 id="history-heading">Response history</h2>
+                        </div>
+                        {% if completed_page.paginator.count %}
+                            <nav class="history-sort" aria-label="Sort response history">
+                                <a class="sort-chip{% if sort == 'newest' %} is-active{% endif %}" href="?sort=newest"{% if sort == 'newest' %} aria-current="true"{% endif %}>Newest</a>
+                                <a class="sort-chip{% if sort == 'oldest' %} is-active{% endif %}" href="?sort=oldest"{% if sort == 'oldest' %} aria-current="true"{% endif %}>Oldest</a>
+                            </nav>
+                        {% endif %}
+                    </div>
+
+                    {% if completed_page.object_list %}
+                        <div class="table-scroll" tabindex="0">
+                            <table class="history-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Survey</th>
+                                        <th scope="col">Completed</th>
+                                        <th scope="col">Points</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for submission in completed_page %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ submission.version.title_snapshot|default:submission.survey.title }}</strong>
+                                                {% if submission.survey.topics.all %}
+                                                    <span class="history-topics">{% for topic in submission.survey.topics.all %}<span>{{ topic.name }}</span>{% endfor %}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ submission.completed_at|date:'M j, Y' }}<small>{{ submission.completed_at|date:'H:i' }}</small></td>
+                                            <td class="history-points">
+                                                {% if submission.points_earned %}
+                                                    <span class="points-gain">+{{ submission.points_earned }}</span>
+                                                {% else %}
+                                                    <span aria-label="No points earned">—</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if completed_page.paginator.num_pages > 1 %}
+                            <nav class="history-pagination" aria-label="Response history pages">
+                                {% if completed_page.has_previous %}<a class="button button-secondary button-small" href="?sort={{ sort }}&amp;page={{ completed_page.previous_page_number }}">Previous</a>{% endif %}
+                                <span>Page {{ completed_page.number }} of {{ completed_page.paginator.num_pages }}</span>
+                                {% if completed_page.has_next %}<a class="button button-secondary button-small" href="?sort={{ sort }}&amp;page={{ completed_page.next_page_number }}">Next</a>{% endif %}
+                            </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state">
+                            <span class="empty-icon" aria-hidden="true">✦</span>
+                            <h3>You haven’t completed a survey yet</h3>
+                            <p>Every completed study earns points and appears here.</p>
+                            <a class="button button-primary" href="{% url 'discover' %}">Discover surveys</a>
+                        </div>
+                    {% endif %}
+                </section>
+            </div>
+
+            {% if profile.completion_percentage < 100 %}
+                <div class="responses-side">
+                    <aside class="panel progress-panel" aria-labelledby="profile-progress-heading">
+                        <span class="panel-kicker">Unlock better matches</span>
+                        <h2 id="profile-progress-heading">Complete your profile</h2>
+                        <div class="progress-ring" style="--progress: {{ profile.completion_percentage }}%" aria-label="Profile is {{ profile.completion_percentage }}% complete">
+                            <span>{{ profile.completion_percentage }}%</span>
+                        </div>
+                        <p>A complete research profile unlocks targeted surveys and a one-time points bonus.</p>
+                        <a class="button button-secondary button-block" href="{% url 'profile_edit' %}">Complete your profile</a>
+                    </aside>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

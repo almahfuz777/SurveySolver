@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}Discover | SurveySolver{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/core/discover.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/core/resumable.css' %}"><link rel="stylesheet" href="{% static 'css/core/discover.css' %}">{% endblock %}
 {% block extra_scripts %}<script src="{% static 'js/pages/discover.js' %}" defer></script>{% endblock %}
 
 {% block content %}
@@ -23,10 +23,21 @@
         <div class="sr-only" id="discover-heading">Filter by subject, time commitment, reward, or response privacy.</div>
         <div class="discovery-panel">
             <form class="discovery-filters" method="get" action="{% url 'discover' %}" aria-label="Filter surveys" data-live-filters>
-                <label>Topic<select name="topic"><option value="">All topics</option>{% for topic in topics %}<option value="{{ topic.slug }}"{% if selected_topic == topic.slug %} selected{% endif %}>{{ topic.name }}</option>{% endfor %}</select></label>
+                <div class="filter-field">
+                    <span class="filter-field-label">Topic</span>
+                    <details class="topic-multiselect">
+                        <summary>{% if selected_topics %}{{ selected_topics|length }} selected{% else %}All topics{% endif %}</summary>
+                        <div class="topic-multiselect-list">
+                            {% for topic in topics %}
+                                <label><input type="checkbox" name="topic" value="{{ topic.slug }}"{% if topic.slug in selected_topics %} checked{% endif %}> {{ topic.name }}</label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                </div>
+                <label>Response privacy<select name="privacy">{% if user.is_authenticated %}<option value="">Any privacy</option>{% endif %}<option value="anonymous"{% if selected_privacy == 'anonymous' %} selected{% endif %}>Anonymous</option><option value="identified"{% if selected_privacy == 'identified' %} selected{% endif %}{% if not user.is_authenticated %} disabled{% endif %}>Profile shared</option></select></label>
                 <label>Duration<select name="duration"><option value="">Any length</option><option value="5"{% if selected_duration == 5 %} selected{% endif %}>Up to 5 min</option><option value="10"{% if selected_duration == 10 %} selected{% endif %}>Up to 10 min</option><option value="20"{% if selected_duration == 20 %} selected{% endif %}>Up to 20 min</option></select></label>
                 <label>Points<select name="points"><option value="">Any reward</option><option value="10"{% if selected_points == 10 %} selected{% endif %}>10+ points</option></select></label>
-                <label>Response privacy<select name="privacy">{% if user.is_authenticated %}<option value="">Any privacy</option>{% endif %}<option value="anonymous"{% if selected_privacy == 'anonymous' %} selected{% endif %}>Anonymous</option><option value="identified"{% if selected_privacy == 'identified' %} selected{% endif %}{% if not user.is_authenticated %} disabled{% endif %}>Identified</option></select></label>
+                {% if user.is_authenticated %}<label class="discovery-filter-checkbox"><input type="checkbox" name="show_completed" value="1"{% if show_completed %} checked{% endif %}> Show completed</label>{% endif %}
                 <noscript><button class="button button-primary" type="submit">Apply filters</button></noscript>
             </form>
             <p class="filter-status sr-only" role="status" aria-live="polite" data-filter-status></p>
