@@ -9,6 +9,10 @@
 
     <title>{% block title %}SurveySolver{% endblock %}</title>
 
+    <link rel="icon" type="image/svg+xml" href="{% static 'images/brand/open-crest-tile-gradient.svg' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/brand/favicon-32.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/brand/apple-touch-icon.png' %}">
+
     {# Resolve theme before first paint so there is no light/dark flash. #}
     <script>
         (function () {
@@ -36,10 +40,7 @@
         <div class="shell header-inner">
             <a class="brand" href="{% url 'home' %}" aria-label="SurveySolver home">
                 <span class="brand-mark" aria-hidden="true">
-                    <svg viewBox="0 0 32 32" role="img">
-                        <path d="M7 5.5h18a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H14l-6.5 5v-5H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z"/>
-                        <path class="brand-check" d="m10 14 3.3 3.3L21.5 10"/>
-                    </svg>
+                    <img src="{% static 'images/brand/open-crest-gradient.svg' %}" alt="" width="32" height="32">
                 </span>
                 <span>SurveySolver</span>
             </a>
@@ -127,7 +128,12 @@
     {% block footer %}<footer class="site-footer">
         <div class="shell footer-inner">
             <div class="footer-brand">
-                <a class="brand brand-footer" href="{% url 'home' %}">SurveySolver</a>
+                <a class="brand brand-footer" href="{% url 'home' %}">
+                    <span class="brand-mark" aria-hidden="true">
+                        <img src="{% static 'images/brand/open-crest-gradient.svg' %}" alt="" width="32" height="32">
+                    </span>
+                    <span>SurveySolver</span>
+                </a>
                 <p>Better research starts with better responses.</p>
             </div>
             <nav class="footer-nav" aria-label="Footer navigation">

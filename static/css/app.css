@@ -217,23 +217,11 @@ a {
     width: 2rem;
     height: 2rem;
     place-items: center;
-    color: white;
-    background: linear-gradient(145deg, var(--brand-strong), var(--indigo-500));
-    border-radius: 0.7rem;
-    box-shadow: 0 6px 16px rgba(67, 56, 202, 0.25);
 }
 
-.brand-mark svg {
-    width: 1.35rem;
-    fill: currentColor;
-}
-
-.brand-mark .brand-check {
-    fill: none;
-    stroke: var(--brand-strong);
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 2.4;
+.brand-mark img {
+    width: 100%;
+    height: 100%;
 }
 
 .primary-nav {
