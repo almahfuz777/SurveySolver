@@ -10,10 +10,10 @@ from responses.models import Submission
 from responses.services import hash_session_key
 
 from .models import GuestRewardClaim
+from .policy import BASE_COMPLETION_POINTS
 from .services import award_survey_completion
 
 
-BASE_COMPLETION_POINTS = 10
 CLAIM_LIFETIME = timedelta(days=7)
 PENDING_CLAIM_SESSION_KEY = 'pending_guest_reward_claim'
 CLAIM_SECRET_SESSION_KEY = 'guest_reward_claim_secrets'

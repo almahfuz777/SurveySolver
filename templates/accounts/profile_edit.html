@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}Edit research profile | SurveySolver{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/eligibility.css' %}"><link rel="stylesheet" href="{% static 'css/account/profile/profile.css' %}"><link rel="stylesheet" href="{% static 'css/account/profile/profile-edit.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/surveys/eligibility.css' %}"><link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}"><link rel="stylesheet" href="{% static 'css/accounts/profile-edit.css' %}">{% endblock %}
 
 {% block content %}
 <section class="page-heading">
@@ -68,12 +68,6 @@
                         <label for="{{ profile_form.gender.id_for_label }}">{{ profile_form.gender.label }}</label>
                         {{ profile_form.gender }}
                         {{ profile_form.gender.errors }}
-                    </div>
-                    <div class="field-group field-wide" data-selfdescribe-field{% if profile_form.gender.value != 'self_describe' %} hidden{% endif %}>
-                        <label for="{{ profile_form.gender_self_description.id_for_label }}">{{ profile_form.gender_self_description.label }}</label>
-                        {{ profile_form.gender_self_description }}
-                        {% if profile_form.gender_self_description.help_text %}<small class="helptext">{{ profile_form.gender_self_description.help_text }}</small>{% endif %}
-                        {{ profile_form.gender_self_description.errors }}
                     </div>
                 </div>
             </fieldset>

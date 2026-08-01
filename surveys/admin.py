@@ -68,8 +68,5 @@ class QuestionAdmin(admin.ModelAdmin):
     inlines = (QuestionChoiceInline, MatrixRowInline)
 
 
-# BranchRule, Quota and the version-scoped EligibilityCriteria are legacy tables
-# that runtime code no longer writes (live branching, response limits and
-# targeting moved to survey-level SurveyBranchRule / Survey.response_limit /
-# SurveyEligibilityCriteria). They are intentionally left unregistered so admin
-# edits can't imply an effect they no longer have.
+# Live branching, response limits and targeting are owned by SurveyBranchRule, SurveyVersion.response_limit and SurveyEligibilityCriteria.
+# The version-scoped tables they replaced were dropped in migration 0013.

@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from surveys.models import Survey
 
-from sharing.invitations import create_collaborator_invitation
+from sharing.collaborator_invitations import create_collaborator_invitation
 from sharing.models import CollaboratorInvitation, SurveyCollaborator
 
 

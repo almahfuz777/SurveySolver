@@ -2,6 +2,8 @@ from allauth.account.forms import LoginForm, SignupForm
 from django import forms
 from django.contrib.auth import get_user_model
 
+from core.widgets import PillCheckboxSelectMultiple
+
 from . import demographics
 from .models import Profile
 
@@ -49,10 +51,6 @@ class UserNameForm(forms.ModelForm):
         fields = ('first_name', 'last_name')
 
 
-class PillCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
-    template_name = 'surveys/widgets/pill_select.html'
-
-
 def _topic_choices():
     from surveys.models import Topic
     return list(Topic.objects.filter(is_active=True).values_list('slug', 'name'))
@@ -84,7 +82,6 @@ class ResearchProfileForm(forms.ModelForm):
             'avatar',
             'birth_date',
             'gender',
-            'gender_self_description',
             'country',
             'region',
             'languages',
@@ -102,11 +99,9 @@ class ResearchProfileForm(forms.ModelForm):
         widgets = {
             'avatar': forms.ClearableFileInput(attrs={'data-avatar-input': '', 'accept': 'image/*'}),
             'birth_date': forms.DateInput(attrs={'type': 'date'}),
-            'gender': forms.Select(attrs={'data-gender-select': ''}),
             'country': forms.Select(attrs={'data-region-country': ''}),
         }
         help_texts = {
-            'gender_self_description': 'Complete only when you selected “Prefer to self-describe”.',
             'income_bracket': 'Approximate personal income, kept private.',
         }
 
@@ -118,14 +113,6 @@ class ResearchProfileForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        if (
-            cleaned_data.get('gender') == Profile.Gender.SELF_DESCRIBE
-            and not cleaned_data.get('gender_self_description', '').strip()
-        ):
-            self.add_error(
-                'gender_self_description',
-                'Describe your gender or choose another option.',
-            )
         # A region must belong to the chosen country (its code is prefixed with
         # the ISO country code, e.g. ``BD-13``), otherwise clear it.
         country = cleaned_data.get('country')

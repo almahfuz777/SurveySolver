@@ -43,14 +43,18 @@ ALLOWED_HOSTS = env.list(
 
 # Application definition
 
+# Installed apps in order of precedence (django and allauth apps come after the project apps)
 INSTALLED_APPS = [
-    'accounts.apps.AccountsConfig',
-    'analytics.apps.AnalyticsConfig',
-    'core.apps.CoreConfig',
-    'rewards.apps.RewardsConfig',
-    'responses.apps.ResponsesConfig',
-    'sharing.apps.SharingConfig',
-    'surveys.apps.SurveysConfig',
+    'accounts',
+    'analytics',
+    'core',
+    'rewards',
+    'responses',
+    'sharing',
+    'surveys',
+]
+
+DJANGO_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -58,12 +62,23 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.forms',
+]
+
+# Authentication: local accounts plus Google sign-in.
+ALLAUTH_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+]
+
+THIRD_PARTY_APPS = [
     'django_countries',
 ]
+
+INSTALLED_APPS += DJANGO_APPS
+INSTALLED_APPS += ALLAUTH_APPS
+INSTALLED_APPS += THIRD_PARTY_APPS
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

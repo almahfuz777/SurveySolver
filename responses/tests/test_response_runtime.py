@@ -4,7 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from surveys.models import BranchRule, Question, Survey
+from surveys.branching import Action, Operator
+from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 from surveys import services as survey_services
 
@@ -87,9 +88,9 @@ class ResponseRuntimeTests(TestCase):
             revision,
             {
                 'source_question': first_question,
-                'operator': BranchRule.Operator.EQUALS,
+                'operator': Operator.EQUALS,
                 'compare_value': 'Skip follow-up',
-                'action': BranchRule.Action.END_SURVEY,
+                'action': Action.END_SURVEY,
                 'target_section': None,
             },
         )

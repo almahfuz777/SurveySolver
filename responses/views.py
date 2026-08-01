@@ -1,19 +1,21 @@
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.core.paginator import Paginator
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 from django_countries import countries
 
 from accounts.models import Profile
-from rewards.claims import BASE_COMPLETION_POINTS, claim_secret_from_session, create_guest_claim, store_claim_secret
-from rewards.models import GuestRewardClaim
-from rewards.services import award_survey_completion
+from rewards.claims import claim_secret_from_session, store_claim_secret
+from rewards.models import GuestRewardClaim, PointTransaction
 from surveys.models import Question, Survey
+from surveys.presentation import presented_question_ids
 from sharing.respondent_invitations import invitation_from_session
 
+from .completion import finish_submission
 from .models import Submission
 from .services import (
     DuplicateSubmission,
@@ -23,12 +25,70 @@ from .services import (
     ResponseUnavailable,
     ResponseValidationError,
     can_access_submission,
-    complete_submission,
     current_published_version,
     discard_in_progress_submission,
+    resumable_submissions,
     save_progress,
     start_submission,
 )
+
+
+COMPLETED_RESPONSES_PER_PAGE = 20
+
+
+@login_required
+def my_responses(request):
+    """Respondent-side home: what this user has answered and earned.
+
+    Surveys the user *owns* belong to My surveys; nothing creator-facing is
+    repeated here.
+    """
+    user = request.user
+    sort = 'oldest' if request.GET.get('sort') == 'oldest' else 'newest'
+
+    completed = (
+        Submission.objects.filter(
+            respondent=user,
+            status=Submission.Status.COMPLETED,
+        )
+        .select_related('survey', 'version', 'point_transaction')
+        .prefetch_related('survey__topics')
+        .order_by('completed_at' if sort == 'oldest' else '-completed_at')
+    )
+    page = Paginator(completed, COMPLETED_RESPONSES_PER_PAGE).get_page(
+        request.GET.get('page')
+    )
+    for submission in page:
+        # Reverse one-to-one: absent whenever the completion earned no points
+        # (self-owned survey, collaborator, or an already rewarded survey).
+        transaction_record = getattr(submission, 'point_transaction', None)
+        submission.points_earned = transaction_record.amount if transaction_record else 0
+
+    ongoing_submissions = list(
+        resumable_submissions(user, request.session.session_key)
+    )
+    for submission in ongoing_submissions:
+        submission.question_count = len(
+            presented_question_ids(submission.presentation)
+        )
+        submission.progress_percent = (
+            round(submission.saved_answer_count / submission.question_count * 100)
+            if submission.question_count
+            else 0
+        )
+
+    return render(
+        request,
+        'responses/my_responses.html',
+        {
+            'profile': user.profile,
+            'points_balance': PointTransaction.objects.balance_for(user),
+            'surveys_completed_count': page.paginator.count,
+            'completed_page': page,
+            'ongoing_submissions': ongoing_submissions,
+            'sort': sort,
+        },
+    )
 
 
 def _session_key(request):
@@ -262,24 +322,12 @@ def submission_form(request, submission_id):
                     request.POST,
                 )
             else:
-                with transaction.atomic():
-                    completed_submission = complete_submission(
-                        submission.id,
-                        request.user,
-                        _session_key(request),
-                        request.POST,
-                    )
-                    if not request.user.is_authenticated:
-                        claim, claim_secret = create_guest_claim(
-                            completed_submission.id,
-                            _session_key(request),
-                        )
-                    else:
-                        award_survey_completion(
-                            request.user,
-                            completed_submission,
-                            BASE_COMPLETION_POINTS,
-                        )
+                _, claim, claim_secret = finish_submission(
+                    submission.id,
+                    request.user,
+                    _session_key(request),
+                    request.POST,
+                )
         except ResponseValidationError as error:
             errors = error.errors
         except DuplicateSubmission as error:

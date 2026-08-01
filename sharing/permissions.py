@@ -26,6 +26,13 @@ def role_for(user, survey):
     )
 
 
+def is_collaborator(user, survey):
+    """True when the user holds a shared role on a survey someone else owns."""
+    if not user or not user.is_authenticated:
+        return False
+    return SurveyCollaborator.objects.filter(survey=survey, user=user).exists()
+
+
 def accessible_surveys(user, roles=VIEW_ROLES):
     if not user or not user.is_authenticated or not roles:
         return Survey.objects.none()

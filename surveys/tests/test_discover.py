@@ -102,7 +102,7 @@ class SurveyDiscoveryTests(TestCase):
         )
         self.assertContains(
             response,
-            '<option value="identified" disabled>Identified</option>',
+            '<option value="identified" disabled>Profile shared</option>',
             html=True,
         )
         self.assertNotContains(response, 'Sign in to access identified studies.')
@@ -361,7 +361,7 @@ class SurveyDiscoveryTests(TestCase):
 
         self.assertContains(response, 'data-live-filters')
         self.assertContains(response, 'data-discovery-results')
-        self.assertContains(response, 'css/core/discover.css')
+        self.assertContains(response, 'css/surveys/discover.css')
         self.assertContains(response, 'js/pages/discover.js')
 
     def test_live_filter_request_returns_only_updated_results(self):
@@ -374,7 +374,7 @@ class SurveyDiscoveryTests(TestCase):
             HTTP_X_REQUESTED_WITH='XMLHttpRequest',
         )
 
-        self.assertTemplateUsed(response, 'core/partials/discovery_results.html')
+        self.assertTemplateUsed(response, 'surveys/partials/discover_results.html')
         self.assertContains(response, matching.title)
         self.assertNotContains(response, excluded.title)
         self.assertNotContains(response, 'data-live-filters')

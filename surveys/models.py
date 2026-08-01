@@ -6,6 +6,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.db import models, transaction
 from django.utils.text import slugify
 
+from .branching import Action, Operator
 from .validators import validate_survey_image_size
 
 
@@ -561,72 +562,6 @@ class MatrixRow(models.Model):
         return super().delete(*args, **kwargs)
 
 
-class BranchRule(models.Model):
-    class Operator(models.TextChoices):
-        EQUALS = 'equals', 'Equals'
-        NOT_EQUALS = 'not_equals', 'Does not equal'
-        CONTAINS = 'contains', 'Contains'
-        ANSWERED = 'answered', 'Is answered'
-
-    class Action(models.TextChoices):
-        GO_TO_SECTION = 'go_to_section', 'Go to section'
-        END_SURVEY = 'end_survey', 'End survey'
-
-    # Which conditions actually make sense to evaluate against each answer shape.
-    # e.g. "contains" is meaningless for a single-answer choice, "equals" is
-    # meaningless for a matrix whose answer is one value per row.
-    OPERATORS_BY_QUESTION_TYPE = {
-        Question.Type.SINGLE_CHOICE: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
-        Question.Type.DROPDOWN: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
-        Question.Type.MULTIPLE_CHOICE: (Operator.CONTAINS, Operator.ANSWERED),
-        Question.Type.RANKING: (Operator.ANSWERED,),
-        Question.Type.LIKERT_MATRIX: (Operator.ANSWERED,),
-        Question.Type.SCALE: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
-        Question.Type.NUMBER: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
-        Question.Type.SHORT_TEXT: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.CONTAINS, Operator.ANSWERED),
-        Question.Type.LONG_TEXT: (Operator.CONTAINS, Operator.ANSWERED),
-        Question.Type.DATE: (Operator.EQUALS, Operator.NOT_EQUALS, Operator.ANSWERED),
-    }
-
-    @classmethod
-    def allowed_operators(cls, question_type):
-        return cls.OPERATORS_BY_QUESTION_TYPE.get(question_type, tuple(cls.Operator.values))
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    version = models.ForeignKey(SurveyVersion, on_delete=models.CASCADE, related_name='branch_rules')
-    source_question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='branch_rules')
-    operator = models.CharField(max_length=16, choices=Operator.choices)
-    compare_value = models.CharField(max_length=240, blank=True)
-    action = models.CharField(max_length=20, choices=Action.choices)
-    target_section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='incoming_branch_rules', blank=True, null=True)
-    order = models.PositiveIntegerField()
-
-    class Meta:
-        ordering = ('order',)
-        constraints = [models.UniqueConstraint(fields=('version', 'order'), name='surveys_branch_rule_order_unique')]
-
-    def clean(self):
-        if self.source_question_id and self.source_question.section.version_id != self.version_id:
-            raise ValidationError('Branch question must belong to this survey version.')
-        if self.action == self.Action.GO_TO_SECTION and not self.target_section_id:
-            raise ValidationError('A target section is required for this action.')
-        if self.target_section_id and self.target_section.version_id != self.version_id:
-            raise ValidationError('Branch target must belong to this survey version.')
-
-    def save(self, *args, **kwargs):
-        if self.version_id:
-            status = SurveyVersion.objects.values_list('status', flat=True).get(pk=self.version_id)
-            if status != SurveyVersion.Status.DRAFT:
-                raise ValidationError('Published survey versions are immutable.')
-        self.full_clean()
-        return super().save(*args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        if self.version.status != SurveyVersion.Status.DRAFT:
-            raise ValidationError('Published survey versions are immutable.')
-        return super().delete(*args, **kwargs)
-
-
 class SurveyBranchRule(models.Model):
     """Live branching keyed to stable identities, independent of snapshots."""
 
@@ -641,7 +576,7 @@ class SurveyBranchRule(models.Model):
         on_delete=models.PROTECT,
         related_name='source_branch_rules',
     )
-    operator = models.CharField(max_length=16, choices=BranchRule.Operator.choices)
+    operator = models.CharField(max_length=16, choices=Operator.choices)
     compare_value = models.CharField(max_length=240, blank=True)
     compare_choice_identity = models.ForeignKey(
         ChoiceIdentity,
@@ -650,7 +585,7 @@ class SurveyBranchRule(models.Model):
         blank=True,
         null=True,
     )
-    action = models.CharField(max_length=20, choices=BranchRule.Action.choices)
+    action = models.CharField(max_length=20, choices=Action.choices)
     target_section_identity = models.ForeignKey(
         SectionIdentity,
         on_delete=models.PROTECT,
@@ -675,7 +610,7 @@ class SurveyBranchRule(models.Model):
             and self.source_question_identity.survey_id != self.survey_id
         ):
             raise ValidationError('Branch question must belong to this survey.')
-        if self.action == BranchRule.Action.GO_TO_SECTION and not self.target_section_identity_id:
+        if self.action == Action.GO_TO_SECTION and not self.target_section_identity_id:
             raise ValidationError('A target section is required for this action.')
         if (
             self.target_section_identity_id
@@ -709,119 +644,6 @@ class SurveyBranchRule(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
-
-
-class Quota(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    version = models.ForeignKey(SurveyVersion, on_delete=models.CASCADE, related_name='quotas')
-    name = models.CharField(max_length=120)
-    limit = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-    criteria = models.JSONField(default=dict, blank=True)
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        ordering = ('name',)
-        constraints = [models.UniqueConstraint(fields=('version', 'name'), name='surveys_quota_name_unique')]
-
-    def __str__(self):
-        return self.name
-
-    def save(self, *args, **kwargs):
-        if self.version_id:
-            status = SurveyVersion.objects.values_list('status', flat=True).get(pk=self.version_id)
-            if status != SurveyVersion.Status.DRAFT:
-                raise ValidationError('Published survey versions are immutable.')
-        return super().save(*args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        if self.version.status != SurveyVersion.Status.DRAFT:
-            raise ValidationError('Published survey versions are immutable.')
-        return super().delete(*args, **kwargs)
-
-
-class EligibilityCriteria(models.Model):
-    version = models.OneToOneField(
-        SurveyVersion,
-        on_delete=models.CASCADE,
-        related_name='eligibility_criteria',
-    )
-    min_age = models.PositiveSmallIntegerField(
-        blank=True,
-        null=True,
-        validators=[MaxValueValidator(120)],
-    )
-    max_age = models.PositiveSmallIntegerField(
-        blank=True,
-        null=True,
-        validators=[MaxValueValidator(120)],
-    )
-    education_levels = models.JSONField(default=list, blank=True)
-    countries = models.JSONField(default=list, blank=True)
-    regions = models.JSONField(default=list, blank=True)
-    genders = models.JSONField(default=list, blank=True)
-    employment_statuses = models.JSONField(default=list, blank=True)
-    industries = models.JSONField(default=list, blank=True)
-    income_brackets = models.JSONField(default=list, blank=True)
-    religions = models.JSONField(default=list, blank=True)
-    ethnicities = models.JSONField(default=list, blank=True)
-    languages = models.JSONField(default=list, blank=True)
-
-    class Meta:
-        verbose_name_plural = 'eligibility criteria'
-
-    @property
-    def is_targeted(self):
-        return bool(
-            self.min_age is not None
-            or self.max_age is not None
-            or self.education_levels
-            or self.countries
-            or self.regions
-            or self.genders
-            or self.employment_statuses
-            or self.industries
-            or self.income_brackets
-            or self.religions
-            or self.ethnicities
-            or self.languages
-        )
-
-    def clean(self):
-        from accounts import demographics
-        from accounts.models import Profile
-        from django_countries import countries
-
-        if self.min_age is not None and self.max_age is not None and self.min_age > self.max_age:
-            raise ValidationError({'max_age': 'Maximum age must be at least the minimum age.'})
-        valid_values = {
-            'education_levels': set(Profile.EducationLevel.values),
-            'countries': {code for code, _ in countries},
-            'regions': demographics.valid_subdivision_codes(),
-            'genders': set(Profile.Gender.values),
-            'employment_statuses': set(Profile.EmploymentStatus.values),
-            'industries': demographics.INDUSTRY_VALUES,
-            'income_brackets': demographics.INCOME_VALUES,
-            'religions': demographics.RELIGION_VALUES,
-            'ethnicities': demographics.ETHNICITY_VALUES,
-            'languages': demographics.LANGUAGE_VALUES,
-        }
-        for field_name, allowed in valid_values.items():
-            values = getattr(self, field_name)
-            if not isinstance(values, list) or not set(values).issubset(allowed):
-                raise ValidationError({field_name: 'Select only supported eligibility values.'})
-
-    def save(self, *args, **kwargs):
-        if self.version_id:
-            status = SurveyVersion.objects.values_list('status', flat=True).get(pk=self.version_id)
-            if status != SurveyVersion.Status.DRAFT:
-                raise ValidationError('Published survey versions are immutable.')
-        self.full_clean()
-        return super().save(*args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        if self.version.status != SurveyVersion.Status.DRAFT:
-            raise ValidationError('Published survey versions are immutable.')
-        return super().delete(*args, **kwargs)
 
 
 class SurveyEligibilityCriteria(models.Model):

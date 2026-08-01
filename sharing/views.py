@@ -7,7 +7,7 @@ from django.views.decorators.http import require_POST
 
 from surveys.models import Survey
 
-from .invitations import (
+from .collaborator_invitations import (
     accept_collaborator_invitation,
     create_collaborator_invitation,
     deliver_collaborator_invitation,

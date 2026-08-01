@@ -1,17 +1,33 @@
+import copy
 from urllib.parse import urlparse
 
 from django.conf import settings
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 
-class GoogleAuthenticationTests(TestCase):
-    def test_google_provider_uses_required_environment_configuration(self):
-        app = settings.SOCIALACCOUNT_PROVIDERS['google']['APP']
+def _providers_with_placeholder_credentials():
+    """The project's real provider settings with placeholder secrets substituted in.
 
-        self.assertTrue(app['client_id'])
-        self.assertTrue(app['secret'])
-        self.assertEqual(app['key'], '')
+    Everything except the credentials still comes from settings.py, so these tests cover the
+    actual OAuth configuration without requiring a populated .env on CI or a clean checkout.
+    """
+    providers = copy.deepcopy(settings.SOCIALACCOUNT_PROVIDERS)
+    providers['google']['APP'].update(client_id='test-client-id', secret='test-secret')
+    return providers
+
+
+@override_settings(SOCIALACCOUNT_PROVIDERS=_providers_with_placeholder_credentials())
+class GoogleAuthenticationTests(TestCase):
+    def test_google_provider_requests_pkce_and_only_basic_scopes(self):
+        provider = settings.SOCIALACCOUNT_PROVIDERS['google']
+
+        self.assertEqual(provider['SCOPE'], ['profile', 'email'])
+        self.assertEqual(provider['AUTH_PARAMS'], {'access_type': 'online'})
+        self.assertTrue(provider['OAUTH_PKCE_ENABLED'])
+        self.assertTrue(provider['EMAIL_AUTHENTICATION'])
+        # Google authenticates with client_id/secret alone, so `key` stays empty.
+        self.assertEqual(provider['APP']['key'], '')
 
     def test_login_and_signup_offer_google_authentication(self):
         for url_name in ('account_login', 'account_signup'):

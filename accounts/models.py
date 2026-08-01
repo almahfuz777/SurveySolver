@@ -50,11 +50,9 @@ class User(AbstractUser):
 
 class Profile(models.Model):
     class Gender(models.TextChoices):
-        WOMAN = 'woman', 'Woman'
         MAN = 'man', 'Man'
-        NON_BINARY = 'non_binary', 'Non-binary'
-        SELF_DESCRIBE = 'self_describe', 'Prefer to self-describe'
-        PREFER_NOT_TO_SAY = 'prefer_not_to_say', 'Prefer not to say'
+        WOMAN = 'woman', 'Woman'
+        OTHER = 'other', 'Other'
 
     class EducationLevel(models.TextChoices):
         SECONDARY = 'secondary', 'Secondary school'
@@ -93,7 +91,6 @@ class Profile(models.Model):
     )
     birth_date = models.DateField(blank=True, null=True, validators=[validate_birth_date])
     gender = models.CharField(max_length=20, choices=Gender.choices, blank=True)
-    gender_self_description = models.CharField(max_length=80, blank=True)
     country = CountryField(blank=True)
     region = models.CharField(max_length=10, blank=True)
     education_level = models.CharField(
@@ -165,10 +162,7 @@ class Profile(models.Model):
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
             'birth_date': self.birth_date,
-            'gender': self.gender and (
-                self.gender != self.Gender.SELF_DESCRIBE
-                or self.gender_self_description.strip()
-            ),
+            'gender': self.gender,
             'country': self.country,
             'education_level': self.education_level,
             'field_of_study': self.field_of_study,

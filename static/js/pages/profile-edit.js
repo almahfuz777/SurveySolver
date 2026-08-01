@@ -69,16 +69,6 @@
         sync();
     })();
 
-    /* --- Show self-describe only for that gender ----------------------- */
-    (function genderSelfDescribe() {
-        const select = document.querySelector('[data-gender-select]');
-        const field = document.querySelector('[data-selfdescribe-field]');
-        if (!select || !field) return;
-        const sync = () => { field.hidden = select.value !== 'self_describe'; };
-        select.addEventListener('change', sync);
-        sync();
-    })();
-
     /* --- Searchable multi-select chips (languages) --------------------- */
     document.querySelectorAll('[data-country-select]').forEach((wrapper) => {
         const search = wrapper.querySelector('[data-country-search]');

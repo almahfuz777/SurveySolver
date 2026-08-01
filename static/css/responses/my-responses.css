@@ -21,7 +21,7 @@
     color: var(--text-muted);
 }
 
-/* `core/partials/resumable_surveys.html` is a full-width band on Discover; here
+/* `responses/partials/resumable_surveys.html` is a full-width band on Discover; here
    it sits inside this page's shell, so its own wrappers are neutralised. */
 .responses-content .resume-section {
     padding-block: 0 1.5rem;

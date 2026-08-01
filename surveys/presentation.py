@@ -2,7 +2,8 @@ import hashlib
 import json
 import random
 
-from .models import BranchRule, Question, SurveyBranchRule
+from .branching import Action
+from .models import Question, SurveyBranchRule
 
 
 def _stable_json(value):
@@ -102,7 +103,7 @@ def resolved_branch_rules(version):
         target = section_map.get(rule.target_section_identity_id)
         if source is None:
             continue
-        if rule.action == BranchRule.Action.GO_TO_SECTION and target is None:
+        if rule.action == Action.GO_TO_SECTION and target is None:
             continue
         compare_choice = choice_map.get(rule.compare_choice_identity_id)
         compare_value = (

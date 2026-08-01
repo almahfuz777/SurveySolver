@@ -1,12 +1,10 @@
 from django.db import transaction
 
 from responses.models import Submission
-from sharing.models import SurveyCollaborator
+from sharing.permissions import is_collaborator
 
 from .models import PointTransaction
-
-
-PROFILE_COMPLETION_BONUS = 50
+from .policy import PROFILE_COMPLETION_BONUS
 
 
 @transaction.atomic
@@ -33,7 +31,7 @@ def award_survey_completion(user, submission, points):
         submission.status != Submission.Status.COMPLETED
         or not submission.is_eligible
         or user.id == submission.survey.owner_id
-        or SurveyCollaborator.objects.filter(survey=submission.survey, user=user).exists()
+        or is_collaborator(user, submission.survey)
         or (submission.respondent_id and submission.respondent_id != user.id)
     ):
         return None, False
@@ -53,3 +51,8 @@ def award_survey_completion(user, submission, points):
             },
         },
     )
+
+
+def detach_survey_transactions(survey):
+    """Unlink a survey's point transactions so the ledger survives its deletion."""
+    PointTransaction.objects.filter(survey=survey).update(survey=None)

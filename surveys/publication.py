@@ -6,8 +6,8 @@ from django.utils import timezone
 
 from sharing.permissions import EDIT_ROLES, accessible_surveys
 
+from .branching import Action
 from .models import (
-    BranchRule,
     ChoiceIdentity,
     MatrixRow,
     MatrixRowIdentity,
@@ -70,7 +70,7 @@ def branch_cycle_sections(version):
     edges = {}
     for rule in resolved_branch_rules(version):
         if (
-            rule['action'] == BranchRule.Action.GO_TO_SECTION
+            rule['action'] == Action.GO_TO_SECTION
             and rule['target_section_id']
         ):
             edges.setdefault(rule['source_section_id'], set()).add(
@@ -334,7 +334,7 @@ def discard_draft_changes(survey_id, user, expected_revision):
 
 @transaction.atomic
 def delete_retired_version(survey_id, version_id, user):
-    from responses.models import ResponseAuditEvent, Submission
+    from responses.deletion import purge_version_responses
 
     survey = accessible_surveys(user, {'owner'}).select_for_update().get(id=survey_id)
     version = SurveyVersion.objects.select_for_update().get(
@@ -342,32 +342,6 @@ def delete_retired_version(survey_id, version_id, user):
         survey=survey,
         status=SurveyVersion.Status.RETIRED,
     )
-    submissions = list(
-        Submission.objects.select_for_update().filter(version=version)
-    )
-    ResponseAuditEvent.objects.bulk_create(
-        [
-            ResponseAuditEvent(
-                survey=survey,
-                submission_id=submission.id,
-                actor=user,
-                action=ResponseAuditEvent.Action.DELETED,
-                metadata={
-                    'version_id': str(version.id),
-                    'version_number': version.number,
-                    'status': submission.status,
-                    'source': submission.source,
-                    'completed_at': (
-                        submission.completed_at.isoformat()
-                        if submission.completed_at
-                        else None
-                    ),
-                    'reason': 'retired_version_deleted',
-                },
-            )
-            for submission in submissions
-        ]
-    )
-    Submission.objects.filter(version=version).delete()
+    response_count = purge_version_responses(version, user)
     SurveyVersion.objects.filter(pk=version.pk).delete()
-    return len(submissions)
+    return response_count

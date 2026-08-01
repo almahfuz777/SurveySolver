@@ -20,15 +20,32 @@ from django.contrib import admin
 from django.urls import include, path
 
 urlpatterns = [
+    # Public pages
     path('', include('core.urls')),
-    path('', include('responses.urls')),
-    path('', include('sharing.urls')),
-    path('rewards/', include('rewards.urls')),
+    path('discover/', include('surveys.discover_urls')),
+
+    # Managing an owned survey or as a collaborator
     path('surveys/', include('surveys.urls')),
+    path('surveys/', include('responses.creator_urls')),
+    path('surveys/', include('sharing.urls')),
+
+    # Answering a survey
+    path('s/', include('responses.public_urls')),
+    path('responses/', include('responses.urls')),
+    path('my-responses/', include('responses.history_urls')),
+
+    # Accepting a tokenised invitation
+    path('collaborate/', include('sharing.collaborate_urls')),
+    path('invitation/', include('sharing.invitation_urls')),
+
+    path('rewards/', include('rewards.urls')),
     path('analytics/', include('analytics.urls')),
-    path('admin/', admin.site.urls),
+
+    # Ours first: allauth owns every other accounts/ path (login, signup, password reset).
     path('accounts/', include('accounts.urls')),
     path('accounts/', include('allauth.urls')),
+
+    path('admin/', admin.site.urls),
 ]
 
 if settings.DEBUG:

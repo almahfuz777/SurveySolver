@@ -3,7 +3,8 @@ from django.test import TestCase
 
 from surveys import services
 from surveys.forms import BranchRuleForm, EligibilityCriteriaForm, QuestionEditorForm, ResponseLimitForm
-from surveys.models import BranchRule, Question, Survey
+from surveys.branching import Action, Operator
+from surveys.models import Question, Survey
 
 
 class AdvancedLogicTests(TestCase):
@@ -58,9 +59,9 @@ class AdvancedLogicTests(TestCase):
         branch_form = BranchRuleForm(
             data={
                 'source_question': question.id,
-                'operator': BranchRule.Operator.EQUALS,
+                'operator': Operator.EQUALS,
                 'compare_value': 'Option 1',
-                'action': BranchRule.Action.GO_TO_SECTION,
+                'action': Action.GO_TO_SECTION,
                 'target_section': second_section.id,
             },
             version=self.version,

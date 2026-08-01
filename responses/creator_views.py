@@ -27,7 +27,7 @@ from .exports import (
     response_sheet_questions,
 )
 from .forms import ResponseFilterForm, ResponseSheetFilterForm
-from .management import permanently_delete_submission
+from .deletion import permanently_delete_submission
 from .models import Submission
 
 

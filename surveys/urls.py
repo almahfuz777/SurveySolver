@@ -1,7 +1,6 @@
 from django.urls import path
 
-from . import views
-from responses import creator_views
+from . import builder_views, views
 
 
 urlpatterns = [
@@ -22,24 +21,18 @@ urlpatterns = [
     path('<uuid:survey_id>/draft/discard/', views.survey_discard_draft, name='survey_discard_draft'),
     path('<uuid:survey_id>/versions/<uuid:version_id>/restore/', views.survey_version_restore, name='survey_version_restore'),
     path('<uuid:survey_id>/versions/<uuid:version_id>/delete/', views.survey_version_delete, name='survey_version_delete'),
-    path('<uuid:survey_id>/responses/', creator_views.response_list, name='creator_response_list'),
-    path('<uuid:survey_id>/responses/export.csv', creator_views.response_export_csv, name='response_export_csv'),
-    path('<uuid:survey_id>/responses/export.json', creator_views.response_export_json, name='response_export_json'),
-    path('<uuid:survey_id>/responses/export.xlsx', creator_views.response_export_excel, name='response_export_excel'),
-    path('<uuid:survey_id>/responses/<uuid:submission_id>/', creator_views.response_detail, name='creator_response_detail'),
-    path('<uuid:survey_id>/responses/<uuid:submission_id>/delete/', creator_views.response_delete, name='creator_response_delete'),
-    path('<uuid:survey_id>/builder/', views.survey_builder, name='survey_builder'),
-    path('<uuid:survey_id>/preview/', views.survey_preview, name='survey_preview'),
-    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/branches/add/', views.question_branch_add, name='question_branch_add'),
-    path('<uuid:survey_id>/builder/branches/<uuid:rule_id>/delete/', views.question_branch_delete, name='question_branch_delete'),
-    path('<uuid:survey_id>/builder/sections/add/', views.section_add, name='section_add'),
-    path('<uuid:survey_id>/builder/sections/<uuid:section_id>/update/', views.section_update, name='section_update'),
-    path('<uuid:survey_id>/builder/sections/<uuid:section_id>/move/', views.section_move, name='section_move'),
-    path('<uuid:survey_id>/builder/sections/<uuid:section_id>/delete/', views.section_delete, name='section_delete'),
-    path('<uuid:survey_id>/builder/questions/add/', views.question_add, name='question_add'),
-    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/duplicate/', views.question_duplicate, name='question_duplicate'),
-    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/reorder/', views.question_reorder, name='question_reorder'),
-    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/update/', views.question_update, name='question_update'),
-    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/move/', views.question_move, name='question_move'),
-    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/delete/', views.question_delete, name='question_delete'),
+    path('<uuid:survey_id>/builder/', builder_views.survey_builder, name='survey_builder'),
+    path('<uuid:survey_id>/preview/', builder_views.survey_preview, name='survey_preview'),
+    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/branches/add/', builder_views.question_branch_add, name='question_branch_add'),
+    path('<uuid:survey_id>/builder/branches/<uuid:rule_id>/delete/', builder_views.question_branch_delete, name='question_branch_delete'),
+    path('<uuid:survey_id>/builder/sections/add/', builder_views.section_add, name='section_add'),
+    path('<uuid:survey_id>/builder/sections/<uuid:section_id>/update/', builder_views.section_update, name='section_update'),
+    path('<uuid:survey_id>/builder/sections/<uuid:section_id>/move/', builder_views.section_move, name='section_move'),
+    path('<uuid:survey_id>/builder/sections/<uuid:section_id>/delete/', builder_views.section_delete, name='section_delete'),
+    path('<uuid:survey_id>/builder/questions/add/', builder_views.question_add, name='question_add'),
+    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/duplicate/', builder_views.question_duplicate, name='question_duplicate'),
+    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/reorder/', builder_views.question_reorder, name='question_reorder'),
+    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/update/', builder_views.question_update, name='question_update'),
+    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/move/', builder_views.question_move, name='question_move'),
+    path('<uuid:survey_id>/builder/questions/<uuid:question_id>/delete/', builder_views.question_delete, name='question_delete'),
 ]

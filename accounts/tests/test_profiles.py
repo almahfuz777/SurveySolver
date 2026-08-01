@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from accounts.models import Profile
 from rewards.models import PointTransaction
 
 
@@ -34,8 +35,7 @@ class ProfileTests(TestCase):
             'first_name': 'Amina',
             'last_name': 'Rahman',
             'birth_date': date(2000, 4, 8).isoformat(),
-            'gender': 'prefer_not_to_say',
-            'gender_self_description': '',
+            'gender': 'other',
             'country': 'BD',
             'education_level': 'postgraduate',
             'field_of_study': 'computer_science',
@@ -106,13 +106,8 @@ class ProfileTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Choose a region inside your selected country.')
 
-    def test_self_described_gender_requires_description(self):
-        self.client.force_login(self.user)
-
-        response = self.client.post(
-            reverse('profile_edit'),
-            {'gender': 'self_describe', 'gender_self_description': ''},
+    def test_gender_choices_are_limited_to_man_woman_and_other(self):
+        self.assertEqual(
+            list(Profile.Gender.choices),
+            [('man', 'Man'), ('woman', 'Woman'), ('other', 'Other')],
         )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Describe your gender or choose another option.')

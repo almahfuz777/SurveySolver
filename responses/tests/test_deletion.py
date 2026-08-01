@@ -8,7 +8,7 @@ from rewards.models import GuestRewardClaim, PointTransaction
 from surveys.models import Question, Survey
 from surveys.publication import publish_survey
 
-from responses.management import permanently_delete_submission
+from responses.deletion import permanently_delete_submission
 from responses.models import ResponseAuditEvent, Submission
 
 

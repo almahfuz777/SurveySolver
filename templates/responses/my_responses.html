@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}My responses | SurveySolver{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/core/resumable.css' %}"><link rel="stylesheet" href="{% static 'css/core/my-responses.css' %}">{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/responses/resumable.css' %}"><link rel="stylesheet" href="{% static 'css/responses/my-responses.css' %}">{% endblock %}
 
 {% block content %}
 <section class="page-heading">
@@ -35,7 +35,7 @@
             </article>
         </div>
 
-        {% include 'core/partials/resumable_surveys.html' %}
+        {% include 'responses/partials/resumable_surveys.html' %}
 
         <div class="responses-grid">
             <div class="responses-main">
