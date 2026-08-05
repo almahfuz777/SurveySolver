@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.http import QueryDict
 from django.test import TestCase
 
-from surveys.models import MatrixRow, Question, QuestionChoice, Survey
+from surveys.models import MatrixRow, Question, QuestionChoice, QuestionIdentity, Survey
 
 from responses.services import normalize_answer
 
@@ -17,18 +17,21 @@ class AnswerNormalizationTests(TestCase):
         )
         self.section = survey.draft_version.sections.get()
 
-    def question(self, question_type, **kwargs):
-        return Question.objects.create(
+    def question(self, question_type, required=False, **kwargs):
+        question = Question.objects.create(
             section=self.section,
             type=question_type,
             prompt=f'{question_type} question',
-            order=self.section.questions.count() + 1,
             **kwargs,
         )
+        if required:
+            QuestionIdentity.objects.filter(pk=question.identity_id).update(required=True)
+            question.refresh_from_db()
+        return question
 
     def choices(self, question, labels):
         return [
-            QuestionChoice.objects.create(question=question, label=label, order=index)
+            QuestionChoice.objects.create(question=question, label=label,)
             for index, label in enumerate(labels, start=1)
         ]
 
@@ -72,7 +75,7 @@ class AnswerNormalizationTests(TestCase):
         matrix = self.question(Question.Type.LIKERT_MATRIX, required=True)
         choices = self.choices(matrix, ['Agree', 'Disagree'])
         rows = [
-            MatrixRow.objects.create(question=matrix, label=label, order=index)
+            MatrixRow.objects.create(question=matrix, label=label,)
             for index, label in enumerate(['Statement one', 'Statement two'], start=1)
         ]
         data = QueryDict('', mutable=True)

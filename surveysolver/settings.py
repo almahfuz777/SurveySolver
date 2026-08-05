@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'accounts',
     'analytics',
     'core',
+    'discover',
     'rewards',
     'responses',
     'sharing',

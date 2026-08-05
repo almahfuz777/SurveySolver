@@ -33,8 +33,8 @@ class SurveyAdmin(admin.ModelAdmin):
 class SectionInline(admin.TabularInline):
     model = Section
     extra = 0
-    # `order` is a legacy snapshot field; live ordering lives on SectionIdentity
-    # and is resolved at read time, so editing it here has no effect.
+    # Ordering and randomization live on SectionIdentity, so a snapshot row only
+    # offers the content that belongs to this version.
     fields = ('title',)
 
 
@@ -59,9 +59,8 @@ class MatrixRowInline(admin.TabularInline):
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    # `order`/`required` are legacy snapshot fields; the live values live on
-    # QuestionIdentity and are resolved at read time. Keep them out of the
-    # editable admin surface so it can't imply an effect they no longer have.
+    # Placement, required state and randomization live on QuestionIdentity, so a
+    # snapshot row only offers the content that belongs to this version.
     list_display = ('prompt', 'type', 'section')
     list_filter = ('type',)
     search_fields = ('prompt', 'section__version__survey__title')

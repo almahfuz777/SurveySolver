@@ -1,0 +1,55 @@
+/* Pill select (topics, genders, education, employment) */
+/* Rendered by core.widgets.PillCheckboxSelectMultiple, so both the survey targeting rules
+   and the respondent profile form load these styles. */
+.pill-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.pill-select label {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.45rem 0.8rem;
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: var(--ink-800);
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.pill-select label input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.pill-select label:has(input:checked) {
+    color: #fff;
+    font-weight: 600;
+    background: var(--brand-strong);
+    border-color: var(--brand-strong);
+}
+
+.pill-select label input:focus-visible {
+    outline: none;
+}
+
+.pill-select label:has(input:focus-visible) {
+    outline: 2px solid var(--indigo-500);
+    outline-offset: 2px;
+}
+
+.pill-select label:has(input:disabled) {
+    opacity: 0.4;
+    cursor: not-allowed;
+}

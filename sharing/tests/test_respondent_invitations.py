@@ -35,8 +35,6 @@ class RespondentInvitationTests(TestCase):
             section=draft.sections.get(),
             type=Question.Type.SHORT_TEXT,
             prompt='What supports your learning?',
-            required=True,
-            order=1,
         )
         self.published, _ = publish_survey(
             self.survey.id,

@@ -51,10 +51,12 @@ def normalize_answer(
             if data.get(f'{name}_{row_id}', '')
         }
 
+    # The stored presentation is the authority for a live submission; without one the
+    # caller is validating against the current draft, so read the live identity.
     required = (
         presentation_data.get('required', False)
         if presentation_data is not None
-        else question.required
+        else question.identity.required
     )
     if _empty(raw_value):
         if required and enforce_required:

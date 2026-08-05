@@ -14,7 +14,7 @@ class Submission(models.Model):
 
     class Source(models.TextChoices):
         DIRECT = 'direct', 'Direct link'
-        DISCOVERY = 'discovery', 'Survey discovery'
+        DISCOVER = 'discover', 'Survey discover'
         INVITATION = 'invitation', 'Respondent invitation'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -124,7 +124,10 @@ class Answer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ('question__section__order', 'question__order')
+        ordering = (
+            'question__identity__section_identity__order',
+            'question__identity__order',
+        )
         constraints = [
             models.UniqueConstraint(
                 fields=('submission', 'question'),

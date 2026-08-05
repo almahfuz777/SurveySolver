@@ -26,7 +26,6 @@ class ResponseManagementTests(TestCase):
             section=draft.sections.get(),
             type=Question.Type.SHORT_TEXT,
             prompt='Question',
-            order=1,
         )
         self.version, _ = publish_survey(self.survey.id, self.owner, draft.revision)
         self.submission = Submission.objects.create(

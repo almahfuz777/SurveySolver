@@ -24,6 +24,11 @@ survey_image_validators = [
 ]
 
 
+def next_order(identities):
+    """The order value that appends to the end of an identity queryset."""
+    return (identities.aggregate(highest=models.Max('order'))['highest'] or 0) + 1
+
+
 class Topic(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=80, unique=True)
@@ -362,17 +367,9 @@ class Section(models.Model):
     )
     title = models.CharField(max_length=160, default='Untitled section')
     description = models.TextField(blank=True)
-    order = models.PositiveIntegerField()
-    randomize_questions = models.BooleanField(default=False)
 
     class Meta:
-        ordering = ('order',)
-        constraints = [
-            models.UniqueConstraint(
-                fields=('version', 'order'),
-                name='surveys_section_order_unique',
-            ),
-        ]
+        ordering = ('identity__order',)
 
     def __str__(self):
         return self.title
@@ -386,8 +383,9 @@ class Section(models.Model):
         if not self.identity_id and self.version_id:
             self.identity = SectionIdentity.objects.create(
                 survey_id=self.version.survey_id,
-                order=self.order,
-                randomize_questions=self.randomize_questions,
+                order=next_order(
+                    SectionIdentity.objects.filter(survey_id=self.version.survey_id)
+                ),
             )
         self._ensure_editable()
         return super().save(*args, **kwargs)
@@ -420,19 +418,10 @@ class Question(models.Model):
     type = models.CharField(max_length=24, choices=Type.choices)
     prompt = models.CharField(max_length=500)
     help_text = models.CharField(max_length=300, blank=True)
-    required = models.BooleanField(default=False)
-    randomize_choices = models.BooleanField(default=False)
-    order = models.PositiveIntegerField()
     config = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ('order',)
-        constraints = [
-            models.UniqueConstraint(
-                fields=('section', 'order'),
-                name='surveys_question_order_unique',
-            ),
-        ]
+        ordering = ('identity__order',)
 
     @property
     def accepts_choices(self):
@@ -462,12 +451,11 @@ class Question(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.identity_id and self.section_id:
+            section_identity = self.section.identity
             self.identity = QuestionIdentity.objects.create(
                 survey_id=self.section.version.survey_id,
-                section_identity=self.section.identity,
-                order=self.order,
-                required=self.required,
-                randomize_choices=self.randomize_choices,
+                section_identity=section_identity,
+                order=next_order(section_identity.question_identities),
             )
         self._ensure_editable()
         return super().save(*args, **kwargs)
@@ -486,16 +474,9 @@ class QuestionChoice(models.Model):
         related_name='snapshots',
     )
     label = models.CharField(max_length=240)
-    order = models.PositiveIntegerField()
 
     class Meta:
-        ordering = ('order',)
-        constraints = [
-            models.UniqueConstraint(
-                fields=('question', 'order'),
-                name='surveys_choice_order_unique',
-            ),
-        ]
+        ordering = ('identity__order',)
 
     def __str__(self):
         return self.label
@@ -511,10 +492,11 @@ class QuestionChoice(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.identity_id and self.question_id:
+            question_identity = self.question.identity
             self.identity = ChoiceIdentity.objects.create(
                 survey_id=self.question.section.version.survey_id,
-                question_identity=self.question.identity,
-                order=self.order,
+                question_identity=question_identity,
+                order=next_order(question_identity.choice_identities),
             )
         self._ensure_editable()
         return super().save(*args, **kwargs)
@@ -533,11 +515,9 @@ class MatrixRow(models.Model):
         related_name='snapshots',
     )
     label = models.CharField(max_length=240)
-    order = models.PositiveIntegerField()
 
     class Meta:
-        ordering = ('order',)
-        constraints = [models.UniqueConstraint(fields=('question', 'order'), name='surveys_matrix_row_order_unique')]
+        ordering = ('identity__order',)
 
     def __str__(self):
         return self.label
@@ -549,10 +529,11 @@ class MatrixRow(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.identity_id and self.question_id:
+            question_identity = self.question.identity
             self.identity = MatrixRowIdentity.objects.create(
                 survey_id=self.question.section.version.survey_id,
-                question_identity=self.question.identity,
-                order=self.order,
+                question_identity=question_identity,
+                order=next_order(question_identity.matrix_row_identities),
             )
         self._ensure_editable()
         return super().save(*args, **kwargs)

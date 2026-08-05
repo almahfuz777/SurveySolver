@@ -7,7 +7,7 @@ from django.utils import timezone
 from responses.models import ResponseAuditEvent, Submission
 from rewards.models import PointTransaction
 from surveys import services
-from surveys.forms import SurveyMetadataForm
+from surveys.builder.forms import SurveyMetadataForm
 from surveys.models import Question, Survey, Topic
 from surveys.publication import publish_survey
 from surveys.validators import MAX_SURVEY_IMAGE_SIZE, validate_survey_image_size
@@ -52,7 +52,6 @@ class SurveyManagementTests(TestCase):
             section=section,
             type=Question.Type.SHORT_TEXT,
             prompt='Your name?',
-            order=1,
         )
 
         self.client.get(reverse('survey_list'))
@@ -154,7 +153,6 @@ class SurveyManagementTests(TestCase):
             section=draft.sections.get(),
             type=Question.Type.SHORT_TEXT,
             prompt='Question',
-            order=1,
         )
         version, _ = publish_survey(survey.id, self.user, draft.revision)
         submission = Submission.objects.create(

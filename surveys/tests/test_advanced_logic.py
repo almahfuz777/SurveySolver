@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from surveys import services
-from surveys.forms import BranchRuleForm, EligibilityCriteriaForm, QuestionEditorForm, ResponseLimitForm
+from surveys.builder.forms import BranchRuleForm, EligibilityCriteriaForm, QuestionEditorForm, ResponseLimitForm
 from surveys.branching import Action, Operator
 from surveys.models import Question, Survey
 

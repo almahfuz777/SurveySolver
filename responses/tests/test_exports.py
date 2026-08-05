@@ -31,8 +31,6 @@ class ResponseExportTests(TestCase):
             section=draft.sections.get(),
             type=Question.Type.LONG_TEXT,
             prompt='Describe your experience',
-            required=True,
-            order=1,
         )
         self.version, _ = publish_survey(self.survey.id, self.owner, draft.revision)
         self.survey.refresh_from_db()

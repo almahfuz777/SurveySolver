@@ -28,11 +28,9 @@ class SurveyAnalyticsDashboardTests(TestCase):
             section=draft.sections.get(),
             type=Question.Type.SINGLE_CHOICE,
             prompt='Preferred study setting?',
-            required=True,
-            order=1,
         )
-        QuestionChoice.objects.create(question=question, label='Library', order=1)
-        QuestionChoice.objects.create(question=question, label='Home', order=2)
+        QuestionChoice.objects.create(question=question, label='Library',)
+        QuestionChoice.objects.create(question=question, label='Home',)
         self.version, _ = publish_survey(self.survey.id, self.owner, draft.revision)
         self.survey.refresh_from_db()
         self.question = self.version.sections.get().questions.get()

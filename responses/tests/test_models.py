@@ -21,7 +21,6 @@ class SubmissionModelTests(TestCase):
             section=self.version.sections.get(),
             type=Question.Type.SHORT_TEXT,
             prompt='Question',
-            order=1,
         )
 
     def test_submission_version_must_belong_to_survey(self):
@@ -52,7 +51,7 @@ class SubmissionModelTests(TestCase):
             completed_at=timezone.now(),
         )
         submission.refresh_from_db()
-        submission.source = Submission.Source.DISCOVERY
+        submission.source = Submission.Source.DISCOVER
 
         with self.assertRaisesMessage(ValidationError, 'immutable'):
             submission.save()

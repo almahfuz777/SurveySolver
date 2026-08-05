@@ -82,12 +82,12 @@ class LivePresentationVersioningTests(TestCase):
         return question, revision
 
     def test_live_controls_change_both_presentations_without_mutating_snapshots(self):
-        active_questions = list(
-            self.active.sections.get().questions.order_by('order')
-        )
-        draft_questions = list(self.draft.sections.get().questions.order_by('order'))
-        active_legacy = [(item.id, item.order, item.required) for item in active_questions]
-        draft_legacy = [(item.id, item.order, item.required) for item in draft_questions]
+        # Keyed by id, not by live order: the point is that the snapshot rows keep their
+        # content, while the order they resolve in is expected to follow the identities.
+        active_questions = list(self.active.sections.get().questions.order_by('id'))
+        draft_questions = list(self.draft.sections.get().questions.order_by('id'))
+        active_content = [(item.id, item.prompt, item.section_id) for item in active_questions]
+        draft_content = [(item.id, item.prompt, item.section_id) for item in draft_questions]
         signature = questionnaire_signature(self.active)
 
         draft_second, revision = self._update_second(required=True)
@@ -99,17 +99,17 @@ class LivePresentationVersioningTests(TestCase):
         self.assertEqual(publication_intent(self.survey, self.draft)['action'], 'unchanged')
         self.assertEqual(
             [
-                (item.id, item.order, item.required)
-                for item in self.active.sections.get().questions.order_by('order')
+                (item.id, item.prompt, item.section_id)
+                for item in self.active.sections.get().questions.order_by('id')
             ],
-            active_legacy,
+            active_content,
         )
         self.assertEqual(
             [
-                (item.id, item.order, item.required)
-                for item in self.draft.sections.get().questions.order_by('order')
+                (item.id, item.prompt, item.section_id)
+                for item in self.draft.sections.get().questions.order_by('id')
             ],
-            draft_legacy,
+            draft_content,
         )
         resolved_active = [
             question
@@ -388,17 +388,17 @@ class LivePresentationVersioningTests(TestCase):
 
         self.assertFalse(diff['has_changes'])
 
-    def test_swapping_a_choice_keeps_snapshot_orders_unique(self):
+    def test_swapping_a_choice_renumbers_the_surviving_identities(self):
         section = self.draft.sections.get()
         question, revision = services.add_question(
             section.id,
             Question.Type.SINGLE_CHOICE,
             self.draft.revision,
         )
-        kept, dropped = list(question.choices.order_by('order'))
+        kept, dropped = list(question.choices.order_by('identity__order'))
 
-        # Drop one option and add another in the same save — the new row would
-        # otherwise collide with the not-yet-deleted row's snapshot order.
+        # Drop one option and add another in the same save, so the survivor keeps its
+        # identity while the replacement takes the free position after it.
         services.update_question(
             question.id,
             revision,
@@ -416,8 +416,11 @@ class LivePresentationVersioningTests(TestCase):
         )
 
         question.refresh_from_db()
-        labels = [choice.label for choice in question.choices.order_by('order')]
-        orders = [choice.order for choice in question.choices.order_by('order')]
+        labels = [choice.label for choice in question.choices.order_by('identity__order')]
+        orders = [
+            choice.identity.order
+            for choice in question.choices.order_by('identity__order')
+        ]
         self.assertEqual(labels, ['Kept option', 'Fresh option'])
         self.assertEqual(orders, [1, 2])
         self.assertFalse(question.choices.filter(identity_id=dropped.identity_id).exists())

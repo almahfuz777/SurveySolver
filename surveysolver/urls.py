@@ -22,7 +22,7 @@ from django.urls import include, path
 urlpatterns = [
     # Public pages
     path('', include('core.urls')),
-    path('discover/', include('surveys.discover_urls')),
+    path('discover/', include('discover.urls')),
 
     # Managing an owned survey or as a collaborator
     path('surveys/', include('surveys.urls')),

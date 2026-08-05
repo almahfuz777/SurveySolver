@@ -19,5 +19,4 @@ def create_initial_survey_version(sender, instance, created, **kwargs):
         version=version,
         identity=identity,
         title='Section 1',
-        order=1,
     )

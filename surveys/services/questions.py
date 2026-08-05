@@ -58,13 +58,11 @@ def add_question(section_id, question_type, expected_revision, after_order=None)
         section_identity=section_identity,
         order=order,
     )
-    legacy_order = (section.questions.aggregate(max_order=Max('order'))['max_order'] or 0) + 1
     question = Question.objects.create(
         section=section,
         identity=identity,
         type=question_type,
         prompt='Untitled question',
-        order=legacy_order,
         config=config,
     )
     for index, label in enumerate(choices, 1):
@@ -77,7 +75,6 @@ def add_question(section_id, question_type, expected_revision, after_order=None)
             question=question,
             identity=choice_identity,
             label=label,
-            order=index,
         )
     for index, label in enumerate(rows, 1):
         row_identity = MatrixRowIdentity.objects.create(
@@ -89,7 +86,6 @@ def add_question(section_id, question_type, expected_revision, after_order=None)
             question=question,
             identity=row_identity,
             label=label,
-            order=index,
         )
     return question, _bump_revision(version)
 
@@ -115,16 +111,12 @@ def duplicate_question(question_id, expected_revision):
         required=original.identity.required,
         randomize_choices=original.identity.randomize_choices,
     )
-    legacy_order = (section.questions.aggregate(max_order=Max('order'))['max_order'] or 0) + 1
     clone = Question.objects.create(
         section=section,
         identity=identity,
         type=original.type,
         prompt=original.prompt,
         help_text=original.help_text,
-        required=False,
-        randomize_choices=False,
-        order=legacy_order,
         config=original.config,
     )
     for choice in original.choices.select_related('identity').all():
@@ -137,7 +129,6 @@ def duplicate_question(question_id, expected_revision):
             question=clone,
             identity=choice_identity,
             label=choice.label,
-            order=choice.order,
         )
     for row in original.matrix_rows.select_related('identity').all():
         row_identity = MatrixRowIdentity.objects.create(
@@ -149,7 +140,6 @@ def duplicate_question(question_id, expected_revision):
             question=clone,
             identity=row_identity,
             label=row.label,
-            order=row.order,
         )
     return clone, _bump_revision(version)
 
@@ -260,11 +250,9 @@ def _plan_label_sync(existing, labels, identity_ids):
 def _sync_label_rows(question, labels, identity_ids, *, manager, identity_model, snapshot_model):
     """Reconcile a question's choices or matrix statements against submitted labels.
 
-    Rows carry both a legacy snapshot `order` (unique per question) and a live
-    order on their identity. Dropped rows are deleted first and the survivors are
-    parked at a collision-free offset before their final positions are written,
-    so swapping one option for another can't trip the unique constraint
-    mid-update.
+    The snapshot row carries the label and its identity carries the live order, so
+    reordering an option writes one row on each side and no position ever has to be
+    parked out of the way first.
     """
     existing = {
         str(row.identity_id): row
@@ -276,20 +264,12 @@ def _sync_label_rows(question, labels, identity_ids, *, manager, identity_model,
         if identity_id not in claimed:
             row.delete()
 
-    offset = 100000
-    for position, (identity_id, _) in enumerate(planned):
-        if identity_id:
-            row = existing[identity_id]
-            row.order = offset + position
-            row.save(update_fields=('order',))
-
     survey = question.section.version.survey
     for index, (identity_id, label) in enumerate(planned, 1):
         if identity_id:
             row = existing[identity_id]
             row.label = label
-            row.order = index
-            row.save(update_fields=('label', 'order'))
+            row.save(update_fields=('label',))
             identity_model.objects.filter(pk=row.identity_id).update(order=index)
             continue
         identity = identity_model.objects.create(
@@ -301,7 +281,6 @@ def _sync_label_rows(question, labels, identity_ids, *, manager, identity_model,
             question=question,
             identity=identity,
             label=label,
-            order=index,
         )
 
 

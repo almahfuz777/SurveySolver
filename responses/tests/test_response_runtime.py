@@ -5,9 +5,10 @@ from django.test import TestCase
 from django.urls import reverse
 
 from surveys.branching import Action, Operator
-from surveys.models import Question, Survey
+from surveys.models import Question, QuestionIdentity, Survey
 from surveys.publication import publish_survey
 from surveys import services as survey_services
+from surveys.lifecycle import set_response_collection
 
 from responses.models import Answer, Submission
 from responses.services import hash_session_key
@@ -29,9 +30,10 @@ class ResponseRuntimeTests(TestCase):
             section=draft.sections.get(),
             type=Question.Type.SHORT_TEXT,
             prompt='What helps you focus?',
-            required=True,
-            order=1,
         )
+        QuestionIdentity.objects.filter(
+            pk=self.draft_question.identity_id,
+        ).update(required=True)
         self.published, _ = publish_survey(self.survey.id, self.owner, draft.revision)
         self.survey.refresh_from_db()
         self.question = Question.objects.get(section__version=self.published)
@@ -96,8 +98,8 @@ class ResponseRuntimeTests(TestCase):
         )
         self.published, _ = publish_survey(self.survey.id, self.owner, revision)
         self.survey.refresh_from_db()
-        self.question = self.published.sections.order_by('order').first().questions.get()
-        return self.published.sections.order_by('order').last().questions.get()
+        self.question = self.published.sections.order_by('identity__order').first().questions.get()
+        return self.published.sections.order_by('identity__order').last().questions.get()
 
     def add_response_limit(self, limit=1):
         draft = self.survey.draft_version
@@ -159,7 +161,7 @@ class ResponseRuntimeTests(TestCase):
         published, _ = publish_survey(self.survey.id, self.owner, revision)
         ranking = published.sections.get().questions.get(type=Question.Type.RANKING)
         short_text = published.sections.get().questions.get(type=Question.Type.SHORT_TEXT)
-        choices = list(ranking.choices.order_by('order'))
+        choices = list(ranking.choices.order_by('identity__order'))
         self.start()
         submission = Submission.objects.get()
 
@@ -285,7 +287,6 @@ class ResponseRuntimeTests(TestCase):
             section=next_draft.sections.get(),
             type=Question.Type.LONG_TEXT,
             prompt='What should universities improve?',
-            order=2,
         )
         publish_survey(self.survey.id, self.owner, next_draft.revision)
 
@@ -615,7 +616,7 @@ class ResponseRuntimeTests(TestCase):
     def test_pausing_collection_blocks_an_in_progress_completion(self):
         self.start()
         submission = Submission.objects.get()
-        survey_services.set_response_collection(self.survey.id, False)
+        set_response_collection(self.survey.id, False)
 
         response = self.client.post(
             reverse('response_form', args=[submission.id]),

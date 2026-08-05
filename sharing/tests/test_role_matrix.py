@@ -26,7 +26,6 @@ class CollaborationRoleMatrixTests(TestCase):
             section=draft.sections.get(),
             type=Question.Type.SHORT_TEXT,
             prompt='Question',
-            order=1,
         )
         SurveyCollaborator.objects.create(
             survey=self.survey,

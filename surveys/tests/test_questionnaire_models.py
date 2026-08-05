@@ -3,7 +3,14 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
-from surveys.models import Question, QuestionChoice, Section, Survey, SurveyVersion
+from surveys.models import (
+    ChoiceIdentity,
+    Question,
+    QuestionChoice,
+    Section,
+    Survey,
+    SurveyVersion,
+)
 
 
 class QuestionnaireModelTests(TestCase):
@@ -22,18 +29,19 @@ class QuestionnaireModelTests(TestCase):
         self.assertEqual(self.version.status, SurveyVersion.Status.DRAFT)
         self.assertEqual(self.version.created_by, self.user)
         self.assertEqual(self.section.title, 'Section 1')
-        self.assertEqual(self.section.order, 1)
+        self.assertEqual(self.section.identity.order, 1)
 
-    def test_question_and_choices_preserve_explicit_order(self):
+    def test_question_and_choices_order_by_their_identity(self):
         question = Question.objects.create(
             section=self.section,
             type=Question.Type.SINGLE_CHOICE,
             prompt='Which option fits best?',
-            required=True,
-            order=1,
         )
-        second = QuestionChoice.objects.create(question=question, label='Second', order=2)
-        first = QuestionChoice.objects.create(question=question, label='First', order=1)
+        second = QuestionChoice.objects.create(question=question, label='Second')
+        first = QuestionChoice.objects.create(question=question, label='First')
+        # Ordering is live presentation, so swapping it touches the identities only.
+        ChoiceIdentity.objects.filter(pk=first.identity_id).update(order=1)
+        ChoiceIdentity.objects.filter(pk=second.identity_id).update(order=2)
 
         self.assertTrue(question.accepts_choices)
         self.assertEqual(list(question.choices.all()), [first, second])
@@ -46,16 +54,20 @@ class QuestionnaireModelTests(TestCase):
                 created_by=self.user,
             )
 
-    def test_section_order_is_unique_within_version(self):
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Section.objects.create(version=self.version, title='Duplicate', order=1)
+    def test_added_sections_take_the_next_free_identity_order(self):
+        second = Section.objects.create(version=self.version, title='Second')
+        third = Section.objects.create(version=self.version, title='Third')
+
+        self.assertEqual(
+            [self.section.identity.order, second.identity.order, third.identity.order],
+            [1, 2, 3],
+        )
 
     def test_published_version_and_questions_are_immutable(self):
         question = Question.objects.create(
             section=self.section,
             type=Question.Type.SHORT_TEXT,
             prompt='Original wording',
-            order=1,
         )
         self.version.status = SurveyVersion.Status.PUBLISHED
         self.version.save()

@@ -23,12 +23,10 @@ def add_section(version_id, expected_revision):
         or 0
     ) + 1
     identity = SectionIdentity.objects.create(survey=version.survey, order=order)
-    legacy_order = (version.sections.aggregate(max_order=Max('order'))['max_order'] or 0) + 1
     section = Section.objects.create(
         version=version,
         identity=identity,
         title=f'Section {order}',
-        order=legacy_order,
     )
     return section, _bump_revision(version)
 
@@ -43,7 +41,6 @@ def update_section(section_id, expected_revision, cleaned_data):
     SectionIdentity.objects.filter(pk=section.identity_id).update(
         randomize_questions=cleaned_data['randomize_questions'],
     )
-    section.randomize_questions = cleaned_data['randomize_questions']
     return section, _bump_revision(version)
 
 
@@ -72,18 +69,12 @@ def delete_section(section_id, expected_revision):
     if version.sections.count() == 1:
         raise ValidationError('A survey must contain at least one section.')
     removed_order = section.identity.order
-    fallback_section = version.sections.exclude(pk=section.pk).order_by('order').first()
-    fallback_order = (
-        fallback_section.questions.aggregate(max_order=Max('order'))['max_order'] or 0
-    )
-    for moved_question in section.questions.exclude(
+    fallback_section = version.sections.exclude(pk=section.pk).first()
+    # Questions snapshotted here but placed elsewhere survive the delete; re-parent
+    # them so the snapshot still holds a row for their identity.
+    section.questions.exclude(
         identity__section_identity_id=section.identity_id,
-    ):
-        fallback_order += 1
-        Question.objects.filter(pk=moved_question.pk).update(
-            section=fallback_section,
-            order=fallback_order,
-        )
+    ).update(section=fallback_section)
     logical_questions = Question.objects.filter(
         section__version=version,
         identity__section_identity_id=section.identity_id,

@@ -116,6 +116,30 @@ def can_access_submission(submission, user, session_key):
     )
 
 
+def completed_survey_ids(user):
+    """The ids of every survey this user has completed a response to."""
+    if not (user and user.is_authenticated):
+        return set()
+    return set(
+        Submission.objects.filter(
+            respondent=user,
+            status=Submission.Status.COMPLETED,
+        ).values_list('survey_id', flat=True)
+    )
+
+
+def completed_response_counts(surveys):
+    """How many completed responses each of these surveys has, keyed by survey id."""
+    return dict(
+        Submission.objects.filter(
+            survey__in=surveys,
+            status=Submission.Status.COMPLETED,
+        )
+        .values_list('survey')
+        .annotate(total=Count('id'))
+    )
+
+
 def resumable_submissions(user, session_key):
     access_filters = []
     if session_key:

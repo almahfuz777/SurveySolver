@@ -3,7 +3,7 @@ import json
 import random
 
 from .branching import Action
-from .models import Question, SurveyBranchRule
+from .models import SurveyBranchRule
 
 
 def _stable_json(value):
@@ -13,11 +13,12 @@ def _stable_json(value):
 def resolved_version(version):
     """Return snapshot rows arranged exclusively by the live presentation layer.
 
-    The returned model instances are annotated in memory for existing templates:
-    legacy presentation fields are overwritten only on these loaded instances,
-    never persisted. Related-manager prefetch caches are replaced with the
-    resolved ordering so callers using ``section.questions.all`` and
-    ``question.choices.all`` cannot accidentally fall back to snapshot order.
+    A snapshot row carries answer meaning only; its identity carries placement,
+    required state and randomization. The returned instances are annotated in
+    memory with the identity's presentation state so templates can read it
+    directly, and a question is regrouped under the section its identity points
+    at, which is how a question moved between sections since the last publish
+    still renders in its live position.
     """
 
     sections = list(
@@ -31,13 +32,11 @@ def resolved_version(version):
     questions_by_section = {identity_id: [] for identity_id in section_by_identity}
 
     for section in sections:
-        section.order = section.identity.order
         section.randomize_questions = section.identity.randomize_questions
         for question in list(section.questions.all()):
             target_identity_id = question.identity.section_identity_id
             if target_identity_id not in section_by_identity:
                 continue
-            question.order = question.identity.order
             question.required = question.identity.required
             question.randomize_choices = question.identity.randomize_choices
             choices = sorted(
@@ -48,10 +47,6 @@ def resolved_version(version):
                 question.matrix_rows.all(),
                 key=lambda item: (item.identity.order, str(item.identity_id)),
             )
-            for choice in choices:
-                choice.order = choice.identity.order
-            for row in rows:
-                row.order = row.identity.order
             question._prefetched_objects_cache['choices'] = choices
             question._prefetched_objects_cache['matrix_rows'] = rows
             questions_by_section[target_identity_id].append(question)

@@ -111,26 +111,21 @@ def _clone_version(source, created_by, *, number=None):
         created_by=created_by,
     )
     section_map = {}
-    for section in source.sections.select_related('identity').order_by('order'):
+    for section in source.sections.select_related('identity'):
         cloned_section = Section.objects.create(
             version=clone,
             identity=section.identity,
             title=section.title,
             description=section.description,
-            order=section.order,
-            randomize_questions=section.randomize_questions,
         )
         section_map[section.id] = cloned_section
-        for question in section.questions.select_related('identity').order_by('order'):
+        for question in section.questions.select_related('identity'):
             cloned_question = Question.objects.create(
                 section=cloned_section,
                 identity=question.identity,
                 type=question.type,
                 prompt=question.prompt,
                 help_text=question.help_text,
-                required=question.required,
-                randomize_choices=question.randomize_choices,
-                order=question.order,
                 config=deepcopy(question.config),
             )
             QuestionChoice.objects.bulk_create(
@@ -139,7 +134,6 @@ def _clone_version(source, created_by, *, number=None):
                         question=cloned_question,
                         identity=choice.identity,
                         label=choice.label,
-                        order=choice.order,
                     )
                     for choice in question.choices.select_related('identity').all()
                 ]
@@ -150,7 +144,6 @@ def _clone_version(source, created_by, *, number=None):
                         question=cloned_question,
                         identity=row.identity,
                         label=row.label,
-                        order=row.order,
                     )
                     for row in question.matrix_rows.select_related('identity').all()
                 ]
