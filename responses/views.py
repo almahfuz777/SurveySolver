@@ -6,9 +6,7 @@ from django.core.paginator import Paginator
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
-from django_countries import countries
 
-from accounts.models import Profile
 from rewards.claims import claim_secret_from_session, store_claim_secret
 from rewards.models import GuestRewardClaim, PointTransaction
 from surveys.models import Question, Survey
@@ -16,8 +14,10 @@ from surveys.presentation import presented_question_ids
 from sharing.respondent_invitations import invitation_from_session
 
 from .completion import finish_submission
+from .screening import EligibilityScreenerForm
 from .models import Submission
 from .services import (
+    AuthenticationRequired,
     DuplicateSubmission,
     EligibilityUnknown,
     IneligibleRespondent,
@@ -108,11 +108,11 @@ def _public_survey(slug, invitation_access=False):
 
 @require_http_methods(['GET', 'POST'])
 def survey_landing(request, slug):
-    survey = get_object_or_404(Survey.objects.prefetch_related('topics'), slug=slug)
-    if (
-        survey.identity_mode == Survey.IdentityMode.IDENTIFIED
-        and not request.user.is_authenticated
-    ):
+    survey = get_object_or_404(
+        Survey.objects.prefetch_related('topics').select_related('eligibility_criteria'),
+        slug=slug,
+    )
+    if not request.user.is_authenticated and survey.requires_account_to_respond:
         return redirect_to_login(request.get_full_path())
     invitation = invitation_from_session(
         request.session,
@@ -120,37 +120,36 @@ def survey_landing(request, slug):
         _session_key(request),
     )
     survey, version = _public_survey(slug, invitation_access=bool(invitation))
+    criteria = getattr(survey, 'eligibility_criteria', None)
     identity_errors = {}
     eligibility_notice = ''
+    screener = EligibilityScreenerForm(
+        request.POST if request.method == 'POST' else None,
+        criteria=criteria,
+        user=request.user,
+    )
     if request.method == 'POST':
-        try:
-            submission = start_submission(
-                survey,
-                request.user,
-                _session_key(request),
-                identity_consent=request.POST.get('identity_consent') == 'yes',
-                identity_data={
-                    'name': request.POST.get('identity_name', ''),
-                    'email': request.POST.get('identity_email', ''),
-                },
-                screener_data={
-                    'birth_date': request.POST.get('eligibility_birth_date', ''),
-                    'education_level': request.POST.get('eligibility_education_level', ''),
-                    'country': request.POST.get('eligibility_country', ''),
-                    'gender': request.POST.get('eligibility_gender', ''),
-                    'employment_status': request.POST.get('eligibility_employment_status', ''),
-                },
-                respondent_invitation_id=invitation.id if invitation else None,
-            )
-        except ResponseValidationError as error:
-            identity_errors = error.errors
-        except (EligibilityUnknown, IneligibleRespondent, QuotaReached, PermissionDenied) as error:
-            eligibility_notice = str(error)
-        else:
-            return redirect('response_form', submission_id=submission.id)
-    default_name = request.user.get_full_name() if request.user.is_authenticated else ''
-    default_email = request.user.email if request.user.is_authenticated else ''
-    criteria = getattr(survey, 'eligibility_criteria', None)
+        # A screener with nothing left to ask validates trivially.
+        if screener.is_valid():
+            try:
+                submission = start_submission(
+                    survey,
+                    request.user,
+                    _session_key(request),
+                    identity_consent=request.POST.get('identity_consent') == 'yes',
+                    screener_data=screener.respondent_values(),
+                    respondent_invitation_id=invitation.id if invitation else None,
+                )
+            except AuthenticationRequired:
+                return redirect_to_login(request.get_full_path())
+            except ResponseValidationError as error:
+                identity_errors = error.errors
+            except (EligibilityUnknown, IneligibleRespondent, QuotaReached, PermissionDenied) as error:
+                eligibility_notice = str(error)
+            else:
+                # Only once the response exists, so a refused start never rewrites the profile.
+                screener.save_to_profile()
+                return redirect('response_form', submission_id=submission.id)
     return render(
         request,
         'responses/survey_landing.html',
@@ -158,17 +157,10 @@ def survey_landing(request, slug):
             'survey': survey,
             'version': version,
             'identity_errors': identity_errors,
-            'identity_name': request.POST.get('identity_name', default_name),
-            'identity_email': request.POST.get('identity_email', default_email),
-            'criteria': criteria if criteria and criteria.is_targeted else None,
-            'eligibility_errors': identity_errors,
+            'screener': screener if screener.is_needed else None,
             'eligibility_notice': eligibility_notice,
-            'education_choices': Profile.EducationLevel.choices,
-            'gender_choices': Profile.Gender.choices,
-            'employment_choices': Profile.EmploymentStatus.choices,
-            'country_choices': countries,
         },
-        status=403 if eligibility_notice else (422 if identity_errors else 200),
+        status=403 if eligibility_notice else (422 if (identity_errors or screener.errors) else 200),
     )
 
 
@@ -307,6 +299,9 @@ def _saved_answer_data(submission):
 @require_http_methods(['GET', 'POST'])
 def submission_form(request, submission_id):
     submission = _accessible_submission(request, submission_id)
+    # The creator can make the survey account-only after a guest has started answering.
+    if submission.survey.requires_account_to_respond and not request.user.is_authenticated:
+        return redirect_to_login(request.get_full_path())
     if submission.status == Submission.Status.COMPLETED:
         return redirect('response_complete', submission_id=submission.id)
     errors = {}
@@ -332,6 +327,8 @@ def submission_form(request, submission_id):
             errors = error.errors
         except DuplicateSubmission as error:
             return redirect('response_complete', submission_id=error.submission.id)
+        except AuthenticationRequired:
+            return redirect_to_login(request.get_full_path())
         except (QuotaReached, ResponseUnavailable) as error:
             errors = {'submission': str(error)}
         else:

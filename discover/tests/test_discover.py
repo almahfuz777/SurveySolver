@@ -84,6 +84,27 @@ class SurveyDiscoveryTests(TestCase):
         self.assertContains(response, 'name="privacy"')
         self.assertNotContains(response, hidden.title)
 
+    def test_guest_discovery_hides_account_only_studies(self):
+        open_survey, _ = self.publish_survey('Open study')
+        members_only, _ = self.publish_survey('Members only study')
+        Survey.objects.filter(pk=members_only.pk).update(requires_account=True)
+
+        response = self.client.get(reverse('discover'))
+
+        self.assertContains(response, open_survey.title)
+        self.assertNotContains(response, members_only.title)
+        self.assertEqual(len(response.context['discovery_surveys']), 1)
+
+    def test_account_holder_discovery_includes_account_only_studies(self):
+        members_only, _ = self.publish_survey('Members only study')
+        Survey.objects.filter(pk=members_only.pk).update(requires_account=True)
+        respondent = get_user_model().objects.create_user(email='member@example.com')
+        self.client.force_login(respondent)
+
+        response = self.client.get(reverse('discover'))
+
+        self.assertContains(response, members_only.title)
+
     def test_guest_discovery_only_lists_anonymous_studies(self):
         anonymous, _ = self.publish_survey('Anonymous study')
         identified, _ = self.publish_survey(
@@ -102,7 +123,7 @@ class SurveyDiscoveryTests(TestCase):
         )
         self.assertContains(
             response,
-            '<option value="identified" disabled>Profile shared</option>',
+            '<option value="identified" disabled>Identified response</option>',
             html=True,
         )
         self.assertNotContains(response, 'Sign in to access identified studies.')
@@ -181,7 +202,7 @@ class SurveyDiscoveryTests(TestCase):
         self.client.force_login(wrong_lang)
         self.assertNotContains(self.client.get(reverse('discover')), targeted.title)
 
-    def test_incomplete_profile_does_not_receive_targeted_surveys(self):
+    def test_incomplete_profile_still_sees_targeted_surveys_with_a_screener(self):
         unrestricted, _ = self.publish_survey('Unrestricted study')
         targeted, _ = self.publish_survey('Targeted study', criteria=self.criteria())
         respondent = get_user_model().objects.create_user(email='incomplete-match@example.com')
@@ -189,8 +210,50 @@ class SurveyDiscoveryTests(TestCase):
 
         response = self.client.get(reverse('discover'))
 
+        # An unanswered attribute is a question to ask, not a reason to hide the study.
+        self.assertContains(response, unrestricted.title)
+        self.assertContains(response, targeted.title)
+        self.assertContains(response, 'Eligibility screener')
+
+    def test_a_conflicting_profile_value_still_hides_the_survey(self):
+        targeted, _ = self.publish_survey('Targeted study', criteria=self.criteria())
+        respondent = get_user_model().objects.create_user(email='wrong-country@example.com')
+        respondent.profile.country = 'US'
+        respondent.profile.save()
+        self.client.force_login(respondent)
+
+        response = self.client.get(reverse('discover'))
+
+        self.assertNotContains(response, targeted.title)
+
+    def test_no_screening_filter_keeps_only_surveys_open_to_everyone(self):
+        unrestricted, _ = self.publish_survey('Unrestricted study')
+        targeted, _ = self.publish_survey('Targeted study', criteria=self.criteria())
+
+        response = self.client.get(reverse('discover'), {'no_screening': '1'})
+
         self.assertContains(response, unrestricted.title)
         self.assertNotContains(response, targeted.title)
+
+    def test_no_screening_filter_hides_targeted_surveys_from_a_matching_profile(self):
+        unrestricted, _ = self.publish_survey('Unrestricted study')
+        targeted, _ = self.publish_survey('Targeted study', criteria=self.criteria())
+        respondent = get_user_model().objects.create_user(email='fully-matched@example.com')
+        profile = respondent.profile
+        profile.birth_date = date(2001, 1, 1)
+        profile.education_level = 'undergraduate'
+        profile.country = 'BD'
+        profile.employment_status = 'student'
+        profile.save()
+        self.client.force_login(respondent)
+
+        matched = self.client.get(reverse('discover'))
+        filtered = self.client.get(reverse('discover'), {'no_screening': '1'})
+
+        # The filter is about the survey having no criteria, not about this respondent qualifying.
+        self.assertContains(matched, targeted.title)
+        self.assertContains(filtered, unrestricted.title)
+        self.assertNotContains(filtered, targeted.title)
 
     def test_completed_and_owned_surveys_are_removed_from_feed(self):
         completed_survey, version = self.publish_survey('Completed study')

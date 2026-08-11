@@ -33,12 +33,14 @@ def discover(request):
     elif privacy not in Survey.IdentityMode.values:
         privacy = ''
     show_completed = request.GET.get('show_completed') == '1'
+    no_screening = request.GET.get('no_screening') == '1'
     discovery_surveys = discover_surveys(
         request.user,
         topics=topics or None,
         duration=duration,
         identity_mode=privacy or None,
         include_completed=show_completed,
+        without_screening=no_screening,
     )
     if minimum_points and BASE_COMPLETION_POINTS < minimum_points:
         discovery_surveys = []
@@ -90,6 +92,7 @@ def discover(request):
             'selected_points': minimum_points,
             'selected_privacy': privacy,
             'show_completed': show_completed,
+            'no_screening': no_screening,
             'base_completion_points': BASE_COMPLETION_POINTS,
         },
     )

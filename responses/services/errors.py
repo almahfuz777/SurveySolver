@@ -17,6 +17,10 @@ class DuplicateSubmission(Exception):
         super().__init__('A response has already been completed for this survey.')
 
 
+class AuthenticationRequired(Exception):
+    """An account-only survey was reached by a guest."""
+
+
 class EligibilityUnknown(Exception):
     pass
 

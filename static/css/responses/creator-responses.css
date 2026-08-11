@@ -56,6 +56,9 @@
 .response-identity-card { position: sticky; top: 6rem; }
 .response-identity-card h2 { margin: 0.6rem 0 0.2rem; }
 .response-identity-card p, .response-identity-card small { color: var(--text-muted); }
+.identity-profile { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.9rem; margin: 0.8rem 0; padding-top: 0.8rem; border-top: 1px solid var(--border); }
+.identity-profile dt { color: var(--text-muted); font-size: 0.76rem; }
+.identity-profile dd { margin: 0; color: var(--text); font-size: 0.8rem; overflow-wrap: anywhere; }
 .response-answer-list { display: grid; gap: 1rem; }
 .response-answer-section { padding: 1.5rem; }
 .response-answer-section > h2 { margin: 0.35rem 0 1.25rem; }

@@ -9,47 +9,35 @@
     gap: 0.85rem;
 }
 
+.eligibility-fields[hidden] { display: none; }
+
+.eligibility-hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 500;
+}
+
 .eligibility-rule {
     background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: 0.85rem;
+    padding: 0.9rem 1rem 1rem;
 }
 
+/* A plain heading, not a control: the master switch above decides whether these show at all. */
 .eligibility-rule-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin: 0;
-    padding: 0.9rem 1rem;
-    cursor: pointer;
-}
-
-.eligibility-rule-copy {
     display: grid;
     gap: 0.1rem;
+    margin: 0 0 0.7rem;
 }
 
-.eligibility-rule-copy strong { color: var(--text); font-size: 0.84rem; }
-.eligibility-rule-copy small { color: var(--text-muted); font-size: 0.72rem; font-weight: 500; }
+.eligibility-rule-heading strong { color: var(--text); font-size: 0.84rem; }
+.eligibility-rule-heading small { color: var(--text-muted); font-size: 0.72rem; font-weight: 500; }
 
 .eligibility-rule-body {
-    padding: 0.9rem 1rem 1rem;
-    border-top: 1px solid var(--border);
-}
-
-.eligibility-rule-body[hidden] { display: none; }
-
-.eligibility-field {
-    display: flex;
-    flex-direction: column;
+    display: grid;
     gap: 0.55rem;
-}
-
-.eligibility-field label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--ink-800);
 }
 
 .eligibility-cols-2 {
@@ -59,14 +47,6 @@
 }
 
 /* Age range */
-.eligibility-age-range { gap: 0.55rem !important; }
-
-.age-range-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--ink-800);
-}
-
 .age-range-inputs {
     display: flex;
     align-items: center;

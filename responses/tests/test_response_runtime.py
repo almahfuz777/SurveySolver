@@ -10,8 +10,11 @@ from surveys.publication import publish_survey
 from surveys import services as survey_services
 from surveys.lifecycle import set_response_collection
 
+from rewards.models import PointTransaction
+from rewards.policy import PROFILE_COMPLETION_BONUS
+
 from responses.models import Answer, Submission
-from responses.services import hash_session_key
+from responses.services import AuthenticationRequired, hash_session_key, start_submission
 
 
 class ResponseRuntimeTests(TestCase):
@@ -58,6 +61,17 @@ class ResponseRuntimeTests(TestCase):
             values,
         )
         self.survey.refresh_from_db()
+
+    def screener_post(self, **overrides):
+        """Screener answers that satisfy the default `target_survey` criteria."""
+        answers = {
+            'birth_date': '2002-04-10',
+            'education_level': 'undergraduate',
+            'country': 'BD',
+            'employment_status': 'student',
+        }
+        answers.update(overrides)
+        return {f'eligibility-{name}': value for name, value in answers.items()}
 
     def add_branched_section(self):
         draft = self.survey.draft_version
@@ -308,38 +322,111 @@ class ResponseRuntimeTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_identified_response_requires_disclosed_identity_and_consent(self):
+    def test_identified_response_shares_the_account_and_needs_consent(self):
         self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
         self.survey.save(update_fields=('identity_mode', 'updated_at'))
-        respondent = get_user_model().objects.create_user(email='identified@example.com')
+        respondent = get_user_model().objects.create_user(
+            email='identified@example.com',
+            first_name='Samira',
+            last_name='Khan',
+        )
         self.client.force_login(respondent)
         url = reverse('respond_survey', args=[self.survey.slug])
 
-        invalid = self.client.post(
-            url,
-            {'identity_name': '', 'identity_email': 'invalid'},
-        )
+        page = self.client.get(url)
+        invalid = self.client.post(url, {})
 
+        # The respondent reads what is shared; there is nothing for them to type or edit.
+        self.assertContains(page, 'Samira Khan')
+        self.assertContains(page, 'identified@example.com')
+        self.assertNotContains(page, 'name="identity_name"')
+        self.assertNotContains(page, 'name="identity_email"')
         self.assertEqual(invalid.status_code, 422)
-        self.assertContains(invalid, 'Consent is required', status_code=422)
+        self.assertContains(invalid, 'Confirm you agree', status_code=422)
         self.assertFalse(Submission.objects.exists())
 
-        valid = self.client.post(
-            url,
-            {
-                'identity_name': '  Samira Khan  ',
-                'identity_email': 'SAMIRA@example.com',
-                'identity_consent': 'yes',
-            },
-        )
+        valid = self.client.post(url, {'identity_consent': 'yes'})
 
         submission = Submission.objects.get()
         self.assertRedirects(valid, reverse('response_form', args=[submission.id]))
         self.assertEqual(
             submission.identity_data,
-            {'name': 'Samira Khan', 'email': 'samira@example.com'},
+            {'name': 'Samira Khan', 'email': 'identified@example.com'},
         )
         self.assertIsNotNone(submission.identity_consent_at)
+
+    def test_profile_scope_discloses_and_shares_the_research_profile(self):
+        self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
+        self.survey.identity_scope = Survey.IdentityScope.PROFILE
+        self.survey.save()
+        # Saving a profile-sharing survey turns the account requirement on by itself.
+        self.assertTrue(self.survey.requires_account)
+        respondent = get_user_model().objects.create_user(
+            email='shares@example.com',
+            first_name='Nadia',
+            last_name='Rahman',
+        )
+        profile = respondent.profile
+        profile.birth_date = date(2000, 6, 1)
+        profile.gender = 'woman'
+        profile.country = 'BD'
+        profile.education_level = 'undergraduate'
+        profile.save()
+        self.client.force_login(respondent)
+        url = reverse('respond_survey', args=[self.survey.slug])
+
+        page = self.client.get(url)
+        self.client.post(url, {'identity_consent': 'yes'})
+
+        # The respondent is told the profile is shared, and it genuinely is.
+        self.assertContains(page, 'Research profile')
+        self.assertContains(page, 'your research profile alongside your answers')
+        shared = Submission.objects.get().identity_data
+        self.assertEqual(shared['name'], 'Nadia Rahman')
+        labels = {row['label']: row['value'] for row in shared['profile']}
+        self.assertEqual(labels['Education'], 'Undergraduate')
+        self.assertEqual(labels['Country'], 'Bangladesh')
+        self.assertEqual(labels['Gender'], 'Woman')
+
+    def test_contact_scope_shares_no_research_profile(self):
+        self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
+        self.survey.identity_scope = Survey.IdentityScope.CONTACT
+        self.survey.save()
+        respondent = get_user_model().objects.create_user(email='contact-only@example.com')
+        respondent.profile.education_level = 'undergraduate'
+        respondent.profile.save()
+        self.client.force_login(respondent)
+
+        self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            {'identity_consent': 'yes'},
+        )
+
+        self.assertNotIn('profile', Submission.objects.get().identity_data)
+
+    def test_a_posted_identity_cannot_override_the_account(self):
+        self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
+        self.survey.save(update_fields=('identity_mode', 'updated_at'))
+        respondent = get_user_model().objects.create_user(
+            email='real@example.com',
+            first_name='Real',
+            last_name='Respondent',
+        )
+        self.client.force_login(respondent)
+
+        self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            {
+                'identity_consent': 'yes',
+                'identity_name': 'Someone Else',
+                'identity_email': 'spoofed@example.com',
+            },
+        )
+
+        self.assertEqual(
+            Submission.objects.get().identity_data,
+            {'name': 'Real Respondent', 'email': 'real@example.com'},
+        )
 
     def test_identified_survey_requires_authentication(self):
         self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
@@ -454,34 +541,67 @@ class ResponseRuntimeTests(TestCase):
         self.assertEqual(submission.answers.count(), 1)
         self.assertEqual(submission.answers.get().value, 'Home')
 
-    def test_targeted_guest_must_complete_generated_screener(self):
-        self.target_survey()
+    def test_targeted_guest_is_asked_every_criterion_the_survey_sets(self):
+        self.target_survey(languages=['bn'], religions=['islam'])
         url = reverse('respond_survey', args=[self.survey.slug])
 
         page = self.client.get(url)
         invalid = self.client.post(url, {})
 
         self.assertContains(page, 'Eligibility check')
-        self.assertContains(page, 'name="eligibility_birth_date"')
+        for field in (
+            'eligibility-birth_date',
+            'eligibility-education_level',
+            'eligibility-country',
+            'eligibility-employment_status',
+            'eligibility-religion',
+            'eligibility-languages',
+        ):
+            self.assertContains(page, f'name="{field}"')
         self.assertEqual(invalid.status_code, 422)
-        self.assertContains(invalid, 'Select your education level', status_code=422)
         self.assertFalse(Submission.objects.exists())
+
+    def test_screener_says_the_answers_are_not_shown_with_the_response(self):
+        self.target_survey()
+
+        anonymous = self.client.get(reverse('respond_survey', args=[self.survey.slug]))
+
+        self.assertContains(anonymous, 'never shown next to your response')
+        self.assertContains(anonymous, 'This survey is anonymous')
+
+        self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
+        self.survey.save()
+        respondent = get_user_model().objects.create_user(email='screener-copy@example.com')
+        self.client.force_login(respondent)
+
+        identified = self.client.get(reverse('respond_survey', args=[self.survey.slug]))
+
+        # The anonymity reassurance is only true when the response really is anonymous.
+        self.assertContains(identified, 'never shown next to your response')
+        self.assertNotContains(identified, 'This survey is anonymous')
 
     def test_ineligible_guest_cannot_start_targeted_survey(self):
         self.target_survey()
 
         response = self.client.post(
             reverse('respond_survey', args=[self.survey.slug]),
-            {
-                'eligibility_birth_date': '2002-04-10',
-                'eligibility_education_level': 'undergraduate',
-                'eligibility_country': 'US',
-                'eligibility_employment_status': 'student',
-            },
+            self.screener_post(country='US'),
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, 'does not match', status_code=403)
+        self.assertContains(response, 'do not meet', status_code=403)
+        self.assertFalse(Submission.objects.exists())
+
+    def test_guest_is_refused_on_a_criterion_beyond_the_original_five(self):
+        self.target_survey(languages=['bn'])
+
+        response = self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            self.screener_post(**{'languages': ['en']}),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'do not meet', status_code=403)
         self.assertFalse(Submission.objects.exists())
 
     def test_eligible_guest_screener_is_snapshotted_separately(self):
@@ -489,12 +609,7 @@ class ResponseRuntimeTests(TestCase):
 
         response = self.client.post(
             reverse('respond_survey', args=[self.survey.slug]),
-            {
-                'eligibility_birth_date': '2002-04-10',
-                'eligibility_education_level': 'undergraduate',
-                'eligibility_country': 'BD',
-                'eligibility_employment_status': 'student',
-            },
+            self.screener_post(),
         )
 
         submission = Submission.objects.get()
@@ -503,6 +618,38 @@ class ResponseRuntimeTests(TestCase):
         self.assertTrue(submission.eligibility_data['targeted'])
         self.assertEqual(submission.eligibility_data['country'], 'BD')
         self.assertIsNotNone(submission.eligibility_checked_at)
+
+    def test_account_only_survey_sends_a_guest_to_sign_in(self):
+        Survey.objects.filter(pk=self.survey.pk).update(requires_account=True)
+        url = reverse('respond_survey', args=[self.survey.slug])
+
+        page = self.client.get(url)
+        posted = self.client.post(url, {})
+
+        self.assertRedirects(page, f'{reverse("account_login")}?next={url}')
+        self.assertRedirects(posted, f'{reverse("account_login")}?next={url}')
+        self.assertFalse(Submission.objects.exists())
+
+    def test_service_refuses_an_account_only_start_without_an_account(self):
+        Survey.objects.filter(pk=self.survey.pk).update(requires_account=True)
+        self.survey.refresh_from_db()
+
+        with self.assertRaises(AuthenticationRequired):
+            start_submission(self.survey, None, 'anonymous-account-only')
+
+        self.assertFalse(Submission.objects.exists())
+
+    def test_account_holder_can_still_answer_an_account_only_survey(self):
+        Survey.objects.filter(pk=self.survey.pk).update(requires_account=True)
+        self.survey.refresh_from_db()
+        respondent = get_user_model().objects.create_user(email='member@example.com')
+        self.client.force_login(respondent)
+
+        response = self.start()
+
+        submission = Submission.objects.get()
+        self.assertRedirects(response, reverse('response_form', args=[submission.id]))
+        self.assertEqual(submission.respondent, respondent)
 
     def test_authenticated_targeting_uses_profile_not_posted_screener(self):
         self.target_survey()
@@ -521,23 +668,127 @@ class ResponseRuntimeTests(TestCase):
         self.assertEqual(submission.respondent, respondent)
         self.assertEqual(submission.eligibility_data['country'], 'BD')
 
-    def test_incomplete_authenticated_profile_cannot_use_guest_screener(self):
+    def test_a_future_birth_date_is_rejected_rather_than_passing_as_young(self):
+        self.target_survey()
+
+        response = self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            self.screener_post(birth_date='2030-01-01'),
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertContains(response, 'cannot be in the future', status_code=422)
+        self.assertFalse(Submission.objects.exists())
+
+    def test_screener_answers_that_complete_a_profile_award_the_bonus(self):
+        self.target_survey()
+        respondent = get_user_model().objects.create_user(
+            email='completing@example.com',
+            first_name='Nadia',
+            last_name='Rahman',
+        )
+        profile = respondent.profile
+        profile.birth_date = date(2002, 4, 10)
+        profile.gender = 'woman'
+        profile.country = 'BD'
+        profile.field_of_study = 'computer_science'
+        profile.employment_status = 'student'
+        profile.research_interests = ['learning-science']
+        profile.save()
+        self.client.force_login(respondent)
+
+        self.assertEqual(PointTransaction.objects.balance_for(respondent), 0)
+
+        self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            {'eligibility-education_level': 'undergraduate'},
+        )
+
+        # Finishing a profile earns the same bonus wherever the answers were typed.
+        profile.refresh_from_db()
+        self.assertEqual(profile.completion_percentage, 100)
+        self.assertEqual(PointTransaction.objects.balance_for(respondent), PROFILE_COMPLETION_BONUS)
+
+    def test_screener_rejects_a_region_outside_the_answered_country(self):
+        self.target_survey(regions=['BD-13'], countries=['BD', 'CA'])
+        respondent = get_user_model().objects.create_user(email='mismatch@example.com')
+        self.client.force_login(respondent)
+
+        response = self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            self.screener_post(country='CA', region='BD-13'),
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertContains(response, 'region inside your selected country', status_code=422)
+        self.assertFalse(Submission.objects.exists())
+
+    def test_targeting_a_region_also_asks_for_the_country(self):
+        self.target_survey(regions=['BD-13'], countries=[], min_age=None, max_age=None,
+                           education_levels=[], employment_statuses=[])
+
+        page = self.client.get(reverse('respond_survey', args=[self.survey.slug]))
+
+        self.assertContains(page, 'name="eligibility-region"')
+        self.assertContains(page, 'name="eligibility-country"')
+
+    def test_incomplete_profile_is_asked_only_for_the_missing_answers(self):
         self.target_survey()
         respondent = get_user_model().objects.create_user(email='incomplete@example.com')
+        respondent.profile.birth_date = date(2002, 4, 10)
+        respondent.profile.country = 'BD'
+        respondent.profile.save()
+        self.client.force_login(respondent)
+
+        page = self.client.get(reverse('respond_survey', args=[self.survey.slug]))
+
+        # Birth date and country are already on file, so only the rest are asked for.
+        self.assertContains(page, 'name="eligibility-education_level"')
+        self.assertContains(page, 'name="eligibility-employment_status"')
+        self.assertNotContains(page, 'name="eligibility-birth_date"')
+        self.assertNotContains(page, 'name="eligibility-country"')
+
+    def test_screener_answers_are_saved_back_onto_the_profile(self):
+        self.target_survey()
+        respondent = get_user_model().objects.create_user(email='partial@example.com')
+        respondent.profile.birth_date = date(2002, 4, 10)
+        respondent.profile.country = 'BD'
+        respondent.profile.save()
         self.client.force_login(respondent)
 
         response = self.client.post(
             reverse('respond_survey', args=[self.survey.slug]),
             {
-                'eligibility_birth_date': '2002-04-10',
-                'eligibility_education_level': 'undergraduate',
-                'eligibility_country': 'BD',
-                'eligibility_employment_status': 'student',
+                'eligibility-education_level': 'undergraduate',
+                'eligibility-employment_status': 'student',
+            },
+        )
+
+        submission = Submission.objects.get()
+        self.assertRedirects(response, reverse('response_form', args=[submission.id]))
+        respondent.profile.refresh_from_db()
+        self.assertEqual(respondent.profile.education_level, 'undergraduate')
+        self.assertEqual(respondent.profile.employment_status, 'student')
+
+    def test_a_refused_start_does_not_write_to_the_profile(self):
+        self.target_survey()
+        respondent = get_user_model().objects.create_user(email='refused@example.com')
+        respondent.profile.birth_date = date(2002, 4, 10)
+        respondent.profile.country = 'BD'
+        respondent.profile.save()
+        self.client.force_login(respondent)
+
+        response = self.client.post(
+            reverse('respond_survey', args=[self.survey.slug]),
+            {
+                'eligibility-education_level': 'secondary',
+                'eligibility-employment_status': 'student',
             },
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, 'Complete the required research profile', status_code=403)
+        respondent.profile.refresh_from_db()
+        self.assertEqual(respondent.profile.education_level, '')
         self.assertFalse(Submission.objects.exists())
 
     def test_matching_end_branch_skips_later_required_sections(self):

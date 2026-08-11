@@ -12,6 +12,24 @@ without also storing the country.
 from functools import lru_cache
 
 import pycountry
+from django.utils import timezone
+
+
+# Nobody is younger than zero or older than this. The profile form rejects such dates, and the
+# age calculation below refuses them again so a caller that skips the form cannot slip one past
+# a minimum- or maximum-age criterion.
+MAX_PLAUSIBLE_AGE = 120
+
+
+def age_on(birth_date, today=None):
+    """Whole years since ``birth_date``, or ``None`` when the date cannot describe a living person."""
+    if not birth_date:
+        return None
+    today = today or timezone.localdate()
+    age = today.year - birth_date.year - (
+        (today.month, today.day) < (birth_date.month, birth_date.day)
+    )
+    return age if 0 <= age <= MAX_PLAUSIBLE_AGE else None
 
 
 # --- Languages (respondents may speak several — stored as a list) -----------

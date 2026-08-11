@@ -84,6 +84,26 @@ class RespondentInvitationTests(TestCase):
         self.assertEqual(invitation.bound_submission_id, submission.id)
         self.assertIsNotNone(invitation.consumed_at)
 
+    def test_invitation_to_an_account_only_survey_still_requires_signing_in(self):
+        Survey.objects.filter(pk=self.survey.pk).update(requires_account=True)
+        invitation, token = create_respondent_invitation(
+            self.survey.id,
+            self.owner,
+            'guest@example.com',
+        )
+
+        self.client.get(reverse('open_respondent_invitation', args=[invitation.id, token]))
+        landing_url = reverse('respond_survey', args=[self.survey.slug])
+        landing = self.client.get(landing_url)
+        started = self.client.post(landing_url)
+
+        # An invitation grants access to the survey; it does not stand in for an account.
+        self.assertRedirects(landing, f'{reverse("account_login")}?next={landing_url}')
+        self.assertRedirects(started, f'{reverse("account_login")}?next={landing_url}')
+        self.assertFalse(Submission.objects.exists())
+        invitation.refresh_from_db()
+        self.assertIsNone(invitation.bound_submission_id)
+
     def test_forwarded_grant_cannot_start_second_response(self):
         invitation, token = create_respondent_invitation(
             self.survey.id,

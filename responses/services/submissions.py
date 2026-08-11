@@ -11,7 +11,12 @@ from surveys.models import (
 )
 
 from ..models import Submission
-from .eligibility import _ensure_quota_available, _validated_eligibility, _validated_identity
+from .eligibility import (
+    _ensure_account_access,
+    _ensure_quota_available,
+    _validated_eligibility,
+    _validated_identity,
+)
 from .sessions import build_presentation, current_published_version, hash_session_key
 
 
@@ -22,7 +27,6 @@ def start_submission(
     session_key,
     source=Submission.Source.DIRECT,
     identity_consent=False,
-    identity_data=None,
     screener_data=None,
     respondent_invitation_id=None,
 ):
@@ -38,6 +42,8 @@ def start_submission(
     version = current_published_version(survey, invitation_access=bool(invitation))
     session_hash = hash_session_key(session_key)
     respondent = user if user and user.is_authenticated else None
+    # Before any existing draft is handed back, so flipping the setting locks guests out at once.
+    _ensure_account_access(survey, user)
     if invitation and invitation.bound_submission_id:
         bound_submission = Submission.objects.filter(
             id=invitation.bound_submission_id,
@@ -78,11 +84,7 @@ def start_submission(
         respondent,
         screener_data,
     )
-    identity_data, identity_consent_at = _validated_identity(
-        survey,
-        identity_consent,
-        identity_data,
-    )
+    identity_data, identity_consent_at = _validated_identity(survey, respondent, identity_consent)
     submission = Submission.objects.create(
         survey=survey,
         version=version,
@@ -154,12 +156,16 @@ def resumable_submissions(user, session_key):
     access_filter = access_filters[0]
     for condition in access_filters[1:]:
         access_filter |= condition
+    queryset = Submission.objects.filter(
+        access_filter,
+        status=Submission.Status.IN_PROGRESS,
+        survey__deleted_at__isnull=True,
+    )
+    if not (user and user.is_authenticated):
+        # A guest draft on a survey that has since become account-only is no longer resumable.
+        queryset = queryset.filter(survey__in=Survey.objects.answerable_by_guests())
     return (
-        Submission.objects.filter(
-            access_filter,
-            status=Submission.Status.IN_PROGRESS,
-            survey__deleted_at__isnull=True,
-        )
+        queryset
         .select_related('survey', 'version')
         .prefetch_related('survey__topics')
         .annotate(saved_answer_count=Count('answers', distinct=True))

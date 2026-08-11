@@ -3,9 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.shortcuts import redirect, render
 
-from rewards.services import award_profile_completion_bonus
-
 from .forms import ResearchProfileForm, UserNameForm
+from .services import update_research_profile
 
 
 @login_required
@@ -22,8 +21,10 @@ def profile_edit(request):
         if user_form.is_valid() and profile_form.is_valid():
             with transaction.atomic():
                 user_form.save()
-                profile = profile_form.save()
-                _, bonus_awarded = award_profile_completion_bonus(profile)
+                profile, bonus_awarded = update_research_profile(
+                    profile,
+                    profile_form.cleaned_data,
+                )
 
             if bonus_awarded:
                 messages.success(request, 'Profile complete — 50 reward points added.')

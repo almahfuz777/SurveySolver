@@ -6,6 +6,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.db import models, transaction
 from django.utils.text import slugify
 
+from . import targeting
 from .branching import Action, Operator
 from .validators import validate_survey_image_size
 
@@ -57,6 +58,12 @@ class SurveyQuerySet(models.QuerySet):
             deleted_at__isnull=True,
         )
 
+    def answerable_by_guests(self):
+        """Queryset form of ``Survey.requires_account_to_respond`` — keep the two in step."""
+        return self.filter(requires_account=False).exclude(
+            identity_mode=Survey.IdentityMode.IDENTIFIED,
+        )
+
     def delete(self):
         # A plain bulk delete cascades the survey-owned identity hierarchy in one
         # collector batch and trips its PROTECT guards. Route every survey
@@ -79,6 +86,12 @@ class Survey(models.Model):
     class IdentityMode(models.TextChoices):
         ANONYMOUS = 'anonymous', 'Anonymous to creator'
         IDENTIFIED = 'identified', 'Identified with consent'
+
+    class IdentityScope(models.TextChoices):
+        """How much of an identified respondent's account the creator receives."""
+
+        CONTACT = 'contact', 'Name and email'
+        PROFILE = 'profile', 'Name, email and research profile'
 
     class Status(models.TextChoices):
         DRAFT = 'draft', 'Draft'
@@ -107,15 +120,17 @@ class Survey(models.Model):
         choices=IdentityMode.choices,
         default=IdentityMode.ANONYMOUS,
     )
+    # Only read when identity_mode is IDENTIFIED. Sharing the research profile implies requiring
+    # an account, which save() and a database constraint both enforce.
+    identity_scope = models.CharField(
+        max_length=16,
+        choices=IdentityScope.choices,
+        default=IdentityScope.CONTACT,
+    )
+    # Guests can answer by default; turning this on shuts them out everywhere at once, including
+    # the public catalogue and any direct or invitation link.
+    requires_account = models.BooleanField(default=False)
 
-    RESPONDENT_IDENTITY_LABELS = {
-        IdentityMode.ANONYMOUS: 'Anonymous',
-        IdentityMode.IDENTIFIED: 'Profile shared with creator',
-    }
-
-    @property
-    def respondent_identity_label(self):
-        return self.RESPONDENT_IDENTITY_LABELS.get(self.identity_mode, self.get_identity_mode_display())
     status = models.CharField(
         max_length=16,
         choices=Status.choices,
@@ -149,13 +164,52 @@ class Survey(models.Model):
 
     objects = SurveyQuerySet.as_manager()
 
+    @property
+    def respondent_identity_label(self):
+        """What a respondent actually hands over, so a card never overstates it."""
+        if self.identity_mode != self.IdentityMode.IDENTIFIED:
+            return 'Anonymous'
+        if self.identity_scope == self.IdentityScope.PROFILE:
+            return 'Research profile shared'
+        return 'Name and email shared'
+
+    @property
+    def requires_account_to_respond(self):
+        """The authoritative account rule, whatever the stored toggle happens to say.
+
+        An identified response has to disclose a real account, so identified always implies one.
+        Mirrored by ``SurveyQuerySet.answerable_by_guests`` for queryset use.
+        """
+        return self.requires_account or self.identity_mode == self.IdentityMode.IDENTIFIED
+
     class Meta:
         ordering = ('-updated_at',)
+        constraints = [
+            # A research profile only exists for an account, so sharing one without requiring one
+            # is a state the database refuses to hold rather than a rule the form has to remember.
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(
+                        identity_mode='identified',
+                        identity_scope='profile',
+                    )
+                    | models.Q(requires_account=True)
+                ),
+                name='surveys_profile_sharing_requires_account',
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.slug:
             title_slug = slugify(self.title)[:140] or 'survey'
             self.slug = f'{title_slug}-{self.id.hex[:8]}'
+        if (
+            self.identity_mode == self.IdentityMode.IDENTIFIED
+            and self.identity_scope == self.IdentityScope.PROFILE
+        ):
+            self.requires_account = True
+            if kwargs.get('update_fields') is not None:
+                kwargs['update_fields'] = set(kwargs['update_fields']) | {'requires_account'}
         return super().save(*args, **kwargs)
 
     def archive(self):
@@ -661,20 +715,10 @@ class SurveyEligibilityCriteria(models.Model):
 
     @property
     def is_targeted(self):
-        return bool(
-            self.min_age is not None
-            or self.max_age is not None
-            or self.education_levels
-            or self.countries
-            or self.regions
-            or self.genders
-            or self.employment_statuses
-            or self.industries
-            or self.income_brackets
-            or self.religions
-            or self.ethnicities
-            or self.languages
-        )
+        """Whether any criterion is set, and so whether a respondent has to qualify at all."""
+        if any(getattr(self, field) is not None for field in targeting.AGE_CRITERIA):
+            return True
+        return any(getattr(self, field) for field in targeting.CRITERION_FIELDS)
 
     def clean(self):
         from accounts import demographics
@@ -699,7 +743,9 @@ class SurveyEligibilityCriteria(models.Model):
             'ethnicities': demographics.ETHNICITY_VALUES,
             'languages': demographics.LANGUAGE_VALUES,
         }
-        for field_name, allowed in valid_values.items():
+        # Driven by the shared criterion list so a new criterion cannot slip through unvalidated.
+        for field_name in targeting.CRITERION_FIELDS:
+            allowed = valid_values[field_name]
             values = getattr(self, field_name)
             if not isinstance(values, list) or not set(values).issubset(allowed):
                 raise ValidationError({field_name: 'Select only supported eligibility values.'})

@@ -51,28 +51,18 @@ def survey_edit(request, survey_id):
         criteria = None
     eligibility_form = EligibilityCriteriaForm(
         initial={
-            'restrict_age': bool(criteria and (criteria.min_age is not None or criteria.max_age is not None)),
+            'targeted': bool(criteria and criteria.is_targeted),
             'min_age': criteria.min_age if criteria else None,
             'max_age': criteria.max_age if criteria else None,
-            'restrict_education': bool(criteria and criteria.education_levels),
             'education_levels': criteria.education_levels if criteria else [],
-            'restrict_countries': bool(criteria and criteria.countries),
             'countries': criteria.countries if criteria else [],
-            'restrict_regions': bool(criteria and criteria.regions),
             'regions': criteria.regions if criteria else [],
-            'restrict_genders': bool(criteria and criteria.genders),
             'genders': criteria.genders if criteria else [],
-            'restrict_employment': bool(criteria and criteria.employment_statuses),
             'employment_statuses': criteria.employment_statuses if criteria else [],
-            'restrict_industries': bool(criteria and criteria.industries),
             'industries': criteria.industries if criteria else [],
-            'restrict_income': bool(criteria and criteria.income_brackets),
             'income_brackets': criteria.income_brackets if criteria else [],
-            'restrict_religions': bool(criteria and criteria.religions),
             'religions': criteria.religions if criteria else [],
-            'restrict_ethnicities': bool(criteria and criteria.ethnicities),
             'ethnicities': criteria.ethnicities if criteria else [],
-            'restrict_languages': bool(criteria and criteria.languages),
             'languages': criteria.languages if criteria else [],
         }
     )

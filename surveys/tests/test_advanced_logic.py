@@ -1,10 +1,13 @@
+from datetime import date
+
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from surveys import services
+from surveys import services, targeting
 from surveys.builder.forms import BranchRuleForm, EligibilityCriteriaForm, QuestionEditorForm, ResponseLimitForm
 from surveys.branching import Action, Operator
-from surveys.models import Question, Survey
+from surveys.models import Question, Survey, SurveyEligibilityCriteria
 
 
 class AdvancedLogicTests(TestCase):
@@ -85,20 +88,17 @@ class AdvancedLogicTests(TestCase):
         self.assertEqual(revision, 5)
 
     def test_eligibility_criteria_are_validated_and_versioned(self):
-        invalid = EligibilityCriteriaForm(data={'restrict_age': 'on', 'min_age': 30, 'max_age': 20})
+        invalid = EligibilityCriteriaForm(data={'targeted': 'on', 'min_age': 30, 'max_age': 20})
         self.assertFalse(invalid.is_valid())
 
         form = EligibilityCriteriaForm(
             data={
-                'restrict_age': 'on',
+                'targeted': 'on',
                 'min_age': 18,
                 'max_age': 25,
-                'restrict_education': 'on',
                 'education_levels': ['undergraduate', 'postgraduate'],
-                'restrict_countries': 'on',
                 'countries': ['BD'],
                 'genders': [],
-                'restrict_employment': 'on',
                 'employment_statuses': ['student'],
             }
         )
@@ -114,7 +114,7 @@ class AdvancedLogicTests(TestCase):
         self.assertEqual(criteria.countries, ['BD'])
         self.assertEqual(revision, 2)
 
-    def test_unrestricted_eligibility_toggles_clear_hidden_values(self):
+    def test_turning_targeting_off_clears_every_saved_restriction(self):
         form = EligibilityCriteriaForm(
             data={
                 'min_age': 18,
@@ -129,6 +129,52 @@ class AdvancedLogicTests(TestCase):
         self.assertIsNone(form.cleaned_data['min_age'])
         self.assertEqual(form.cleaned_data['countries'], [])
         self.assertEqual(form.cleaned_data['genders'], [])
+
+        criteria, _ = services.update_eligibility(
+            self.version.id,
+            self.version.revision,
+            form.cleaned_data,
+        )
+
+        self.assertFalse(criteria.is_targeted)
+
+    def test_targeting_on_with_no_filters_leaves_the_survey_open(self):
+        form = EligibilityCriteriaForm(data={'targeted': 'on'})
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+        criteria, _ = services.update_eligibility(
+            self.version.id,
+            self.version.revision,
+            form.cleaned_data,
+        )
+
+        self.assertFalse(criteria.is_targeted)
+
+    def test_every_criterion_is_offered_validated_and_counted_as_targeting(self):
+        """Guards the single criterion list: adding one to the table must reach all three layers."""
+        form = EligibilityCriteriaForm()
+
+        for criterion in targeting.CRITERION_FIELDS:
+            with self.subTest(criterion=criterion):
+                self.assertIn(criterion, form.fields)
+                self.assertTrue(
+                    SurveyEligibilityCriteria(**{criterion: ['nonsense-value']}).is_targeted,
+                )
+                with self.assertRaises(ValidationError):
+                    SurveyEligibilityCriteria(
+                        survey=self.survey,
+                        **{criterion: ['nonsense-value']},
+                    ).full_clean(exclude=('survey',))
+
+    def test_an_implausible_birth_date_never_satisfies_an_age_criterion(self):
+        criteria = SurveyEligibilityCriteria(min_age=18, max_age=30)
+
+        for birth_date in (date(2030, 1, 1), date(1700, 1, 1)):
+            with self.subTest(birth_date=birth_date):
+                # The domain refuses these even when a caller skips the screener form.
+                self.assertFalse(targeting.values_match(criteria, {'birth_date': birth_date}))
+                self.assertTrue(targeting.conflicts_with(criteria, {'birth_date': birth_date}))
 
     def test_response_limit_requires_a_value_only_when_enabled(self):
         self.assertTrue(ResponseLimitForm(data={}).is_valid())

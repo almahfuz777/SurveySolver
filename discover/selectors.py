@@ -3,10 +3,17 @@ from django.db.models import Prefetch
 
 from responses.services import completed_survey_ids
 from surveys.models import Survey, SurveyEligibilityCriteria, SurveyVersion
-from surveys.targeting import profile_matches
+from surveys.targeting import conflicts_with, missing_attributes, profile_values
 
 
-def discover_surveys(user=None, topics=None, duration=None, identity_mode=None, include_completed=False):
+def discover_surveys(
+    user=None,
+    topics=None,
+    duration=None,
+    identity_mode=None,
+    include_completed=False,
+    without_screening=False,
+):
     published_versions = SurveyVersion.objects.filter(
         status=SurveyVersion.Status.PUBLISHED,
     )
@@ -28,6 +35,10 @@ def discover_surveys(user=None, topics=None, duration=None, identity_mode=None, 
         completed_ids = completed_survey_ids(user)
         if not include_completed:
             queryset = queryset.exclude(id__in=completed_ids)
+    authenticated = bool(user and user.is_authenticated)
+    if not authenticated:
+        queryset = queryset.answerable_by_guests()
+    known_values = profile_values(user.profile) if authenticated else {}
     surveys = []
     for survey in queryset.distinct():
         if not survey.live_versions:
@@ -37,11 +48,14 @@ def discover_surveys(user=None, topics=None, duration=None, identity_mode=None, 
             criteria = survey.eligibility_criteria
         except SurveyEligibilityCriteria.DoesNotExist:
             criteria = None
-        survey.is_completed = survey.id in completed_ids
-        if not survey.is_completed and user and user.is_authenticated and not profile_matches(criteria, user.profile):
+        # "No eligibility questions" is a property of the survey, not of who is looking: it keeps
+        # only studies that are open to everyone, whatever this respondent happens to have on file.
+        if without_screening and criteria and criteria.is_targeted:
             continue
-        survey.requires_screener = bool(
-            criteria and criteria.is_targeted and not (user and user.is_authenticated)
-        )
+        survey.is_completed = survey.id in completed_ids
+        if not survey.is_completed and conflicts_with(criteria, known_values):
+            continue
+        # Whatever the respondent has not told us yet is asked on the landing page.
+        survey.requires_screener = bool(missing_attributes(criteria, known_values))
         surveys.append(survey)
     return surveys

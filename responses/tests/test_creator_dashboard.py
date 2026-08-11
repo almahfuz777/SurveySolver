@@ -32,16 +32,10 @@ class CreatorResponseDashboardTests(TestCase):
         self.survey.refresh_from_db()
         self.question = self.version.sections.get().questions.get()
 
-    def complete_response(self, *, identity_data=None):
+    def complete_response(self, *, identity_consent=False):
         client = self.client_class()
         client.force_login(self.respondent)
-        start_data = {}
-        if identity_data:
-            start_data = {
-                'identity_name': identity_data['name'],
-                'identity_email': identity_data['email'],
-                'identity_consent': 'yes',
-            }
+        start_data = {'identity_consent': 'yes'} if identity_consent else {}
         client.post(reverse('respond_survey', args=[self.survey.slug]), start_data)
         submission = Submission.objects.get()
         client.post(
@@ -113,21 +107,22 @@ class CreatorResponseDashboardTests(TestCase):
         self.assertContains(detail, 'Platform account data is hidden')
         self.assertNotContains(detail, self.respondent.email)
 
-    def test_identified_mode_shows_only_explicitly_consented_identity(self):
+    def test_identified_mode_shows_the_consented_account_identity(self):
         self.survey.identity_mode = Survey.IdentityMode.IDENTIFIED
         self.survey.save(update_fields=('identity_mode', 'updated_at'))
-        submission = self.complete_response(
-            identity_data={'name': 'Shared Name', 'email': 'shared@example.com'},
-        )
+        self.respondent.first_name = 'Shared'
+        self.respondent.last_name = 'Name'
+        self.respondent.save(update_fields=('first_name', 'last_name'))
+        submission = self.complete_response(identity_consent=True)
         self.client.force_login(self.owner)
 
         response = self.client.get(
             reverse('creator_response_detail', args=[self.survey.id, submission.id]),
         )
 
+        # Identified responses deliberately disclose the real account behind them.
         self.assertContains(response, 'Shared Name')
-        self.assertContains(response, 'shared@example.com')
-        self.assertNotContains(response, self.respondent.email)
+        self.assertContains(response, self.respondent.email)
 
     def test_dashboard_is_owner_scoped(self):
         submission = self.complete_response()

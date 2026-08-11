@@ -17,6 +17,37 @@ document.addEventListener('DOMContentLoaded', () => {
     sync();
   });
 
+  // The identity scope only means anything for identified surveys, and sharing a research
+  // profile only works for respondents who have one, so it switches on the account requirement.
+  const identityScope = document.getElementById('identity-scope-fields');
+  const identityModes = document.querySelectorAll('input[name="identity_mode"]');
+  const requiresAccount = document.getElementById('id_requires_account');
+  if (identityScope && identityModes.length) {
+    const sharesProfile = () => {
+      const mode = document.querySelector('input[name="identity_mode"]:checked')?.value;
+      const scope = document.querySelector('input[name="identity_scope"]:checked')?.value;
+      return mode === 'identified' && scope === 'profile';
+    };
+    const syncScope = () => {
+      const mode = document.querySelector('input[name="identity_mode"]:checked')?.value;
+      identityScope.hidden = mode !== 'identified';
+      if (sharesProfile() && requiresAccount && !requiresAccount.checked) {
+        requiresAccount.checked = true;
+        requiresAccount.dispatchEvent(new Event('change', {bubbles: true}));
+      }
+    };
+    identityModes.forEach((radio) => radio.addEventListener('change', syncScope));
+    document.querySelectorAll('input[name="identity_scope"]').forEach(
+      (radio) => radio.addEventListener('change', syncScope),
+    );
+    if (requiresAccount) {
+      requiresAccount.addEventListener('change', () => {
+        if (!requiresAccount.checked && sharesProfile()) requiresAccount.checked = true;
+      });
+    }
+    syncScope();
+  }
+
   document.querySelectorAll('[data-stepper]').forEach((stepper) => {
     const input = stepper.querySelector('input');
     const min = parseInt(input.min || '1', 10);
@@ -441,6 +472,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     {% endfor %}
                 </div>
 
+                <div id="identity-scope-fields" class="settings-subfield"{% if form.identity_mode.value != 'identified' %} hidden{% endif %}>
+                    <label class="settings-field-label">What the researcher receives</label>
+                    <div class="option-card-grid cols-2">
+                        {% for radio in form.identity_scope %}
+                            <label class="option-card">
+                                {{ radio.tag }}
+                                <div class="option-card-top">
+                                    {% if radio.data.value == 'contact' %}
+                                        {% include 'partials/icon.html' with name='user-circle' size='17' %}
+                                    {% else %}
+                                        {% include 'partials/icon.html' with name='chart' size='17' %}
+                                    {% endif %}
+                                    <span class="option-card-dot"></span>
+                                </div>
+                                <div class="option-card-title">{{ radio.choice_label }}</div>
+                                <div class="option-card-desc">
+                                    {% if radio.data.value == 'contact' %}Just enough to get back in touch
+                                    {% else %}Adds age, location, education, work and languages{% endif %}
+                                </div>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <p class="settings-note" role="note">Sharing the research profile also requires respondents to have an account, so that setting is turned on for you.</p>
+                </div>
+
+                <label class="setting-toggle-row" for="{{ form.requires_account.id_for_label }}">
+                    <span><strong>Require a SurveySolver account</strong><small>Leave this off and anyone can take part, including people who are not signed in. Turn it on when you need every respondent to have an account — the survey is then hidden from signed-out visitors and any link you share asks them to sign in first.</small></span>
+                    <span class="settings-switch">{{ form.requires_account }}<span class="settings-switch-track"></span></span>
+                </label>
+                <p id="requires-account-caution" class="settings-caution" role="note"{% if not form.requires_account.value %} hidden{% endif %}>{% include 'partials/icon.html' with name='alert' size='14' %} People without an account will not be able to take part. Expect fewer responses.</p>
+                {% if survey.identity_mode == 'identified' %}<p class="settings-note" role="note">Because you are collecting respondent profiles, this survey already requires an account whether or not the setting above is on.</p>{% endif %}
+
                 <div class="settings-autosave-error" data-autosave-error aria-live="polite"></div>
             </section>
 
@@ -472,19 +535,22 @@ document.addEventListener('DOMContentLoaded', () => {
         {% if version %}
             <section id="eligibility" class="settings-card" aria-labelledby="eligibility-heading">
                 <h2 id="eligibility-heading">Respondent Eligibility Criteria</h2>
-                <p class="settings-panel-hint">Everyone is eligible by default. Turn on only the restrictions this study needs.</p>
+                <p class="settings-panel-hint">Choose who this study is for. Respondents are asked whatever you filter on and only continue if their answers fit.</p>
                 <form method="post" action="{% url 'survey_edit' survey.id %}" class="eligibility-form" data-settings-autosave>
                     {% csrf_token %}
                     <input type="hidden" name="autosave" value="1">
                     <input type="hidden" name="revision" value="{{ version.revision }}">
                     <input type="hidden" name="action" value="update_eligibility">
-                    <div class="eligibility-fields">
+                    <label class="setting-toggle-row" for="{{ eligibility_form.targeted.id_for_label }}">
+                        <span><strong>Only accept certain respondents</strong><small>Leave this off and everyone qualifies. Turn it on to pick the groups you need — people are asked about anything you filter on before they can start, and are turned away if they do not fit.</small></span>
+                        <span class="settings-switch">{{ eligibility_form.targeted }}<span class="settings-switch-track"></span></span>
+                    </label>
+                    <div id="eligibility-criteria-fields" class="eligibility-fields"{% if not eligibility_form.targeted.value %} hidden{% endif %}>
+                        <p class="eligibility-hint">Leave a filter empty to accept anyone for it. Each filter you set adds a question respondents must answer first, so keep it to what the study genuinely needs.</p>
+
                         <div class="eligibility-rule">
-                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_age.id_for_label }}">
-                                <span class="eligibility-rule-copy"><strong>Age</strong><small>Any age</small></span>
-                                <span class="settings-switch">{{ eligibility_form.restrict_age }}<span class="settings-switch-track"></span></span>
-                            </label>
-                            <div id="age-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_age.value %} hidden{% endif %}>
+                            <div class="eligibility-rule-heading"><strong>Age</strong><small>Any age</small></div>
+                            <div class="eligibility-rule-body">
                                 <div class="age-range-inputs">
                                     <div class="age-input-group">
                                         {{ eligibility_form.min_age }}
@@ -503,21 +569,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <div class="eligibility-cols-2">
                             <div class="eligibility-rule">
-                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_genders.id_for_label }}">
-                                    <span class="eligibility-rule-copy"><strong>Gender</strong><small>Any gender</small></span>
-                                    <span class="settings-switch">{{ eligibility_form.restrict_genders }}<span class="settings-switch-track"></span></span>
-                                </label>
-                                <div id="gender-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_genders.value %} hidden{% endif %}>
+                                <div class="eligibility-rule-heading"><strong>Gender</strong><small>Any gender</small></div>
+                                <div class="eligibility-rule-body">
                                     {{ eligibility_form.genders }}
                                     {{ eligibility_form.genders.errors }}
                                 </div>
                             </div>
                             <div class="eligibility-rule">
-                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_employment.id_for_label }}">
-                                    <span class="eligibility-rule-copy"><strong>Employment</strong><small>Any employment status</small></span>
-                                    <span class="settings-switch">{{ eligibility_form.restrict_employment }}<span class="settings-switch-track"></span></span>
-                                </label>
-                                <div id="employment-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_employment.value %} hidden{% endif %}>
+                                <div class="eligibility-rule-heading"><strong>Employment</strong><small>Any employment status</small></div>
+                                <div class="eligibility-rule-body">
                                     {{ eligibility_form.employment_statuses }}
                                     {{ eligibility_form.employment_statuses.errors }}
                                 </div>
@@ -525,22 +585,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <div class="eligibility-rule">
-                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_education.id_for_label }}">
-                                <span class="eligibility-rule-copy"><strong>Education</strong><small>Any education level</small></span>
-                                <span class="settings-switch">{{ eligibility_form.restrict_education }}<span class="settings-switch-track"></span></span>
-                            </label>
-                            <div id="education-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_education.value %} hidden{% endif %}>
+                            <div class="eligibility-rule-heading"><strong>Education</strong><small>Any education level</small></div>
+                            <div class="eligibility-rule-body">
                                 {{ eligibility_form.education_levels }}
                                 {{ eligibility_form.education_levels.errors }}
                             </div>
                         </div>
 
                         <div class="eligibility-rule">
-                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_countries.id_for_label }}">
-                                <span class="eligibility-rule-copy"><strong>Country</strong><small>Any country</small></span>
-                                <span class="settings-switch">{{ eligibility_form.restrict_countries }}<span class="settings-switch-track"></span></span>
-                            </label>
-                            <div id="country-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_countries.value %} hidden{% endif %}>
+                            <div class="eligibility-rule-heading"><strong>Country</strong><small>Any country</small></div>
+                            <div class="eligibility-rule-body">
                                 <label class="country-search-label" for="country-search-input">Find countries</label>
                                 <div class="country-select" data-country-select>
                                     <div class="country-tags" data-country-tags></div>
@@ -559,11 +613,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <div class="eligibility-rule">
-                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_regions.id_for_label }}">
-                                <span class="eligibility-rule-copy"><strong>Region</strong><small>Any region or district</small></span>
-                                <span class="settings-switch">{{ eligibility_form.restrict_regions }}<span class="settings-switch-track"></span></span>
-                            </label>
-                            <div id="region-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_regions.value %} hidden{% endif %}>
+                            <div class="eligibility-rule-heading"><strong>Region</strong><small>Any region or district</small></div>
+                            <div class="eligibility-rule-body">
                                 <label class="country-search-label" for="region-search-input">Find regions</label>
                                 <div class="country-select" data-country-select data-noun="regions" data-region-source="#country-options">
                                     <div class="country-tags" data-country-tags></div>
@@ -583,21 +634,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <div class="eligibility-cols-2">
                             <div class="eligibility-rule">
-                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_industries.id_for_label }}">
-                                    <span class="eligibility-rule-copy"><strong>Industry</strong><small>Any industry</small></span>
-                                    <span class="settings-switch">{{ eligibility_form.restrict_industries }}<span class="settings-switch-track"></span></span>
-                                </label>
-                                <div id="industry-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_industries.value %} hidden{% endif %}>
+                                <div class="eligibility-rule-heading"><strong>Industry</strong><small>Any industry</small></div>
+                                <div class="eligibility-rule-body">
                                     {{ eligibility_form.industries }}
                                     {{ eligibility_form.industries.errors }}
                                 </div>
                             </div>
                             <div class="eligibility-rule">
-                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_income.id_for_label }}">
-                                    <span class="eligibility-rule-copy"><strong>Income</strong><small>Any income band</small></span>
-                                    <span class="settings-switch">{{ eligibility_form.restrict_income }}<span class="settings-switch-track"></span></span>
-                                </label>
-                                <div id="income-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_income.value %} hidden{% endif %}>
+                                <div class="eligibility-rule-heading"><strong>Income</strong><small>Any income band</small></div>
+                                <div class="eligibility-rule-body">
                                     {{ eligibility_form.income_brackets }}
                                     {{ eligibility_form.income_brackets.errors }}
                                 </div>
@@ -606,21 +651,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <div class="eligibility-cols-2">
                             <div class="eligibility-rule">
-                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_religions.id_for_label }}">
-                                    <span class="eligibility-rule-copy"><strong>Religion</strong><small>Any religion</small></span>
-                                    <span class="settings-switch">{{ eligibility_form.restrict_religions }}<span class="settings-switch-track"></span></span>
-                                </label>
-                                <div id="religion-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_religions.value %} hidden{% endif %}>
+                                <div class="eligibility-rule-heading"><strong>Religion</strong><small>Any religion</small></div>
+                                <div class="eligibility-rule-body">
                                     {{ eligibility_form.religions }}
                                     {{ eligibility_form.religions.errors }}
                                 </div>
                             </div>
                             <div class="eligibility-rule">
-                                <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_ethnicities.id_for_label }}">
-                                    <span class="eligibility-rule-copy"><strong>Ethnicity</strong><small>Any ethnicity</small></span>
-                                    <span class="settings-switch">{{ eligibility_form.restrict_ethnicities }}<span class="settings-switch-track"></span></span>
-                                </label>
-                                <div id="ethnicity-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_ethnicities.value %} hidden{% endif %}>
+                                <div class="eligibility-rule-heading"><strong>Ethnicity</strong><small>Any ethnicity</small></div>
+                                <div class="eligibility-rule-body">
                                     {{ eligibility_form.ethnicities }}
                                     {{ eligibility_form.ethnicities.errors }}
                                 </div>
@@ -628,11 +667,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <div class="eligibility-rule">
-                            <label class="eligibility-rule-heading" for="{{ eligibility_form.restrict_languages.id_for_label }}">
-                                <span class="eligibility-rule-copy"><strong>Language</strong><small>Any language</small></span>
-                                <span class="settings-switch">{{ eligibility_form.restrict_languages }}<span class="settings-switch-track"></span></span>
-                            </label>
-                            <div id="language-restrictions" class="eligibility-rule-body"{% if not eligibility_form.restrict_languages.value %} hidden{% endif %}>
+                            <div class="eligibility-rule-heading"><strong>Language</strong><small>Any language</small></div>
+                            <div class="eligibility-rule-body">
                                 {{ eligibility_form.languages }}
                                 {{ eligibility_form.languages.errors }}
                             </div>

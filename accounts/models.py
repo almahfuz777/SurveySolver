@@ -2,6 +2,7 @@ import uuid
 
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models.functions import Lower
@@ -157,6 +158,10 @@ class Profile(models.Model):
         return None
 
     @property
+    def age(self):
+        return demographics.age_on(self.birth_date)
+
+    @property
     def completion_percentage(self):
         values = {
             'first_name': self.user.first_name,
@@ -200,6 +205,21 @@ class Profile(models.Model):
             Topic.objects.filter(slug__in=self.research_interests).values_list('slug', 'name')
         )
         return ', '.join(names.get(slug, slug) for slug in self.research_interests)
+
+    def clean(self):
+        """Rules every writer must satisfy, not just the profile-edit form.
+
+        A region code is prefixed with its ISO country code (``BD-13``), so the two fields have to
+        agree; the response screener saves through here too.
+        """
+        super().clean()
+        if self.region and self.region not in demographics.valid_subdivision_codes():
+            raise ValidationError({'region': 'Select a supported region.'})
+        country_code = getattr(self.country, 'code', self.country) or ''
+        if self.region and not country_code:
+            raise ValidationError({'region': 'Select your country before choosing a region.'})
+        if self.region and not self.region.startswith(f'{country_code}-'):
+            raise ValidationError({'region': 'Choose a region inside your selected country.'})
 
     def __str__(self):
         return f'Profile for {self.user.email}'

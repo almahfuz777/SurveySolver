@@ -12,8 +12,23 @@ class SurveyMetadataForm(forms.ModelForm):
         self.fields['topics'].queryset = Topic.objects.filter(is_active=True)
         self.fields['identity_mode'].choices = [
             (Survey.IdentityMode.ANONYMOUS, 'Anonymous'),
-            (Survey.IdentityMode.IDENTIFIED, 'Collect Responder Profiles'),
+            (Survey.IdentityMode.IDENTIFIED, 'Identified response'),
         ]
+        # An anonymous survey never reads the scope, so the settings page hides it and may omit it.
+        self.fields['identity_scope'].required = False
+
+    def clean_identity_scope(self):
+        return self.cleaned_data.get('identity_scope') or Survey.IdentityScope.CONTACT
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # A research profile only exists for an account, so sharing one implies requiring one.
+        if (
+            cleaned_data.get('identity_mode') == Survey.IdentityMode.IDENTIFIED
+            and cleaned_data.get('identity_scope') == Survey.IdentityScope.PROFILE
+        ):
+            cleaned_data['requires_account'] = True
+        return cleaned_data
 
     class Meta:
         model = Survey
@@ -21,12 +36,18 @@ class SurveyMetadataForm(forms.ModelForm):
             'topics',
             'visibility',
             'identity_mode',
+            'identity_scope',
+            'requires_account',
             'estimated_minutes',
         )
         widgets = {
             'topics': PillCheckboxSelectMultiple(attrs={'maxselect': 3}),
             'visibility': forms.RadioSelect(),
             'identity_mode': forms.RadioSelect(),
+            'identity_scope': forms.RadioSelect(),
+            'requires_account': forms.CheckboxInput(
+                attrs={'data-disclosure-toggle': '', 'aria-controls': 'requires-account-caution'}
+            ),
             'estimated_minutes': forms.NumberInput(attrs={'data-stepper-input': 'estimated_minutes', 'min': 1, 'max': 120}),
         }
         help_texts = {

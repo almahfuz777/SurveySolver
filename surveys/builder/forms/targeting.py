@@ -7,6 +7,8 @@ from accounts.models import Profile
 
 from core.widgets import PillCheckboxSelectMultiple
 
+from ... import targeting
+
 
 class ResponseLimitForm(forms.Form):
     enabled = forms.BooleanField(
@@ -40,10 +42,16 @@ class ResponseLimitForm(forms.Form):
 
 
 class EligibilityCriteriaForm(forms.Form):
-    restrict_age = forms.BooleanField(
+    """Who may respond, as a single opt-in with per-attribute filters underneath.
+
+    An empty filter means the attribute is unrestricted, so the survey stays targeted only for as
+    long as at least one value is selected.
+    """
+
+    targeted = forms.BooleanField(
         required=False,
         widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'age-restrictions'}
+            attrs={'data-disclosure-toggle': '', 'aria-controls': 'eligibility-criteria-fields'}
         ),
     )
     min_age = forms.IntegerField(
@@ -58,12 +66,6 @@ class EligibilityCriteriaForm(forms.Form):
         max_value=120,
         widget=forms.NumberInput(attrs={'class': 'age-input', 'placeholder': 'No maximum'}),
     )
-    restrict_education = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'education-restrictions'}
-        ),
-    )
     education_levels = forms.MultipleChoiceField(
         required=False,
         choices=Profile.EducationLevel.choices,
@@ -74,94 +76,40 @@ class EligibilityCriteriaForm(forms.Form):
         choices=countries,
         widget=PillCheckboxSelectMultiple(),
     )
-    restrict_countries = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'country-restrictions'}
-        ),
-    )
-    restrict_genders = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'gender-restrictions'}
-        ),
-    )
     genders = forms.MultipleChoiceField(
         required=False,
         choices=Profile.Gender.choices,
         widget=PillCheckboxSelectMultiple(),
-    )
-    restrict_employment = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'employment-restrictions'}
-        ),
     )
     employment_statuses = forms.MultipleChoiceField(
         required=False,
         choices=Profile.EmploymentStatus.choices,
         widget=PillCheckboxSelectMultiple(),
     )
-    restrict_regions = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'region-restrictions'}
-        ),
-    )
     regions = forms.MultipleChoiceField(
         required=False,
         choices=demographics.subdivision_choices,
         widget=PillCheckboxSelectMultiple(),
-    )
-    restrict_industries = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'industry-restrictions'}
-        ),
     )
     industries = forms.MultipleChoiceField(
         required=False,
         choices=demographics.INDUSTRY_CHOICES,
         widget=PillCheckboxSelectMultiple(),
     )
-    restrict_income = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'income-restrictions'}
-        ),
-    )
     income_brackets = forms.MultipleChoiceField(
         required=False,
         choices=demographics.INCOME_CHOICES,
         widget=PillCheckboxSelectMultiple(),
-    )
-    restrict_religions = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'religion-restrictions'}
-        ),
     )
     religions = forms.MultipleChoiceField(
         required=False,
         choices=demographics.RELIGION_CHOICES,
         widget=PillCheckboxSelectMultiple(),
     )
-    restrict_ethnicities = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'ethnicity-restrictions'}
-        ),
-    )
     ethnicities = forms.MultipleChoiceField(
         required=False,
         choices=demographics.ETHNICITY_CHOICES,
         widget=PillCheckboxSelectMultiple(),
-    )
-    restrict_languages = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(
-            attrs={'data-disclosure-toggle': '', 'aria-controls': 'language-restrictions'}
-        ),
     )
     languages = forms.MultipleChoiceField(
         required=False,
@@ -171,30 +119,14 @@ class EligibilityCriteriaForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        if not cleaned_data.get('restrict_age'):
-            cleaned_data['min_age'] = None
-            cleaned_data['max_age'] = None
-        elif cleaned_data.get('min_age') is None and cleaned_data.get('max_age') is None:
-            self.add_error('min_age', 'Enter a minimum or maximum age.')
-
-        restricted_fields = (
-            ('restrict_genders', 'genders', 'Select at least one gender.'),
-            ('restrict_employment', 'employment_statuses', 'Select at least one employment status.'),
-            ('restrict_education', 'education_levels', 'Select at least one education level.'),
-            ('restrict_countries', 'countries', 'Select at least one country.'),
-            ('restrict_regions', 'regions', 'Select at least one region.'),
-            ('restrict_industries', 'industries', 'Select at least one industry.'),
-            ('restrict_income', 'income_brackets', 'Select at least one income band.'),
-            ('restrict_religions', 'religions', 'Select at least one religion.'),
-            ('restrict_ethnicities', 'ethnicities', 'Select at least one ethnicity.'),
-            ('restrict_languages', 'languages', 'Select at least one language.'),
-        )
-        for toggle, field_name, message in restricted_fields:
-            if cleaned_data.get(toggle):
-                if not cleaned_data.get(field_name):
-                    self.add_error(field_name, message)
-            else:
+        # Turning targeting off discards the restrictions rather than remembering them, so the
+        # saved criteria always match what the settings page shows.
+        if not cleaned_data.get('targeted'):
+            for field_name in targeting.AGE_CRITERIA:
+                cleaned_data[field_name] = None
+            for field_name in targeting.CRITERION_FIELDS:
                 cleaned_data[field_name] = []
+            return cleaned_data
 
         minimum = cleaned_data.get('min_age')
         maximum = cleaned_data.get('max_age')

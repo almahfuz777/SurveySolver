@@ -23,7 +23,7 @@ from .errors import (
     ResponseValidationError,
 )
 from .answers import _branch_matches, normalize_answer
-from .eligibility import _ensure_quota_available
+from .eligibility import _ensure_account_access, _ensure_quota_available
 from .submissions import can_access_submission
 
 
@@ -107,6 +107,7 @@ def save_progress(submission_id, user, session_key, data):
     )
     if not can_access_submission(submission, user, session_key):
         raise PermissionDenied
+    _ensure_account_access(submission.survey, user)
     if submission.status == Submission.Status.COMPLETED:
         raise ResponseValidationError({'submission': 'Completed responses cannot be changed.'})
 
@@ -160,6 +161,7 @@ def complete_submission(submission_id, user, session_key, data):
     )
     if not can_access_submission(submission, user, session_key):
         raise PermissionDenied
+    _ensure_account_access(submission.survey, user)
     if submission.status == Submission.Status.COMPLETED:
         return submission
 

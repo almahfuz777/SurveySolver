@@ -1,20 +1,23 @@
 """Deciding whether a respondent may take a survey, and recording why."""
 from datetime import date
 
-from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.core.validators import validate_email
 
-from accounts.models import Profile
-from django_countries import countries
-
+from accounts.services import research_profile_snapshot
 from surveys.models import (
     Survey,
     SurveyEligibilityCriteria,
 )
+from surveys.targeting import (
+    missing_attributes,
+    profile_values,
+    targeted_attributes,
+    values_match,
+)
 
 from ..models import Submission
 from .errors import (
+    AuthenticationRequired,
     EligibilityUnknown,
     IneligibleRespondent,
     QuotaReached,
@@ -22,110 +25,68 @@ from .errors import (
 )
 
 
-def _validated_identity(survey, consent, identity_data):
+def _validated_identity(survey, user, consent):
+    """The account details an identified survey shares, once the respondent has agreed.
+
+    The respondent cannot edit these: the point of an identified response is that the researcher
+    receives the real account behind it, so the values are read from the account itself.
+    """
     if survey.identity_mode == Survey.IdentityMode.ANONYMOUS:
         return {}, None
-    identity_data = identity_data or {}
-    name = identity_data.get('name', '').strip()
-    email = identity_data.get('email', '').strip().casefold()
-    errors = {}
+    if not (user and user.is_authenticated):
+        raise AuthenticationRequired('Identified surveys are open to account holders only.')
     if not consent:
-        errors['identity_consent'] = 'Consent is required for an identified response.'
-    if not name:
-        errors['identity_name'] = 'Enter the name that will be shared with the researcher.'
-    try:
-        validate_email(email)
-    except ValidationError:
-        errors['identity_email'] = 'Enter a valid email address.'
-    if errors:
-        raise ResponseValidationError(errors)
-    return {'name': name, 'email': email}, timezone.now()
-
-
-def _current_age(birth_date):
-    today = timezone.localdate()
-    return today.year - birth_date.year - (
-        (today.month, today.day) < (birth_date.month, birth_date.day)
-    )
-
-
-def _eligibility_values(criteria, user, screener_data):
-    targeted_fields = {
-        'birth_date': criteria.min_age is not None or criteria.max_age is not None,
-        'education_level': bool(criteria.education_levels),
-        'country': bool(criteria.countries),
-        'gender': bool(criteria.genders),
-        'employment_status': bool(criteria.employment_statuses),
+        raise ResponseValidationError(
+            {'identity_consent': 'Confirm you agree to share your details before starting.'}
+        )
+    identity = {
+        'name': user.get_full_name() or user.email,
+        'email': user.email,
     }
-    if user and user.is_authenticated:
-        profile = user.profile
-        values = {
-            'birth_date': profile.birth_date,
-            'education_level': profile.education_level,
-            'country': profile.country.code if profile.country else '',
-            'gender': profile.gender,
-            'employment_status': profile.employment_status,
-        }
-        missing = [field for field, required in targeted_fields.items() if required and not values[field]]
-        if missing:
-            raise EligibilityUnknown('Complete the required research profile fields to continue.')
-        return values
+    if survey.identity_scope == Survey.IdentityScope.PROFILE:
+        # Snapshotted now, so the creator keeps what was actually consented to even if the
+        # respondent edits their profile afterwards.
+        identity['profile'] = research_profile_snapshot(user.profile)
+    return identity, timezone.now()
 
-    screener_data = screener_data or {}
-    values = {}
-    errors = {}
-    if targeted_fields['birth_date']:
-        try:
-            values['birth_date'] = date.fromisoformat(screener_data.get('birth_date', ''))
-        except (TypeError, ValueError):
-            errors['eligibility_birth_date'] = 'Enter a valid date of birth.'
-    for field, allowed, error_message in (
-        ('education_level', set(Profile.EducationLevel.values), 'Select your education level.'),
-        ('gender', set(Profile.Gender.values), 'Select your gender.'),
-        ('employment_status', set(Profile.EmploymentStatus.values), 'Select your employment status.'),
-    ):
-        if targeted_fields[field]:
-            value = screener_data.get(field, '')
-            if value not in allowed:
-                errors[f'eligibility_{field}'] = error_message
-            else:
-                values[field] = value
-    if targeted_fields['country']:
-        value = screener_data.get('country', '')
-        if value not in {code for code, _ in countries}:
-            errors['eligibility_country'] = 'Select your country.'
-        else:
-            values['country'] = value
-    if errors:
-        raise ResponseValidationError(errors)
-    return values
+
+def _ensure_account_access(survey, user):
+    """Guests may not touch an account-only survey, however far along they already are.
+
+    Checked at every step rather than only at the start, because a creator can turn the setting on
+    while a guest is mid-response.
+    """
+    if survey.requires_account_to_respond and not (user and user.is_authenticated):
+        raise AuthenticationRequired('This survey is open to account holders only.')
 
 
 def _validated_eligibility(survey, user, screener_data):
+    """Check the respondent against every criterion the survey sets.
+
+    ``screener_data`` carries the answers collected on the landing page, already normalised to
+    respondent attributes. A signed-in respondent's stored profile supplies the rest.
+    """
     try:
         criteria = survey.eligibility_criteria
     except SurveyEligibilityCriteria.DoesNotExist:
         return {'targeted': False}, timezone.now()
     if not criteria.is_targeted:
         return {'targeted': False}, timezone.now()
-    values = _eligibility_values(criteria, user, screener_data)
-    age = _current_age(values['birth_date']) if values.get('birth_date') else None
-    eligible = (
-        (criteria.min_age is None or age >= criteria.min_age)
-        and (criteria.max_age is None or age <= criteria.max_age)
-        and (not criteria.education_levels or values['education_level'] in criteria.education_levels)
-        and (not criteria.countries or values['country'] in criteria.countries)
-        and (not criteria.genders or values['gender'] in criteria.genders)
-        and (
-            not criteria.employment_statuses
-            or values['employment_status'] in criteria.employment_statuses
-        )
-    )
-    if not eligible:
-        raise IneligibleRespondent('Your screener does not match this study’s eligibility criteria.')
+
+    values = profile_values(user.profile) if user and user.is_authenticated else {}
+    values.update(screener_data or {})
+    if missing_attributes(criteria, values):
+        raise EligibilityUnknown('Answer the eligibility questions to continue.')
+    if not values_match(criteria, values):
+        raise IneligibleRespondent('You do not meet this study’s eligibility requirements.')
+
     snapshot = {
-        key: value.isoformat() if isinstance(value, date) else value
-        for key, value in values.items()
+        attribute: (
+            values[attribute].isoformat()
+            if isinstance(values[attribute], date)
+            else values[attribute]
+        )
+        for attribute in targeted_attributes(criteria)
     }
     snapshot['targeted'] = True
     return snapshot, timezone.now()

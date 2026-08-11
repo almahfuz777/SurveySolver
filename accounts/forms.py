@@ -104,22 +104,3 @@ class ResearchProfileForm(forms.ModelForm):
         help_texts = {
             'income_bracket': 'Approximate personal income, kept private.',
         }
-
-    def clean_region(self):
-        region = self.cleaned_data.get('region', '')
-        if region and region not in demographics.valid_subdivision_codes():
-            raise forms.ValidationError('Select a supported region.')
-        return region
-
-    def clean(self):
-        cleaned_data = super().clean()
-        # A region must belong to the chosen country (its code is prefixed with
-        # the ISO country code, e.g. ``BD-13``), otherwise clear it.
-        country = cleaned_data.get('country')
-        country_code = getattr(country, 'code', country) or ''
-        region = cleaned_data.get('region')
-        if region and country_code and not region.startswith(f'{country_code}-'):
-            self.add_error('region', 'Choose a region inside your selected country.')
-        elif region and not country_code:
-            self.add_error('region', 'Select your country before choosing a region.')
-        return cleaned_data

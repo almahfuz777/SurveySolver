@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -333,6 +334,97 @@ class SurveyManagementTests(TestCase):
         )
 
         self.assertRedirects(response, reverse('survey_list'))
+
+    def _metadata_post(self, **overrides):
+        data = {
+            'action': 'metadata',
+            'topics': [self.topic.id],
+            'visibility': Survey.Visibility.DISCOVERABLE,
+            'identity_mode': Survey.IdentityMode.IDENTIFIED,
+            'identity_scope': Survey.IdentityScope.CONTACT,
+            'estimated_minutes': 10,
+        }
+        data.update(overrides)
+        return data
+
+    def test_identity_scope_is_saved_and_offered_for_identified_surveys(self):
+        survey = Survey.objects.create(owner=self.user, title='Scope study', summary='Identity scope.')
+        self.client.force_login(self.user)
+
+        page = self.client.get(reverse('survey_edit', args=[survey.id]))
+        response = self.client.post(
+            reverse('survey_edit', args=[survey.id]),
+            self._metadata_post(identity_scope=Survey.IdentityScope.PROFILE),
+        )
+
+        self.assertContains(page, 'id="identity-scope-fields"')
+        self.assertContains(page, 'name="identity_scope"')
+        self.assertEqual(response.status_code, 302)
+        survey.refresh_from_db()
+        self.assertEqual(survey.identity_scope, Survey.IdentityScope.PROFILE)
+
+    def test_sharing_the_profile_forces_the_account_requirement_on(self):
+        survey = Survey.objects.create(owner=self.user, title='Profile study', summary='Shares profile.')
+        self.client.force_login(self.user)
+
+        self.client.post(
+            reverse('survey_edit', args=[survey.id]),
+            self._metadata_post(identity_scope=Survey.IdentityScope.PROFILE),
+        )
+
+        # A research profile only exists for an account, so the survey cannot stay open to guests.
+        survey.refresh_from_db()
+        self.assertTrue(survey.requires_account)
+
+    def test_the_database_refuses_profile_sharing_without_an_account_requirement(self):
+        survey = Survey.objects.create(
+            owner=self.user,
+            title='Constraint study',
+            summary='Profile sharing implies an account.',
+            identity_mode=Survey.IdentityMode.IDENTIFIED,
+            identity_scope=Survey.IdentityScope.PROFILE,
+        )
+
+        # save() normalises, so the only way to reach the invalid state is a raw update.
+        self.assertTrue(survey.requires_account)
+        with self.assertRaises(IntegrityError):
+            Survey.objects.filter(pk=survey.pk).update(requires_account=False)
+
+    def test_identified_surveys_require_an_account_whatever_the_toggle_says(self):
+        survey = Survey.objects.create(
+            owner=self.user,
+            title='Identified study',
+            summary='Contact scope, toggle left off.',
+            identity_mode=Survey.IdentityMode.IDENTIFIED,
+        )
+
+        self.assertFalse(survey.requires_account)
+        self.assertTrue(survey.requires_account_to_respond)
+        self.assertNotIn(survey, Survey.objects.answerable_by_guests())
+
+    def test_identity_label_states_only_what_is_actually_shared(self):
+        survey = Survey.objects.create(owner=self.user, title='Label study', summary='Labels.')
+
+        self.assertEqual(survey.respondent_identity_label, 'Anonymous')
+
+        survey.identity_mode = Survey.IdentityMode.IDENTIFIED
+        self.assertEqual(survey.respondent_identity_label, 'Name and email shared')
+
+        survey.identity_scope = Survey.IdentityScope.PROFILE
+        self.assertEqual(survey.respondent_identity_label, 'Research profile shared')
+
+    def test_contact_scope_leaves_the_account_requirement_alone(self):
+        survey = Survey.objects.create(owner=self.user, title='Contact study', summary='Contact only.')
+        self.client.force_login(self.user)
+
+        self.client.post(
+            reverse('survey_edit', args=[survey.id]),
+            self._metadata_post(identity_scope=Survey.IdentityScope.CONTACT),
+        )
+
+        survey.refresh_from_db()
+        self.assertEqual(survey.identity_scope, Survey.IdentityScope.CONTACT)
+        self.assertFalse(survey.requires_account)
 
     def test_versioned_settings_autosave_returns_each_new_revision(self):
         survey = Survey.objects.create(owner=self.user, title='Autosave revisions', summary='Sequential settings saves.')

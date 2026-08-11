@@ -290,6 +290,11 @@
 .setting-toggle-row > span:first-child { display: grid; gap: 0.1rem; }
 .setting-toggle-row strong { color: var(--text); font-size: 0.82rem; }
 .setting-toggle-row small { color: var(--text-muted); font-size: 0.7rem; font-weight: 500; }
+.settings-caution { display: flex; align-items: center; gap: 0.4rem; margin: 0.5rem 0 0; padding: 0.5rem 0.7rem; color: var(--warn-text); background: var(--warn-soft); border: 1px solid var(--warn-border); border-radius: 0.55rem; font-size: 0.73rem; font-weight: 600; }
+.settings-caution[hidden] { display: none; }
+.settings-note { margin: 0.5rem 0 0; color: var(--text-muted); font-size: 0.72rem; font-weight: 500; }
+.settings-subfield { display: grid; gap: 0.55rem; }
+.settings-subfield[hidden] { display: none; }
 .version-history-list { display: grid; gap: 0.5rem; }
 .version-history-list + .version-history-more { margin-top: 0.5rem; }
 .version-history-more summary { cursor: pointer; color: var(--indigo-700); font-size: 0.78rem; font-weight: 700; padding: 0.4rem 0.1rem; list-style: none; }

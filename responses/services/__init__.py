@@ -4,6 +4,7 @@ The submodules group these by capability; this package is their public surface.
 """
 from .answers import normalize_answer
 from .errors import (
+    AuthenticationRequired,
     DuplicateSubmission,
     EligibilityUnknown,
     IneligibleRespondent,
@@ -24,6 +25,7 @@ from .submissions import (
 
 
 __all__ = [
+    'AuthenticationRequired',
     'DuplicateSubmission',
     'EligibilityUnknown',
     'IneligibleRespondent',
